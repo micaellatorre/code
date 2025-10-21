@@ -1,26 +1,39 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f7f9fb;
+  color: #22292f;
+  letter-spacing: 0.01em;
+}
+
+/* Card base style */
+.cp-card {
+  @apply bg-white rounded-xl shadow-md p-6 transition-shadow duration-200 hover:shadow-lg;
+}
+
+/* Button base style */
+.cp-btn {
+  @apply px-4 py-2 rounded-lg font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-300;
+}
+
+/* Accent colors */
+.cp-accent-blue { color: #2563eb; }
+.cp-accent-green { color: #22c55e; }
+.cp-accent-orange { color: #f59e42; }
+
+/* Section titles */
+.cp-section-title {
+  @apply text-2xl font-bold mb-2 tracking-tight;
+}
+.cp-section-subtitle {
+  @apply text-base text-gray-500 mb-4;
+}
+
+/* Utility for vertical spacing */
+.cp-vspace {
+  @apply my-6;
 }
