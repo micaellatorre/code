@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma'
  * Se beneficia del layout compartido y ofrece un campo de búsqueda.
  */
 export default async function SalesPage() {
-  const sales = await prisma.sale.findMany({ orderBy: { date: 'desc' } })
+  const sales = await prisma.sale.findMany({ orderBy: { date: 'desc' }, include: { payments: true } })
 
   const serialized = sales.map((s) => ({
     ...s,
@@ -20,6 +20,8 @@ export default async function SalesPage() {
     total: s.total != null ? String(s.total) : null,
     profit: s.profit != null ? String(s.profit) : null,
     createdAt: s.createdAt ? s.createdAt.toISOString() : null,
+    // pick first payment method if payments were created; keep null otherwise
+    payment: s.payments && s.payments.length > 0 ? s.payments[0].method : null,
   }))
 
   return (

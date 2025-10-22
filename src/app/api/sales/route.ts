@@ -26,18 +26,33 @@ export async function POST(request: Request) {
         subtotal += item.units * item.unitPrice
         costTotal += item.units * (item.unitCost + (item.extraCost ?? 0))
       }
+      // Build payload consistent with prisma schema: Sale has `payments: Payment[]` relation
+      const salePayload: any = {
+        tenantId: tenant.id,
+        customerName: customerName ?? null,
+        origin: origin ?? null,
+        notes: notes ?? null,
+        subtotal,
+        extraCosts: 0,
+        total: subtotal,
+        profit: subtotal - costTotal,
+      }
+
+      if (payment) {
+        // Frontend sends a PaymentMethod enum key (e.g. 'EFECTIVO_PESOS').
+        // Create a Payment record that covers the sale total by default.
+        salePayload.payments = {
+          create: [
+            {
+              method: payment,
+              amount: subtotal,
+            },
+          ],
+        }
+      }
+
       const sale = await tx.sale.create({
-        data: {
-          tenantId: tenant.id,
-          customerName: customerName ?? null,
-          origin: origin ?? null,
-          payment: payment ?? null,
-          notes: notes ?? null,
-          subtotal,
-          extraCosts: 0,
-          total: subtotal,
-          profit: subtotal - costTotal,
-        },
+        data: salePayload,
       })
       for (const item of items) {
         await tx.saleItem.create({

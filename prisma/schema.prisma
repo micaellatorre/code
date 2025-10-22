@@ -157,7 +157,7 @@ model SaleItem {
   lineProfit Decimal @db.Decimal(12, 2)
 
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime @default(now()) @updatedAt
 
   @@index([saleId])
   @@index([productId])
