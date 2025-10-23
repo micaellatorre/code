@@ -277,3 +277,6 @@ export default function NewSalePage() {
     </DashboardLayout>
   )
 }
+
+// Ensure the new sale page is rendered server-side on each request.
+export const dynamic = 'force-dynamic'

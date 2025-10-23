@@ -4,6 +4,10 @@ import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableProductsTable from '@/components/FilterableProductsTable'
 import { prisma } from '@/lib/prisma'
 
+// Force this page to be server-rendered on every request because it relies on
+// up-to-date DB data and should not be statically prerendered.
+export const dynamic = 'force-dynamic'
+
 export default async function ProductsPage() {
   const products = await prisma.product.findMany({ orderBy: { modelName: 'asc' } })
 

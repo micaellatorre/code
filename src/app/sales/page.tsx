@@ -5,6 +5,8 @@ import SearchBar from '@/components/SearchBar'
 import FilterableSalesTable from '@/components/FilterableSalesTable'
 import { prisma } from '@/lib/prisma'
 
+// Force server rendering for sales listing to keep data fresh and consistent
+export const dynamic = 'force-dynamic'
 /**
  * Listado de ventas.
  * Se beneficia del layout compartido y ofrece un campo de búsqueda.

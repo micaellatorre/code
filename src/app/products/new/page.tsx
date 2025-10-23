@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 
+// New product page should be server-rendered to avoid stale data and ensure
+// any server-side checks run on each request.
+export const dynamic = 'force-dynamic'
+
 /**
  * Página para crear un nuevo producto.
  * Se apoya en DaisyUI para darle estilo al formulario y utiliza el layout
