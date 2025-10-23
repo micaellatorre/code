@@ -162,7 +162,8 @@ export default function FilterableProductsTable({ products }: FilterableProducts
           <thead>
             <tr>
               <th>Modelo</th>
-              <th>Marca</th>
+              <th>Bateria %</th>
+              <th>Color</th>
               <th>Capacidad (GB)</th>
               <th>Condición</th>
               <th>Costo (USD)</th>
@@ -175,11 +176,30 @@ export default function FilterableProductsTable({ products }: FilterableProducts
             {filteredProducts.map((p) => (
               <tr key={p.id}>
                 <td>{p.modelName}</td>
-                <td>{p.brand ?? '-'}</td>
-                <td>{p.capacityGB ?? '-'}</td>
+                <td>
+                  {p.batteryPct != null ? (
+                    <>
+                      {p.batteryPct}<span className="text-xs text-base-content/50"> %</span>
+                    </>
+                  ) : (
+                    '-'
+                  )}
+                </td>
+                <td>{p.color ?? '-'}</td>
+                <td>
+                  {p.capacityGB != null ?
+                    (
+                      <>
+                        {p.capacityGB}<span className="text-xs text-base-content/50"> GB</span>
+                      </>
+                    ) : (
+                      '-'
+                    )
+                  }
+                </td>
                 <td>{p.condition ?? '-'}</td>
-                <td>{formatDecimal((p as any).costPrice)}</td>
-                <td>{formatDecimal((p as any).salePrice)}</td>
+                <td><span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).costPrice)}</td>
+                <td><span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).salePrice)}</td>
                 <td>
                   {editingStockId === p.id ? (
                     <div className="flex items-center gap-2">
