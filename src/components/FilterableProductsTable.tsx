@@ -19,6 +19,7 @@ type SerializedProduct = {
   costPrice: string | null
   salePrice: string | null
   shippingCost: string | null
+  state: string
   status: string
   stock: number
   createdAt: string | null
@@ -59,6 +60,26 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [editingStockId, setEditingStockId] = useState<string | null>(null)
   const [editingStockValue, setEditingStockValue] = useState<string>('')
   const [savingStockId, setSavingStockId] = useState<string | null>(null)
+  const [savingStateId, setSavingStateId] = useState<string | null>(null)
+
+  // Product states from prisma schema enum ProductState
+  const stateOptions = [
+    'EN_STOCK',
+    'EN_CAMINO',
+    'EN_REPARACION',
+    'CON_CLIENTE',
+    'FUERA_DE_STOCK',
+    'VENDIDO',
+  ] as const
+
+  const stateColorMap: Record<string, string> = {
+    EN_STOCK: 'badge-success',
+    EN_CAMINO: 'badge-info',
+    EN_REPARACION: 'badge-warning',
+    CON_CLIENTE: 'badge-primary',
+    FUERA_DE_STOCK: 'badge-error',
+    VENDIDO: 'badge-outline',
+  }
 
   const brands = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.brand).filter(Boolean) as string[])), [productsLocal])
   const conditions = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.condition).filter(Boolean) as string[])), [productsLocal])
@@ -125,9 +146,35 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     persistStockUpdate(id, newStock)
   }
 
+  async function persistStateUpdate(id: string, newState: string) {
+    setSavingStateId(id)
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: newState }),
+      })
+      if (!res.ok) throw new Error('server error')
+      const updated = await res.json()
+      setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: updated.state } : p)))
+    } catch (err) {
+      const original = products.find((p) => p.id === id)
+      if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
+      console.error('Failed to persist state update', err)
+    } finally {
+      setSavingStateId(null)
+    }
+  }
+
+  function changeState(id: string, newState: string) {
+    // optimistic update
+    setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: newState } : p)))
+    persistStateUpdate(id, newState)
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+    <div className="flex flex-col gap-4 !h-full flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
         <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
 
         <select
@@ -157,7 +204,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+      <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
         <table className="table table-zebra w-full">
           <thead>
             <tr>
@@ -169,10 +216,11 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               <th>Costo (USD)</th>
               <th>Precio Venta (USD)</th>
               <th>Stock</th>
+              <th>Estado</th>
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className='h-full'>
             {filteredProducts.map((p) => (
               <tr key={p.id}>
                 <td>{p.modelName}</td>
@@ -256,6 +304,36 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   )}
                 </td>
                 <td>
+                  <div className="dropdown dropdown-end relative">
+                    <label tabIndex={0} className="btn btn-ghost btn-sm gap-2">
+                      <span className={`badge ${stateColorMap[p.state] ?? 'badge-ghost'}`}>{p.state}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </label>
+                    <ul tabIndex={0} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
+                      {stateOptions.map((s) => (
+                        <li key={s}>
+                          <button
+                            className={`w-full text-left btn btn-ghost justify-start ${stateColorMap[s] ?? ''}`}
+                            disabled={savingStateId === p.id}
+                            onClick={() => changeState(p.id, s)}
+                          >
+                            <span className={`badge ${stateColorMap[s] ?? 'badge-ghost'} mr-2`}>{s}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </td>
+                <td>
                   <Link href={`/products/${p.id}/edit`} className="btn btn-sm btn-outline link-primary">
                     Editar
                   </Link>
@@ -265,12 +343,12 @@ export default function FilterableProductsTable({ products }: FilterableProducts
           </tbody>
         </table>
 
-        <div className="join mt-4">
+        {/* <div className="join mt-4">
           <button className="join-item btn">«</button>
           <button className="join-item btn btn-active">1</button>
           <button className="join-item btn">2</button>
           <button className="join-item btn">»</button>
-        </div>
+        </div> */}
       </div>
     </div>
   )

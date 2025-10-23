@@ -80,7 +80,7 @@ export default function DashboardLayout({
           Menú
         </label>
         {/* Contenido principal */}
-        <main className="flex-1 p-4 mx-4">{children}</main>
+        <main className="flex-1 p-4 mx-4 h-full">{children}</main>
       </div>
       <div className="drawer-side !p-2 !bg-base-300 !z-50">
         <label htmlFor="dashboard-drawer" aria-label="close sidebar" className="drawer-overlay"></label>

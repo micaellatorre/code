@@ -39,7 +39,7 @@ export async function PATCH(request: Request, { params }: Params) {
       updateData.stock = stock
     }
     // Permit other partial updates if needed
-    const allowed = ['modelName', 'brand', 'capacityGB', 'condition', 'color', 'batteryPct', 'costPrice', 'salePrice', 'shippingCost', 'status']
+  const allowed = ['modelName', 'brand', 'capacityGB', 'condition', 'color', 'batteryPct', 'costPrice', 'salePrice', 'shippingCost', 'status', 'state']
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
         updateData[key] = body[key]
