@@ -250,7 +250,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
               />
             </div>
           </fieldset>
-          <div className="flex gap-2 mt-4">
+          <div className="relative flex flex-col gap-4 w-full">
             <button type="submit" className="btn btn-primary w-full">
               Guardar
             </button>

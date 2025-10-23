@@ -12,7 +12,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const body = await request.json()
   try {
-    const product = await prisma.product.create({ data: body })
+    // If tenant isn't provided (no auth yet), fall back to the default tenant id
+    const data = { ...body, tenantId: (body.tenantId ?? 'cmh3grger0000hhx0cy3w32rk') }
+    const product = await prisma.product.create({ data })
     return NextResponse.json(product, { status: 201 })
   } catch (err: any) {
     console.error(err)
