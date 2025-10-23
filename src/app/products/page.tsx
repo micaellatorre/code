@@ -1,4 +1,5 @@
 import DashboardLayout from '@/components/DashboardLayout'
+import Link from 'next/link'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableProductsTable from '@/components/FilterableProductsTable'
 import { prisma } from '@/lib/prisma'
@@ -21,7 +22,15 @@ export default async function ProductsPage() {
   return (
     <DashboardLayout activeTab="products">
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Productos' }]} />
-      <FilterableProductsTable products={serialized} />
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Productos</h2>
+          <Link href="/products/new" className="btn btn-primary">
+            Nuevo Producto
+          </Link>
+        </div>
+        <FilterableProductsTable products={serialized} />
+      </div>
     </DashboardLayout>
   )
 }
