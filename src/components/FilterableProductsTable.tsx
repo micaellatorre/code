@@ -61,6 +61,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [editingStockValue, setEditingStockValue] = useState<string>('')
   const [savingStockId, setSavingStockId] = useState<string | null>(null)
   const [savingStateId, setSavingStateId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Product states from prisma schema enum ProductState
   const stateOptions = [
@@ -83,6 +84,15 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
   const brands = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.brand).filter(Boolean) as string[])), [productsLocal])
   const conditions = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.condition).filter(Boolean) as string[])), [productsLocal])
+
+  const conditionOptions = ['A_PLUS', 'OEM', 'ASIS', 'ASIS_PLUS', 'SEALED'] as const
+  const conditionLabelMap: Record<string, string> = {
+    A_PLUS: 'A+',
+    OEM: 'OEM',
+    ASIS: 'ASIS',
+    ASIS_PLUS: 'ASIS+',
+    SEALED: 'Sellado',
+  }
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -172,35 +182,54 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     persistStateUpdate(id, newState)
   }
 
+  async function deleteProduct(id: string) {
+    const ok = window.confirm('¿Eliminar este producto? Esta acción no se puede deshacer.')
+    if (!ok) return
+    setDeletingId(id)
+
+    // keep original and index so we can revert if delete fails
+    const originalIndex = productsLocal.findIndex((p) => p.id === id)
+    const original = productsLocal[originalIndex]
+
+    // optimistic remove
+    setProductsLocal((prev) => prev.filter((p) => p.id !== id))
+
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`Delete failed: ${res.status}`)
+      // success - nothing else to do (row already removed)
+    } catch (err) {
+      // revert by reinserting at original index
+      setProductsLocal((prev) => {
+        const copy = prev.slice()
+        copy.splice(originalIndex, 0, original)
+        return copy
+      })
+      console.error('Failed to delete product', err)
+      alert('No se pudo eliminar el producto. Intente de nuevo.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 !h-full flex-1">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
         <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
 
         <select
-          value={brandFilter}
-          onChange={(e) => setBrandFilter(e.target.value)}
-          className="select select-bordered w-full max-w-xs"
-        >
-          <option value="">Todas las marcas</option>
-          {brands.map((b) => (
-            <option key={b ?? ''} value={b ?? ''}>
-              {b ?? '-'}
-            </option>
-          ))}
-        </select>
-
-        <select
           value={conditionFilter}
           onChange={(e) => setConditionFilter(e.target.value)}
           className="select select-bordered w-full max-w-xs"
         >
-          <option value="">Todas las condiciones</option>
-          {conditions.map((c) => (
-            <option key={c ?? ''} value={c ?? ''}>
-              {c ?? '-'}
-            </option>
-          ))}
+          <option value="">Seleccionar</option>
+          {conditionOptions
+            .filter((opt) => conditions.includes(opt))
+            .map((c) => (
+              <option key={c} value={c}>
+                {conditionLabelMap[c] ?? c}
+              </option>
+            ))}
         </select>
       </div>
 
@@ -333,10 +362,24 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                     </ul>
                   </div>
                 </td>
-                <td>
+                <td className="flex items-center gap-2">
                   <Link href={`/products/${p.id}/edit`} className="btn btn-sm btn-outline link-primary">
                     Editar
                   </Link>
+                  <button
+                    className="btn btn-sm btn-outline btn-error"
+                    onClick={() => deleteProduct(p.id)}
+                    disabled={deletingId === p.id}
+                    aria-disabled={deletingId === p.id}
+                    title="Eliminar producto"
+                  >
+                    {deletingId === p.id ?
+                      <>
+                        Eliminando
+                        <span className="loading loading-bars loading-xs"></span>
+                      </>
+                      : 'Eliminar'}
+                  </button>
                 </td>
               </tr>
             ))}

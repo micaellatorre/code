@@ -28,12 +28,14 @@ export default function NewProductPage() {
     shippingCost: '',
     type: 'PHONE',
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
   }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     const payload: any = {
       modelName: form.modelName,
       brand: form.brand || null,
@@ -51,10 +53,14 @@ export default function NewProductPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (res.ok) {
-      router.push('/products')
-    } else {
-      console.error('Error al crear producto')
+    try {
+      if (res.ok) {
+        router.push('/products')
+      } else {
+        console.error('Error al crear producto')
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
   return (
@@ -217,8 +223,18 @@ export default function NewProductPage() {
               />
             </div>
           </fieldset>
-          <button type="submit" className="btn btn-primary w-full mt-2">
-            Crear
+          <button
+            type="submit"
+            className={`btn btn-primary w-full mt-2`}
+            disabled={isSubmitting}
+          // aria-busy={isSubmitting}
+          >
+            {isSubmitting ?
+              <>
+                Creando
+                <span className="loading loading-bars loading-xs"></span>
+              </>
+              : 'Crear'}
           </button>
         </form>
       </div>
