@@ -27,12 +27,6 @@ export default async function ProductsPage() {
     <DashboardLayout activeTab="products">
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Productos' }]} />
       <div className="flex flex-col gap-4 h-full">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Productos</h2>
-          <Link href="/products/new" className="btn btn-primary">
-            Nuevo Producto
-          </Link>
-        </div>
         <FilterableProductsTable products={serialized} />
       </div>
     </DashboardLayout>

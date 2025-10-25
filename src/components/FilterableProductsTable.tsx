@@ -57,6 +57,11 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState<string>('')
   const [conditionFilter, setConditionFilter] = useState<string>('')
+  const [batteryMin, setBatteryMin] = useState<string>('')
+  const [batteryMax, setBatteryMax] = useState<string>('')
+  const [colorFilter, setColorFilter] = useState<string>('')
+  const [capacityFilter, setCapacityFilter] = useState<string>('')
+  const [stateFilter, setStateFilter] = useState<string>('')
   const [editingStockId, setEditingStockId] = useState<string | null>(null)
   const [editingStockValue, setEditingStockValue] = useState<string>('')
   const [savingStockId, setSavingStockId] = useState<string | null>(null)
@@ -94,16 +99,58 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     SEALED: 'Sellado',
   }
 
+  // Derived filter values
+  const colors = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.color).filter(Boolean) as string[])), [productsLocal])
+  const capacities = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.capacityGB).filter((n): n is number => n != null) as number[])).sort((a, b) => a - b), [productsLocal])
+
+  const stateLabelMap: Record<string, string> = {
+    EN_STOCK: 'En stock',
+    EN_CAMINO: 'En camino',
+    EN_REPARACION: 'En reparación',
+    CON_CLIENTE: 'Con cliente',
+    FUERA_DE_STOCK: 'Fuera de stock',
+    VENDIDO: 'Vendido',
+  }
+
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const min = batteryMin === '' ? null : Number(batteryMin)
+    const max = batteryMax === '' ? null : Number(batteryMax)
+
     return productsLocal.filter((p) => {
       const model = p.modelName ?? ''
       const matchesSearch = q ? model.toLowerCase().includes(q) : true
       const matchesBrand = brandFilter ? p.brand === brandFilter : true
       const matchesCondition = conditionFilter ? p.condition === conditionFilter : true
-      return matchesSearch && matchesBrand && matchesCondition
+      const matchesColor = colorFilter ? p.color === colorFilter : true
+      const matchesCapacity = capacityFilter ? p.capacityGB === Number(capacityFilter) : true
+      const matchesState = stateFilter ? p.state === stateFilter : true
+
+      let matchesBattery = true
+      if (min != null || max != null) {
+        if (p.batteryPct == null) {
+          matchesBattery = false
+        } else {
+          if (min != null && p.batteryPct < min) matchesBattery = false
+          if (max != null && p.batteryPct > max) matchesBattery = false
+        }
+      }
+
+      return matchesSearch && matchesBrand && matchesCondition && matchesColor && matchesCapacity && matchesState && matchesBattery
     })
-  }, [search, brandFilter, conditionFilter, productsLocal])
+  }, [search, brandFilter, conditionFilter, colorFilter, capacityFilter, stateFilter, batteryMin, batteryMax, productsLocal])
+
+  // Clear all filters
+  function clearFilters() {
+    setSearch('')
+    setBrandFilter('')
+    setConditionFilter('')
+    setBatteryMin('')
+    setBatteryMax('')
+    setColorFilter('')
+    setCapacityFilter('')
+    setStateFilter('')
+  }
 
   async function persistStockUpdate(id: string, newStock: number) {
     setSavingStockId(id)
@@ -214,23 +261,132 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
   return (
     <div className="flex flex-col gap-4 !h-full flex-1">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
-        <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">
+          Productos
+          <span className="ml-4 text-sm text-base-content/60">
+            - Resultados {filteredProducts.length}
+          </span>
+          <span className="ml-1 text-sm text-base-content/30">
+            de
+          </span>
+          <span className="ml-1 text-sm text-base-content/30">
+            {products.length}
+          </span>
+        </h2>
+        <Link href="/products/new" className="btn btn-primary">
+          Nuevo Producto
+        </Link>
+      </div>
 
-        <select
-          value={conditionFilter}
-          onChange={(e) => setConditionFilter(e.target.value)}
-          className="select select-bordered w-full max-w-xs"
-        >
-          <option value="">Seleccionar</option>
-          {conditionOptions
-            .filter((opt) => conditions.includes(opt))
-            .map((c) => (
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
+        <div className="flex items-center gap-2">
+          <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
+          {search ? (
+            <button
+              type="button"
+              aria-label="Limpiar búsqueda"
+              onClick={() => setSearch('')}
+              className="btn btn-ghost btn-sm"
+            >
+              ✕
+            </button>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={conditionFilter}
+            onChange={(e) => setConditionFilter(e.target.value)}
+            className="select select-bordered w-full max-w-xs"
+          >
+            <option value="">Filtrar por Condición</option>
+            {conditionOptions
+              .filter((opt) => conditions.includes(opt))
+              .map((c) => (
+                <option key={c} value={c}>
+                  {conditionLabelMap[c] ?? c}
+                </option>
+              ))}
+          </select>
+          {conditionFilter ? (
+            <button className="btn btn-ghost btn-sm" onClick={() => setConditionFilter('')}>✕</button>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            placeholder="Batería min"
+            value={batteryMin}
+            onChange={(e) => setBatteryMin(e.target.value)}
+            className="input input-bordered input-sm w-[120px]"
+          />
+          {batteryMin ? <button className="btn btn-ghost btn-sm" onClick={() => setBatteryMin('')}>✕</button> : null}
+
+          <input
+            type="number"
+            min={0}
+            max={100}
+            placeholder="Batería max"
+            value={batteryMax}
+            onChange={(e) => setBatteryMax(e.target.value)}
+            className="input input-bordered input-sm w-[120px]"
+          />
+          {batteryMax ? <button className="btn btn-ghost btn-sm" onClick={() => setBatteryMax('')}>✕</button> : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={colorFilter}
+            onChange={(e) => setColorFilter(e.target.value)}
+            className="select select-bordered w-full max-w-xs"
+          >
+            <option value="">Todos los colores</option>
+            {colors.map((c) => (
               <option key={c} value={c}>
-                {conditionLabelMap[c] ?? c}
+                {c}
               </option>
             ))}
-        </select>
+          </select>
+          {colorFilter ? <button className="btn btn-ghost btn-sm" onClick={() => setColorFilter('')}>✕</button> : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={capacityFilter}
+            onChange={(e) => setCapacityFilter(e.target.value)}
+            className="select select-bordered w-full max-w-xs"
+          >
+            <option value="">Todas las capacidades</option>
+            {capacities.map((cap) => (
+              <option key={cap} value={String(cap)}>
+                {cap} GB
+              </option>
+            ))}
+          </select>
+          {capacityFilter ? <button className="btn btn-ghost btn-sm" onClick={() => setCapacityFilter('')}>✕</button> : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value)}
+            className="select select-bordered w-full max-w-xs"
+          >
+            <option value="">Todos los estados</option>
+            {stateOptions.map((s) => (
+              <option key={s} value={s}>
+                {stateLabelMap[s] ?? s}
+              </option>
+            ))}
+          </select>
+          {stateFilter ? <button className="btn btn-ghost btn-sm" onClick={() => setStateFilter('')}>✕</button> : null}
+        </div>
+
+        <button className="btn btn-ghost" onClick={clearFilters}>Limpiar filtros</button>
       </div>
 
       <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
@@ -274,7 +430,9 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                     )
                   }
                 </td>
-                <td>{p.condition ?? '-'}</td>
+                <td>
+                  {p.condition == null ? '-' : conditionLabelMap[p.condition] ?? p.condition}
+                </td>
                 <td><span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).costPrice)}</td>
                 <td><span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).salePrice)}</td>
                 <td>
