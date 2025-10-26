@@ -182,13 +182,20 @@ export default function EditProductPage({ params }: EditProductPageProps) {
               <label className="label">
                 <span className="label-text">Capacidad (GB)</span>
               </label>
-              <input
-                type="number"
+              <select
                 name="capacityGB"
                 value={form.capacityGB}
                 onChange={handleChange}
-                className="input input-bordered"
-              />
+                className="select select-bordered"
+              >
+                <option value="">Seleccionar</option>
+                <option value="64">64 GB</option>
+                <option value="128">128 GB</option>
+                <option value="256">256 GB</option>
+                <option value="512">512 GB</option>
+                <option value="1024">1024 GB (1 TB)</option>
+                <option value="2048">2048 GB (2 TB)</option>
+              </select>
             </div>
             <div className="form-control">
               <label className="label">
