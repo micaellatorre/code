@@ -9,18 +9,20 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export default async function ProductsPage() {
-  const products = await prisma.product.findMany({ orderBy: { modelName: 'asc' } })
+  const products = await prisma.product.findMany({ orderBy: { createdAt: 'desc' } })
 
   // Serialize Decimal and Date values into plain JS types so they can be
   // safely passed into Client Components.
   const serialized = products.map((p) => ({
     ...p,
+    imei: p.imei ?? '',
     costPrice: p.costPrice != null ? String(p.costPrice) : null,
     salePrice: p.salePrice != null ? String(p.salePrice) : null,
     shippingCost: p.shippingCost != null ? String(p.shippingCost) : null,
     purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
     createdAt: p.createdAt ? p.createdAt.toISOString() : null,
     updatedAt: p.updatedAt ? p.updatedAt.toISOString() : null,
+    notes: p.notes ?? '',
   }))
 
   return (
