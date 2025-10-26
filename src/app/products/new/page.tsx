@@ -19,6 +19,7 @@ export default function NewProductPage() {
   const [form, setForm] = useState({
     modelName: '',
     brand: '',
+    imei: '',
     capacityGB: '',
     condition: '',
     color: '',
@@ -27,6 +28,7 @@ export default function NewProductPage() {
     salePrice: '',
     shippingCost: '',
     type: 'PHONE',
+    notes: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -39,6 +41,7 @@ export default function NewProductPage() {
     const payload: any = {
       modelName: form.modelName,
       brand: form.brand || null,
+      imei: form.imei || null,
       capacityGB: form.capacityGB ? Number(form.capacityGB) : null,
       condition: form.condition || null,
       color: form.color || null,
@@ -47,6 +50,7 @@ export default function NewProductPage() {
       salePrice: parseFloat(form.salePrice) || 0,
       shippingCost: form.shippingCost ? parseFloat(form.shippingCost) : null,
       type: form.type,
+      notes: form.notes || null,
     }
     const res = await fetch('/api/products', {
       method: 'POST',
@@ -108,7 +112,7 @@ export default function NewProductPage() {
               />
             </div>
             {/* Marca */}
-            <div className="form-control">
+            {/* <div className="form-control">
               <label className="label">
                 <span className="label-text">Marca</span>
               </label>
@@ -116,6 +120,19 @@ export default function NewProductPage() {
                 type="text"
                 name="brand"
                 value={form.brand}
+                onChange={handleChange}
+                className="input input-bordered"
+              />
+            </div> */}
+            {/* IMEI */}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">IMEI</span>
+              </label>
+              <input
+                type="text"
+                name="imei"
+                value={form.imei}
                 onChange={handleChange}
                 className="input input-bordered"
               />
@@ -222,12 +239,23 @@ export default function NewProductPage() {
                 className="input input-bordered"
               />
             </div>
+            {/* Notas */}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Notas</span>
+              </label>
+              <textarea
+                className="textarea textarea-bordered"
+                name="notes"
+                value={form.notes}
+                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              ></textarea>
+            </div>
           </fieldset>
           <button
             type="submit"
             className={`btn btn-primary w-full mt-2`}
             disabled={isSubmitting}
-          // aria-busy={isSubmitting}
           >
             {isSubmitting ?
               <>

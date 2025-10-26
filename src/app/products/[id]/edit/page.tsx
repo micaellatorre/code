@@ -18,6 +18,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
   const [form, setForm] = useState({
     modelName: '',
     brand: '',
+    imei: '',
     capacityGB: '',
     condition: '',
     color: '',
@@ -26,7 +27,9 @@ export default function EditProductPage({ params }: EditProductPageProps) {
     salePrice: '',
     shippingCost: '',
     type: 'PHONE',
+    notes: '',
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     async function fetchProduct() {
@@ -36,6 +39,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         setForm({
           modelName: data.modelName ?? '',
           brand: data.brand ?? '',
+          imei: data.imei ?? '',
           capacityGB: data.capacityGB ?? '',
           condition: data.condition ?? '',
           color: data.color ?? '',
@@ -44,6 +48,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
           salePrice: data.salePrice ?? '',
           shippingCost: data.shippingCost ?? '',
           type: data.type,
+          notes: data.notes ?? '',
         })
       }
       setLoading(false)
@@ -58,9 +63,11 @@ export default function EditProductPage({ params }: EditProductPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     const payload: any = {
       modelName: form.modelName,
       brand: form.brand || null,
+      imei: form.imei || null,
       capacityGB: form.capacityGB ? Number(form.capacityGB) : null,
       condition: form.condition || null,
       color: form.color || null,
@@ -69,16 +76,21 @@ export default function EditProductPage({ params }: EditProductPageProps) {
       salePrice: parseFloat(String(form.salePrice)) || 0,
       shippingCost: form.shippingCost ? parseFloat(String(form.shippingCost)) : null,
       type: form.type,
+      notes: form.notes || null,
     }
     const res = await fetch(`/api/products/${params.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (res.ok) {
-      router.push('/products')
-    } else {
-      console.error('Error al actualizar producto')
+    try {
+      if (res.ok) {
+        router.push('/products')
+      } else {
+        console.error('Error al actualizar producto')
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -142,7 +154,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
                 className="input input-bordered"
               />
             </div>
-            <div className="form-control">
+            {/* <div className="form-control">
               <label className="label">
                 <span className="label-text">Marca</span>
               </label>
@@ -150,6 +162,18 @@ export default function EditProductPage({ params }: EditProductPageProps) {
                 type="text"
                 name="brand"
                 value={form.brand}
+                onChange={handleChange}
+                className="input input-bordered"
+              />
+            </div> */}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">IMEI</span>
+              </label>
+              <input
+                type="text"
+                name="imei"
+                value={form.imei}
                 onChange={handleChange}
                 className="input input-bordered"
               />
@@ -249,10 +273,29 @@ export default function EditProductPage({ params }: EditProductPageProps) {
                 className="input input-bordered"
               />
             </div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Notas</span>
+              </label>
+              <textarea
+                className="textarea textarea-bordered"
+                name="notes"
+                value={form.notes}
+                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              ></textarea>
+            </div>
           </fieldset>
           <div className="relative flex flex-col gap-4 w-full">
-            <button type="submit" className="btn btn-primary w-full">
-              Guardar
+            <button
+              type="submit"
+              className="btn btn-primary w-full"
+              disabled={isSubmitting}>
+              {isSubmitting ?
+                <>
+                  Guardando
+                  <span className="loading loading-bars loading-xs"></span>
+                </>
+                : 'Guardar'}
             </button>
             <button type="button" onClick={handleDelete} className="btn btn-error w-full">
               Eliminar

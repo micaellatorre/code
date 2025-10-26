@@ -10,6 +10,7 @@ type SerializedProduct = {
   tenantId: string
   type: string
   brand: string | null
+  imei: string | null
   modelName: string
   capacityGB: number | null
   condition: string | null
@@ -22,6 +23,7 @@ type SerializedProduct = {
   state: string
   status: string
   stock: number
+  notes: string | null
   createdAt: string | null
   updatedAt: string | null
 }
@@ -393,7 +395,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         <table className="table table-zebra w-full">
           <thead>
             <tr>
+              <th>Agregado</th>
+              <th>Editado</th>
               <th>Modelo</th>
+              <th>IMEI</th>
               <th>Bateria %</th>
               <th>Color</th>
               <th>Capacidad (GB)</th>
@@ -408,7 +413,34 @@ export default function FilterableProductsTable({ products }: FilterableProducts
           <tbody className='h-full'>
             {filteredProducts.map((p) => (
               <tr key={p.id}>
-                <td>{p.modelName}</td>
+                <td className='text-xs text-base-content/60'>
+                  <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
+                    <span className="underline decoration-dotted cursor-help">
+                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                      }) : '-'}
+                    </span>
+                  </div>
+                </td>
+                <td className='text-xs text-base-content/60'>
+                  <div className='tooltip tooltip-right' data-tip={p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-AR') : ''}>
+                    <span className="underline decoration-dotted cursor-help">
+                      {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                      }) : '-'}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
+                    <span className="underline decoration-dotted cursor-help">
+                      {p.modelName}
+                    </span>
+                  </div>
+                </td>
+                <td>{p.imei}</td>
                 <td>
                   {p.batteryPct != null ? (
                     <>

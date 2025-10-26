@@ -2,12 +2,14 @@ import DashboardLayout from '@/components/DashboardLayout'
 import DashboardKpiCard from '@/components/DashboardKpiCard'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
 /**
  * Página de inicio del sistema.
  * Muestra las métricas clave del negocio en un tablero de tarjetas. La
  * información se calcula en el servidor para evitar exponer lógica de
  * agregación en el cliente.
  */
+
 export default async function HomePage() {
   // Stock total (suma de stock de todos los productos)
   const stockAgg = await prisma.product.aggregate({
