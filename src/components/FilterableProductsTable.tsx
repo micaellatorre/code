@@ -396,7 +396,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
           <thead>
             <tr>
               <th>Agregado</th>
-              <th>Editado</th>
+              {/* <th>Editado</th> */}
               <th>Modelo</th>
               <th>IMEI</th>
               <th>Bateria %</th>
@@ -423,7 +423,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                     </span>
                   </div>
                 </td>
-                <td className='text-xs text-base-content/60'>
+                {/* <td className='text-xs text-base-content/60'>
                   <div className='tooltip tooltip-right' data-tip={p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-AR') : ''}>
                     <span className="underline decoration-dotted cursor-help">
                       {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('es-AR', {
@@ -432,7 +432,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       }) : '-'}
                     </span>
                   </div>
-                </td>
+                </td> */}
                 <td>
                   <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
                     <span className="underline decoration-dotted cursor-help">
