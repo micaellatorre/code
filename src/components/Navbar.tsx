@@ -1,20 +1,14 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { useDolar } from "@/app/hooks/useDolar"
+import { DolarPanelItem } from "@/app/lib/dolar"
 
-/**
- * Componente de barra de navegación superior.
- * Utiliza DaisyUI para el estilo de `navbar` y un menú desplegable
- * para seleccionar el tema. También acepta una función `onToggleSidebar`
- * que se invoca al hacer clic en el botón "Menú" para colapsar o expandir
- * la barra lateral.
- */
 export default function Navbar({
   onToggleSidebar,
 }: {
   onToggleSidebar: () => void
 }) {
-  // Lista de temas disponibles. Puedes añadir más temas compatibles con DaisyUI.
   const themes = [
     { value: 'cupcake', label: 'Claro' },
     { value: 'retro', label: 'Desert' },
@@ -22,8 +16,8 @@ export default function Navbar({
     { value: 'forest', label: 'Forest' },
   ]
   const [theme, setTheme] = useState('light')
+  const { data: dolarData, error, isLoading } = useDolar()
 
-  // Al montar, lee el tema guardado en localStorage y lo aplica.
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme')
@@ -33,10 +27,20 @@ export default function Navbar({
     }
   }, [])
 
-  /**
-   * Cambia el tema activo tanto en el estado local como en el
-   * atributo `data-theme`. También guarda la preferencia en localStorage.
-   */
+  // Process dolar data when it's available
+  const dolarBlueVenta = dolarData?.panel?.find((d: DolarPanelItem) => d.titulo === "Dólar Blue")?.venta?.toLocaleString("es-AR", { minimumFractionDigits: 2 }) ?? null;
+  const dolarCriptoVenta = dolarData?.panel?.find((d: DolarPanelItem) => d.titulo === "Dólar Cripto")?.venta?.toLocaleString("es-AR", { minimumFractionDigits: 2 }) ?? null;
+
+  // Debug logging
+  useEffect(() => {
+    if (error) {
+      console.error("Error obteniendo cotizaciones del dólar:", error);
+    }
+    if (dolarData) {
+      console.log("Dolar data received:", dolarData);
+    }
+  }, [error, dolarData]);
+
   const handleThemeChange = (value: string) => {
     setTheme(value)
     if (typeof document !== 'undefined') {
@@ -54,11 +58,31 @@ export default function Navbar({
           onClick={onToggleSidebar}
           className="btn btn-ghost normal-case text-xl"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" className="size-6">
-            <path stroke-linecap="round" strok-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
+            <path strokeLinecap="round" strok-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
 
         </button>
+      </div>
+      <div className="flex items-center gap-3 mr-4">
+        {/* add link to new tab for https://www.finanzasargy.com */}
+        <a className="text-blue-500 hover:text-blue-700" href="https://www.finanzasargy.com" target="_blank" rel="noopener noreferrer">
+          FinanzasArgy
+        </a>
+        <div className="px-3 py-1 rounded-full bg-blue-50 text-blue-800 text-sm font-medium border border-blue-100">
+          Dólar Blue:{" "}
+          <span className="font-semibold">
+            {isLoading ? "..." : error ? "Error" : dolarBlueVenta ? `$${dolarBlueVenta}` : "—"}
+          </span>
+          <span className="text-xs text-base-content/50"> vta</span>
+        </div>
+        <div className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-sm font-medium border border-emerald-100">
+          Dólar Cripto:{" "}
+          <span className="font-semibold">
+            {isLoading ? "..." : error ? "Error" : dolarCriptoVenta ? `$${dolarCriptoVenta}` : "—"}
+          </span>
+          <span className="text-xs text-base-content/50"> vta</span>
+        </div>
       </div>
       <div className="flex-none">
         {/* Menú desplegable para seleccionar el tema */}
