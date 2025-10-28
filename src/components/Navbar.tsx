@@ -64,24 +64,27 @@ export default function Navbar({
 
         </button>
       </div>
-      <div className="flex items-center gap-3 mr-4">
+      <div className="flex items-center gap-4 mr-4">
         {/* add link to new tab for https://www.finanzasargy.com */}
-        <a className="text-blue-500 hover:text-blue-700" href="https://www.finanzasargy.com" target="_blank" rel="noopener noreferrer">
+        <a className="flex flex-row gap-2 items-center text-blue-500 hover:text-blue-700" href="https://www.finanzasargy.com" target="_blank" rel="noopener noreferrer">
           FinanzasArgy
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" className="size-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
         </a>
-        <div className="px-3 py-1 rounded-full bg-blue-50 text-blue-800 text-sm font-medium border border-blue-100">
+        <div className="px-3 py-1 rounded-full bg-base-content/5 text-blue-700 text-sm font-medium border border-blue-400">
           Dólar Blue:{" "}
-          <span className="font-semibold">
+          <span className="font-semibold text-base-content">
             {isLoading ? "..." : error ? "Error" : dolarBlueVenta ? `$${dolarBlueVenta}` : "—"}
           </span>
-          <span className="text-xs text-base-content/50"> vta</span>
+          <span className="text-xs text-base-content/60"> vta</span>
         </div>
-        <div className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-sm font-medium border border-emerald-100">
+        <div className="px-3 py-1 rounded-full bg-base-content/5 text-emerald-700 text-sm font-medium border border-emerald-400">
           Dólar Cripto:{" "}
-          <span className="font-semibold">
+          <span className="font-semibold text-base-content">
             {isLoading ? "..." : error ? "Error" : dolarCriptoVenta ? `$${dolarCriptoVenta}` : "—"}
           </span>
-          <span className="text-xs text-base-content/50"> vta</span>
+          <span className="text-xs text-base-content/60"> vta</span>
         </div>
       </div>
       <div className="flex-none">
