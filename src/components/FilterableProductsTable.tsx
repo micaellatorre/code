@@ -544,11 +544,11 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   </div>
                 </td>
                 <td className="flex items-center gap-2">
-                  <Link href={`/products/${p.id}/edit`} className="btn btn-sm btn-outline link-primary">
-                    Editar
+                  <Link href={`/products/${p.id}/edit`} className="btn btn-sm btn-soft">
+                    <svg width="800px" height="800px" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="size-6"><path fillRule="evenodd" clipRule="evenodd" d="m3.99 16.854-1.314 3.504a.75.75 0 0 0 .966.965l3.503-1.314a3 3 0 0 0 1.068-.687L18.36 9.175s-.354-1.061-1.414-2.122c-1.06-1.06-2.122-1.414-2.122-1.414L4.677 15.786a3 3 0 0 0-.687 1.068zm12.249-12.63 1.383-1.383c.248-.248.579-.406.925-.348.487.08 1.232.322 1.934 1.025.703.703.945 1.447 1.025 1.934.058.346-.1.677-.348.925L19.774 7.76s-.353-1.06-1.414-2.12c-1.06-1.062-2.121-1.415-2.121-1.415z" /></svg>
                   </Link>
                   <button
-                    className="btn btn-sm btn-outline btn-error"
+                    className="btn btn-sm btn-soft btn-error"
                     onClick={() => deleteProduct(p.id)}
                     disabled={deletingId === p.id}
                     aria-disabled={deletingId === p.id}
@@ -556,10 +556,15 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   >
                     {deletingId === p.id ?
                       <>
-                        Eliminando
                         <span className="loading loading-bars loading-xs"></span>
                       </>
-                      : 'Eliminar'}
+                      :
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
+                          <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clipRule="evenodd" />
+                        </svg>
+                      </>
+                    }
                   </button>
                 </td>
               </tr>
