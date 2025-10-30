@@ -3,6 +3,12 @@ import './globals.css'
 export const metadata = {
   title: 'GP Importaciones',
   description: 'Administración de stock y ventas de celulares y accesorios',
+  icons: [
+    {
+      rel: 'icon',
+      url: '/icon.ico',
+    },
+  ],
 }
 
 /**
