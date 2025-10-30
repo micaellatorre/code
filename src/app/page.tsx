@@ -1,6 +1,12 @@
 import DashboardLayout from '@/components/DashboardLayout'
 import DashboardKpiCard from '@/components/DashboardKpiCard'
 import { prisma } from '@/lib/prisma'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+  description: 'Panel de control con métricas clave del negocio',
+}
 
 export const dynamic = 'force-dynamic'
 /**

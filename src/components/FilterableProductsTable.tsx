@@ -420,22 +420,16 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                     </span>
                   </div>
                 </td>
-                {/* <td className='text-xs text-base-content/60'>
-                  <div className='tooltip tooltip-right' data-tip={p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-AR') : ''}>
-                    <span className="underline decoration-dotted cursor-help">
-                      {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('es-AR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                      }) : '-'}
-                    </span>
-                  </div>
-                </td> */}
                 <td>
-                  <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
-                    <span className="underline decoration-dotted cursor-help">
-                      {p.modelName}
-                    </span>
-                  </div>
+                  {p.notes ? (
+                    <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
+                      <span className="underline decoration-dotted cursor-help">
+                        {p.modelName}
+                      </span>
+                    </div>
+                  ) : (
+                    <span>{p.modelName}</span>
+                  )}
                 </td>
                 <td>{p.imei}</td>
                 <td>

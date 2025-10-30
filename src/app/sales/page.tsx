@@ -4,6 +4,12 @@ import Breadcrumbs from '@/components/Breadcrumbs'
 import SearchBar from '@/components/SearchBar'
 import FilterableSalesTable from '@/components/FilterableSalesTable'
 import { prisma } from '@/lib/prisma'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Ventas',
+  description: 'Listado y gestión de ventas realizadas',
+}
 
 // Force server rendering for sales listing to keep data fresh and consistent
 export const dynamic = 'force-dynamic'
