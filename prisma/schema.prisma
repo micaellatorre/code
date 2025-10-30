@@ -305,7 +305,6 @@ enum ProductSate {
   EN_CAMINO
   EN_REPARACION
   CON_CLIENTE
-  FUERA_DE_STOCK
   VENDIDO
 }
 

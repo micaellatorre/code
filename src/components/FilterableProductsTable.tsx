@@ -76,7 +76,6 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     'EN_CAMINO',
     'EN_REPARACION',
     'CON_CLIENTE',
-    'FUERA_DE_STOCK',
     'VENDIDO',
   ] as const
 
@@ -85,7 +84,6 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     EN_CAMINO: 'badge-info',
     EN_REPARACION: 'badge-warning',
     CON_CLIENTE: 'badge-primary',
-    FUERA_DE_STOCK: 'badge-error',
     VENDIDO: 'badge-outline',
   }
 
@@ -110,7 +108,6 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     EN_CAMINO: 'En camino',
     EN_REPARACION: 'En reparación',
     CON_CLIENTE: 'Con cliente',
-    FUERA_DE_STOCK: 'Fuera de stock',
     VENDIDO: 'Vendido',
   }
 
