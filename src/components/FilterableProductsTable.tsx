@@ -59,6 +59,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState<string>('')
   const [conditionFilter, setConditionFilter] = useState<string>('')
+  const [typeFilter, setTypeFilter] = useState<string>('')
   const [batteryMin, setBatteryMin] = useState<string>('')
   const [batteryMax, setBatteryMax] = useState<string>('')
   const [colorFilter, setColorFilter] = useState<string>('')
@@ -121,6 +122,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       const matchesSearch = q ? model.toLowerCase().includes(q) : true
       const matchesBrand = brandFilter ? p.brand === brandFilter : true
       const matchesCondition = conditionFilter ? p.condition === conditionFilter : true
+      const matchesType = typeFilter ? p.type === typeFilter : true
       const matchesColor = colorFilter ? p.color === colorFilter : true
       const matchesCapacity = capacityFilter ? p.capacityGB === Number(capacityFilter) : true
       const matchesState = stateFilter ? p.state === stateFilter : true
@@ -135,9 +137,9 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         }
       }
 
-      return matchesSearch && matchesBrand && matchesCondition && matchesColor && matchesCapacity && matchesState && matchesBattery
+      return matchesSearch && matchesBrand && matchesCondition && matchesType && matchesColor && matchesCapacity && matchesState && matchesBattery
     })
-  }, [search, brandFilter, conditionFilter, colorFilter, capacityFilter, stateFilter, batteryMin, batteryMax, productsLocal])
+  }, [search, brandFilter, conditionFilter, typeFilter, colorFilter, capacityFilter, stateFilter, batteryMin, batteryMax, productsLocal])
 
   // Clear all filters
   function clearFilters() {
@@ -261,18 +263,41 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   return (
     <div className="flex flex-col gap-4 !h-full flex-1">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">
-          Productos
-          <span className="ml-4 text-sm text-base-content/60">
-            - Resultados {filteredProducts.length}
-          </span>
-          <span className="ml-1 text-sm text-base-content/30">
-            de
-          </span>
-          <span className="ml-1 text-sm text-base-content/30">
-            {products.length}
-          </span>
-        </h2>
+        <div className="flex flex-row items-center justify-between gap-2">
+          <h2 className="text-2xl font-bold">
+            Productos
+            <span className="ml-4 text-sm text-base-content/60">
+              - Resultados {filteredProducts.length}
+            </span>
+            <span className="ml-1 text-sm text-base-content/30">
+              de
+            </span>
+            <span className="ml-1 text-sm text-base-content/30">
+              {products.length}
+            </span>
+          </h2>
+          <div className="flex items-center gap-2">
+            <div className="join">
+              <button
+                type="button"
+                className={`join-item btn btn-sm ${typeFilter === 'PHONE' ? 'btn-active' : ''}`}
+                onClick={() => setTypeFilter(typeFilter === 'PHONE' ? '' : 'PHONE')}
+              >
+                Teléfonos
+              </button>
+              <button
+                type="button"
+                className={`join-item btn btn-sm ${typeFilter === 'ACCESSORY' ? 'btn-active' : ''}`}
+                onClick={() => setTypeFilter(typeFilter === 'ACCESSORY' ? '' : 'ACCESSORY')}
+              >
+                Accesorios
+              </button>
+            </div>
+            {typeFilter ? (
+              <button className="btn btn-ghost btn-sm" onClick={() => setTypeFilter('')}>✕</button>
+            ) : null}
+          </div>
+        </div>
         <Link href="/products/new" className="btn btn-primary">
           Nuevo Producto
         </Link>
