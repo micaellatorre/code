@@ -520,7 +520,6 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
-
                       </button>
                     </div>
                   ) : (
@@ -528,22 +527,22 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       <div className="flex flex-row btn-group gap-1 items-center">
                         <button
                           className="btn btn-ghost btn-xs"
-                          aria-label="increment stock"
+                          aria-label="decrement stock"
                           disabled={savingStockId === p.id}
-                          onClick={() => changeStockBy(p.id, 1)}
+                          onClick={() => changeStockBy(p.id, -1)}
                         >
-                          ▲
+                          ▼
                         </button>
                         <span className="cursor-pointer" onClick={() => startEditStock(p.id, p.stock)}>
                           {p.stock}
                         </span>
                         <button
                           className="btn btn-ghost btn-xs"
-                          aria-label="decrement stock"
+                          aria-label="increment stock"
                           disabled={savingStockId === p.id}
-                          onClick={() => changeStockBy(p.id, -1)}
+                          onClick={() => changeStockBy(p.id, 1)}
                         >
-                          ▼
+                          ▲
                         </button>
                       </div>
                     </div>
