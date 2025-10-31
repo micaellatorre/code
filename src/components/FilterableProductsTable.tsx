@@ -276,7 +276,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               {products.length}
             </span>
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="ml-2 flex rounded-box border border-base-content/10 items-center gap-2">
             <div className="join">
               <button
                 type="button"
@@ -285,6 +285,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               >
                 Teléfonos
               </button>
+              <div className='divider divider-horizontal mx-[-4px]'></div>
               <button
                 type="button"
                 className={`join-item btn btn-sm ${typeFilter === 'ACCESSORY' ? 'btn-active' : ''}`}
@@ -338,28 +339,38 @@ export default function FilterableProductsTable({ products }: FilterableProducts
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            max={100}
-            placeholder="Batería min"
-            value={batteryMin}
-            onChange={(e) => setBatteryMin(e.target.value)}
-            className="input input-bordered input-sm w-[120px]"
-          />
-          {batteryMin ? <button className="btn btn-ghost btn-sm" onClick={() => setBatteryMin('')}>✕</button> : null}
-
-          <input
-            type="number"
-            min={0}
-            max={100}
-            placeholder="Batería max"
-            value={batteryMax}
-            onChange={(e) => setBatteryMax(e.target.value)}
-            className="input input-bordered input-sm w-[120px]"
-          />
-          {batteryMax ? <button className="btn btn-ghost btn-sm" onClick={() => setBatteryMax('')}>✕</button> : null}
+        <div className="join join-vertical relative -mt-0.5 max-w-[150px]">
+          <label className='flex flex-row text-right items-center join-item input input-bordered input-xs w-full min-w-[140px]'>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-[2.5em] opacity-55 mx-1">
+              <path d="M4.5 9.75a.75.75 0 0 0-.75.75V15c0 .414.336.75.75.75h6.75A.75.75 0 0 0 12 15v-4.5a.75.75 0 0 0-.75-.75H4.5Z" />
+              <path fillRule="evenodd" d="M3.75 6.75a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3v-.037c.856-.174 1.5-.93 1.5-1.838v-2.25c0-.907-.644-1.664-1.5-1.837V9.75a3 3 0 0 0-3-3h-15Zm15 1.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5h15Z" clipRule="evenodd" />
+            </svg>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={batteryMin}
+              placeholder="Min"
+              onChange={(e) => setBatteryMin(e.target.value)}
+              className='w-full'
+            />
+          </label>
+          {batteryMin ? <button className="absolute right-0 top-0 btn btn-ghost btn-xs" onClick={() => setBatteryMin('')}>✕</button> : null}
+          <label className='flex flex-row text-right items-center join-item input input-bordered input-xs w-full min-w-[140px]'>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-[2.5em] opacity-55 mx-1">
+              <path fillRule="evenodd" d="M3.75 6.75a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3v-.037c.856-.174 1.5-.93 1.5-1.838v-2.25c0-.907-.644-1.664-1.5-1.837V9.75a3 3 0 0 0-3-3h-15Zm15 1.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5h15ZM4.5 9.75a.75.75 0 0 0-.75.75V15c0 .414.336.75.75.75H18a.75.75 0 0 0 .75-.75v-4.5a.75.75 0 0 0-.75-.75H4.5Z" clipRule="evenodd" />
+            </svg>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="Max"
+              value={batteryMax}
+              onChange={(e) => setBatteryMax(e.target.value)}
+              className='w-full'
+            />
+          </label>
+          {batteryMax ? <button className="absolute right-0 bottom-0 btn btn-ghost btn-xs" onClick={() => setBatteryMax('')}>✕</button> : null}
         </div>
 
         <div className="flex items-center gap-2">
