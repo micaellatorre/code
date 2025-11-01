@@ -196,7 +196,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     setSavingField({ productId, fieldName })
     try {
       const updateBody: any = { [fieldName]: value }
-      
+
       // Special handling for stock - also update stockAvailable
       if (fieldName === 'stock') {
         const product = productsLocal.find((p) => p.id === productId)
@@ -214,21 +214,21 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       })
       if (!res.ok) throw new Error('server error')
       const updated = await res.json()
-      
+
       setProductsLocal((prev) =>
         prev.map((p) =>
           p.id === productId
             ? {
-                ...p,
-                [fieldName]: updated[fieldName] ?? p[fieldName as keyof SerializedProduct],
-                ...(fieldName === 'stock' && updated.stockAvailable !== undefined
-                  ? { stockAvailable: updated.stockAvailable }
-                  : {}),
-              }
+              ...p,
+              [fieldName]: updated[fieldName] ?? p[fieldName as keyof SerializedProduct],
+              ...(fieldName === 'stock' && updated.stockAvailable !== undefined
+                ? { stockAvailable: updated.stockAvailable }
+                : {}),
+            }
             : p,
         ),
       )
-      
+
       // Clear editing state
       cancelEditField(productId, fieldName)
     } catch (err) {
@@ -287,17 +287,17 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       prev.map((p) =>
         p.id === productId
           ? {
-              ...p,
-              [fieldName]: processedValue,
-              ...(fieldName === 'stock'
-                ? {
-                    stockAvailable: Math.max(
-                      0,
-                      (p.stockAvailable ?? 0) + (processedValue - (p.stock ?? 0)),
-                    ),
-                  }
-                : {}),
-            }
+            ...p,
+            [fieldName]: processedValue,
+            ...(fieldName === 'stock'
+              ? {
+                stockAvailable: Math.max(
+                  0,
+                  (p.stockAvailable ?? 0) + (processedValue - (p.stock ?? 0)),
+                ),
+              }
+              : {}),
+          }
           : p,
       ),
     )
@@ -332,10 +332,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         prev.map((p) =>
           p.id === id
             ? {
-                ...p,
-                stock: updated.stock,
-                stockAvailable: updated.stockAvailable ?? p.stockAvailable,
-              }
+              ...p,
+              stock: updated.stock,
+              stockAvailable: updated.stockAvailable ?? p.stockAvailable,
+            }
             : p,
         ),
       )
@@ -464,10 +464,11 @@ export default function FilterableProductsTable({ products }: FilterableProducts
           </div>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-sm btn-outline border border-base-content/10"
             onClick={() => setIsTableExpanded(!isTableExpanded)}
             title={isTableExpanded ? 'Contraer tabla' : 'Expandir tabla'}
           >
+            {isTableExpanded ? 'Comprimir' : 'Expandir '} Tabla
             {isTableExpanded ? (
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
                 <path fillRule="evenodd" d="M3.22 3.22a.75.75 0 0 1 1.06 0l3.97 3.97V4.5a.75.75 0 0 1 1.5 0V9a.75.75 0 0 1-.75.75H4.5a.75.75 0 0 1 0-1.5h2.69L3.22 4.28a.75.75 0 0 1 0-1.06Zm17.56 0a.75.75 0 0 1 0 1.06l-3.97 3.97h2.69a.75.75 0 0 1 0 1.5H15a.75.75 0 0 1-.75-.75V4.5a.75.75 0 0 1 1.5 0v2.69l3.97-3.97a.75.75 0 0 1 1.06 0ZM3.75 15a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-2.69l-3.97 3.97a.75.75 0 0 1-1.06-1.06l3.97-3.97H4.5a.75.75 0 0 1-.75-.75Zm10.5 0a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-2.69l3.97 3.97a.75.75 0 1 1-1.06 1.06l-3.97-3.97v2.69a.75.75 0 0 1-1.5 0V15Z" clipRule="evenodd" />
@@ -688,7 +689,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'imei') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <input
                         autoFocus
                         type="text"
@@ -702,16 +703,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         className="input input-xs w-full min-w-[100px]"
                         disabled={savingField?.productId === p.id && savingField?.fieldName === 'imei'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'imei')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'imei')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'imei')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'imei')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -725,7 +728,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'batteryPct') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <input
                         autoFocus
                         type="number"
@@ -741,16 +744,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         className="input input-xs w-20"
                         disabled={savingField?.productId === p.id && savingField?.fieldName === 'batteryPct'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'batteryPct')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'batteryPct')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'batteryPct')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'batteryPct')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -770,7 +775,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'color') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <input
                         autoFocus
                         type="text"
@@ -784,16 +789,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         className="input input-xs w-full min-w-[80px]"
                         disabled={savingField?.productId === p.id && savingField?.fieldName === 'color'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'color')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'color')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'color')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'color')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -807,7 +814,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'capacityGB') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <select
                         autoFocus
                         name="capacityGB"
@@ -829,16 +836,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         <option value="1024">1024 GB (1 TB)</option>
                         <option value="2048">2048 GB (2 TB)</option>
                       </select>
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'capacityGB')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'capacityGB')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'capacityGB')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'capacityGB')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -858,7 +867,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'condition') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <select
                         autoFocus
                         value={getEditingValue(p.id, 'condition')}
@@ -878,16 +887,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                           </option>
                         ))}
                       </select>
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'condition')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'condition')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'condition')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'condition')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -901,7 +912,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'costPrice') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <span className='text-xs text-base-content/50'>$ </span>
                       <input
                         autoFocus
@@ -918,16 +929,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         className="input input-xs w-24"
                         disabled={savingField?.productId === p.id && savingField?.fieldName === 'costPrice'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'costPrice')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'costPrice')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'costPrice')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'costPrice')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -941,7 +954,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'salePrice') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <span className='text-xs text-base-content/50'>$ </span>
                       <input
                         autoFocus
@@ -958,16 +971,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         className="input input-xs w-24"
                         disabled={savingField?.productId === p.id && savingField?.fieldName === 'salePrice'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'salePrice')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'salePrice')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'salePrice')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'salePrice')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -981,7 +996,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'stockInitial') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <input
                         autoFocus
                         type="number"
@@ -997,16 +1012,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         className="input input-xs w-20"
                         disabled={savingField?.productId === p.id && savingField?.fieldName === 'stockInitial'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'stockInitial')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'stockInitial')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stockInitial')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stockInitial')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span
@@ -1020,7 +1037,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td>
                   {isEditing(p.id, 'stock') ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <input
                         autoFocus
                         type="number"
@@ -1036,16 +1053,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         className="input input-xs w-20"
                         disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'stock')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'stock')}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stock')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stock')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
@@ -1132,13 +1151,6 @@ export default function FilterableProductsTable({ products }: FilterableProducts
             ))}
           </tbody>
         </table>
-
-        {/* <div className="join mt-4">
-          <button className="join-item btn">«</button>
-          <button className="join-item btn btn-active">1</button>
-          <button className="join-item btn">2</button>
-          <button className="join-item btn">»</button>
-        </div> */}
       </div>
     </div>
   )
