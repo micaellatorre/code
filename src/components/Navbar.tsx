@@ -10,19 +10,19 @@ export default function Navbar({
   onToggleSidebar: () => void
 }) {
   const themes = [
-    { value: 'retro', label: 'Desert', type: 'light' },
-    { value: 'fantasy', label: 'Fantasy', type: 'light' },
-    { value: 'wireframe', label: 'Wireframe', type: 'light' },
-    { value: 'cmyk', label: 'CMYK', type: 'light' },
-    { value: 'autumn', label: 'Autumn', type: 'light' },
-    { value: 'lemonade', label: 'Lemonade', type: 'light' },
     { value: 'luxury', label: 'Luxury', type: 'dark' },
     { value: 'halloween', label: 'Halloween', type: 'dark' },
     { value: 'forest', label: 'Forest', type: 'dark' },
     { value: 'black', label: 'Black', type: 'dark' },
     { value: 'night', label: 'Night', type: 'dark' },
     { value: 'coffee', label: 'Coffee', type: 'dark' },
-    { value: 'winter', label: 'Winter', type: 'dark' },
+    { value: 'retro', label: 'Desert', type: 'light' },
+    { value: 'fantasy', label: 'Fantasy', type: 'light' },
+    { value: 'wireframe', label: 'Wireframe', type: 'light' },
+    { value: 'cmyk', label: 'CMYK', type: 'light' },
+    { value: 'autumn', label: 'Autumn', type: 'light' },
+    { value: 'lemonade', label: 'Lemonade', type: 'light' },
+    { value: 'winter', label: 'Winter', type: 'light' },
   ]
   const [theme, setTheme] = useState('light')
   const { data: dolarData, error, isLoading } = useDolar()
