@@ -22,7 +22,9 @@ type SerializedProduct = {
   shippingCost: string | null
   state: string
   status: string
+  stockInitial: number
   stock: number
+  stockAvailable: number
   notes: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -65,11 +67,12 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [colorFilter, setColorFilter] = useState<string>('')
   const [capacityFilter, setCapacityFilter] = useState<string>('')
   const [stateFilter, setStateFilter] = useState<string>('')
-  const [editingStockId, setEditingStockId] = useState<string | null>(null)
-  const [editingStockValue, setEditingStockValue] = useState<string>('')
-  const [savingStockId, setSavingStockId] = useState<string | null>(null)
+  // Generic editing state: { productId: { fieldName: value } }
+  const [editingFields, setEditingFields] = useState<Record<string, Record<string, string>>>({})
+  const [savingField, setSavingField] = useState<{ productId: string; fieldName: string } | null>(null)
   const [savingStateId, setSavingStateId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isTableExpanded, setIsTableExpanded] = useState(false)
 
   // Product states from prisma schema enum ProductState
   const stateOptions = [
@@ -153,55 +156,216 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     setStateFilter('')
   }
 
-  async function persistStockUpdate(id: string, newStock: number) {
-    setSavingStockId(id)
+  function startEditField(productId: string, fieldName: string, currentValue: any) {
+    setEditingFields((prev) => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [fieldName]: currentValue == null ? '' : String(currentValue),
+      },
+    }))
+  }
+
+  function cancelEditField(productId: string, fieldName: string) {
+    setEditingFields((prev) => {
+      const updated = { ...prev }
+      if (updated[productId]) {
+        const productFields = { ...updated[productId] }
+        delete productFields[fieldName]
+        if (Object.keys(productFields).length === 0) {
+          delete updated[productId]
+        } else {
+          updated[productId] = productFields
+        }
+      }
+      return updated
+    })
+  }
+
+  function updateEditingValue(productId: string, fieldName: string, value: string) {
+    setEditingFields((prev) => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [fieldName]: value,
+      },
+    }))
+  }
+
+  async function persistFieldUpdate(productId: string, fieldName: string, value: any) {
+    setSavingField({ productId, fieldName })
     try {
-      const res = await fetch(`/api/products/${id}`, {
+      const updateBody: any = { [fieldName]: value }
+      
+      // Special handling for stock - also update stockAvailable
+      if (fieldName === 'stock') {
+        const product = productsLocal.find((p) => p.id === productId)
+        if (product) {
+          const delta = Number(value) - (product.stock ?? 0)
+          const newStockAvailable = Math.max(0, (product.stockAvailable ?? 0) + delta)
+          updateBody.stockAvailable = newStockAvailable
+        }
+      }
+
+      const res = await fetch(`/api/products/${productId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock: newStock }),
+        body: JSON.stringify(updateBody),
       })
       if (!res.ok) throw new Error('server error')
       const updated = await res.json()
-      setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, stock: updated.stock } : p)))
+      
+      setProductsLocal((prev) =>
+        prev.map((p) =>
+          p.id === productId
+            ? {
+                ...p,
+                [fieldName]: updated[fieldName] ?? p[fieldName as keyof SerializedProduct],
+                ...(fieldName === 'stock' && updated.stockAvailable !== undefined
+                  ? { stockAvailable: updated.stockAvailable }
+                  : {}),
+              }
+            : p,
+        ),
+      )
+      
+      // Clear editing state
+      cancelEditField(productId, fieldName)
     } catch (err) {
-      // revert by re-fetching from server or by a simple noop here. For now,
-      // revert the local change by setting the product back from props.
+      const original = products.find((p) => p.id === productId)
+      if (original) {
+        setProductsLocal((prev) => prev.map((p) => (p.id === productId ? original : p)))
+      }
+      console.error(`Failed to persist ${fieldName} update`, err)
+    } finally {
+      setSavingField(null)
+    }
+  }
+
+  function commitEditField(productId: string, fieldName: string) {
+    const editingValue = editingFields[productId]?.[fieldName]
+    if (editingValue === undefined) return
+
+    const product = productsLocal.find((p) => p.id === productId)
+    if (!product) return
+
+    let processedValue: any = editingValue.trim() === '' ? null : editingValue.trim()
+
+    // Type-specific processing
+    if (['capacityGB', 'batteryPct'].includes(fieldName)) {
+      if (processedValue === null || processedValue === '') {
+        processedValue = null
+      } else {
+        const num = parseInt(processedValue, 10)
+        if (Number.isNaN(num) || num < 0) return
+        if (fieldName === 'batteryPct' && num > 100) return
+        processedValue = num
+      }
+    } else if (['stock', 'stockInitial', 'stockAvailable'].includes(fieldName)) {
+      const num = parseInt(processedValue || '0', 10)
+      if (Number.isNaN(num) || num < 0) return
+      processedValue = num
+    } else if (['costPrice', 'salePrice'].includes(fieldName)) {
+      const num = parseFloat(processedValue || '0')
+      if (!Number.isFinite(num) || num < 0) return
+      processedValue = num
+    } else if (fieldName === 'shippingCost') {
+      if (processedValue === null || processedValue === '') {
+        processedValue = null
+      } else {
+        const num = parseFloat(processedValue)
+        if (!Number.isFinite(num) || num < 0) return
+        processedValue = num
+      }
+    } else if (['imei', 'color', 'brand', 'notes'].includes(fieldName)) {
+      // For nullable string fields, empty string becomes null
+      processedValue = processedValue === '' ? null : processedValue
+    }
+
+    // Optimistic update
+    setProductsLocal((prev) =>
+      prev.map((p) =>
+        p.id === productId
+          ? {
+              ...p,
+              [fieldName]: processedValue,
+              ...(fieldName === 'stock'
+                ? {
+                    stockAvailable: Math.max(
+                      0,
+                      (p.stockAvailable ?? 0) + (processedValue - (p.stock ?? 0)),
+                    ),
+                  }
+                : {}),
+            }
+          : p,
+      ),
+    )
+
+    persistFieldUpdate(productId, fieldName, processedValue)
+  }
+
+  function isEditing(productId: string, fieldName: string): boolean {
+    return editingFields[productId]?.[fieldName] !== undefined
+  }
+
+  function getEditingValue(productId: string, fieldName: string): string {
+    return editingFields[productId]?.[fieldName] ?? ''
+  }
+
+  // Legacy functions for stock arrows (keep for backwards compatibility)
+  async function persistStockUpdate(id: string, newStock: number, newStockAvailable?: number) {
+    setSavingField({ productId: id, fieldName: 'stock' })
+    try {
+      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock }
+      if (newStockAvailable !== undefined) {
+        updateBody.stockAvailable = newStockAvailable
+      }
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateBody),
+      })
+      if (!res.ok) throw new Error('server error')
+      const updated = await res.json()
+      setProductsLocal((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                stock: updated.stock,
+                stockAvailable: updated.stockAvailable ?? p.stockAvailable,
+              }
+            : p,
+        ),
+      )
+    } catch (err) {
       const original = products.find((p) => p.id === id)
       if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
       console.error('Failed to persist stock update', err)
     } finally {
-      setSavingStockId(null)
+      setSavingField(null)
     }
   }
 
   function startEditStock(id: string, value: number) {
-    setEditingStockId(id)
-    setEditingStockValue(String(value ?? 0))
-  }
-
-  function cancelEditStock() {
-    setEditingStockId(null)
-    setEditingStockValue('')
-  }
-
-  function commitEditStock(id: string) {
-    const v = parseInt(editingStockValue || '0', 10)
-    if (Number.isNaN(v) || v < 0) return
-    // optimistic
-    setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, stock: v } : p)))
-    setEditingStockId(null)
-    setEditingStockValue('')
-    persistStockUpdate(id, v)
+    startEditField(id, 'stock', value)
   }
 
   function changeStockBy(id: string, delta: number) {
     const p = productsLocal.find((x) => x.id === id)
     if (!p) return
     const newStock = Math.max(0, (p.stock ?? 0) + delta)
+    const newStockAvailable = Math.max(0, (p.stockAvailable ?? 0) + delta)
     // optimistic
-    setProductsLocal((prev) => prev.map((prod) => (prod.id === id ? { ...prod, stock: newStock } : prod)))
-    persistStockUpdate(id, newStock)
+    setProductsLocal((prev) =>
+      prev.map((prod) =>
+        prod.id === id
+          ? { ...prod, stock: newStock, stockAvailable: newStockAvailable }
+          : prod,
+      ),
+    )
+    persistStockUpdate(id, newStock, newStockAvailable)
   }
 
   async function persistStateUpdate(id: string, newState: string) {
@@ -298,10 +462,28 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               <button className="btn btn-ghost btn-sm" onClick={() => setTypeFilter('')}>✕</button>
             ) : null}
           </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setIsTableExpanded(!isTableExpanded)}
+            title={isTableExpanded ? 'Contraer tabla' : 'Expandir tabla'}
+          >
+            {isTableExpanded ? (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
+                <path fillRule="evenodd" d="M3.22 3.22a.75.75 0 0 1 1.06 0l3.97 3.97V4.5a.75.75 0 0 1 1.5 0V9a.75.75 0 0 1-.75.75H4.5a.75.75 0 0 1 0-1.5h2.69L3.22 4.28a.75.75 0 0 1 0-1.06Zm17.56 0a.75.75 0 0 1 0 1.06l-3.97 3.97h2.69a.75.75 0 0 1 0 1.5H15a.75.75 0 0 1-.75-.75V4.5a.75.75 0 0 1 1.5 0v2.69l3.97-3.97a.75.75 0 0 1 1.06 0ZM3.75 15a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-2.69l-3.97 3.97a.75.75 0 0 1-1.06-1.06l3.97-3.97H4.5a.75.75 0 0 1-.75-.75Zm10.5 0a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-2.69l3.97 3.97a.75.75 0 1 1-1.06 1.06l-3.97-3.97v2.69a.75.75 0 0 1-1.5 0V15Z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
+                <path fillRule="evenodd" d="M15 3.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0V5.56l-3.97 3.97a.75.75 0 1 1-1.06-1.06l3.97-3.97h-2.69a.75.75 0 0 1-.75-.75Zm-12 0A.75.75 0 0 1 3.75 3h4.5a.75.75 0 0 1 0 1.5H5.56l3.97 3.97a.75.75 0 0 1-1.06 1.06L4.5 5.56v2.69a.75.75 0 0 1-1.5 0v-4.5Zm11.47 11.78a.75.75 0 1 1 1.06-1.06l3.97 3.97v-2.69a.75.75 0 0 1 1.5 0v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1 0-1.5h2.69l-3.97-3.97Zm-4.94-1.06a.75.75 0 0 1 0 1.06L5.56 19.5h2.69a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 1 1.5 0v2.69l3.97-3.97a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
         </div>
-        <Link href="/products/new" className="btn btn-primary">
-          Nuevo Producto
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/products/new" className="btn btn-primary">
+            Nuevo Producto
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
@@ -425,7 +607,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       </div>
 
       <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
-        <table className="table table-zebra w-full">
+        <table className={`table table-zebra w-full table-pin-rows ${isTableExpanded ? '' : 'table-xs'}`}>
           <thead>
             <tr>
               <th>Agregado</th>
@@ -438,6 +620,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               <th>Condición</th>
               <th>Costo (USD)</th>
               <th>Precio Venta (USD)</th>
+              <th>Stock Inicial</th>
               <th>Stock</th>
               <th>Estado</th>
               <th>Acciones</th>
@@ -457,67 +640,409 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   </div>
                 </td>
                 <td>
-                  {p.notes ? (
-                    <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
-                      <span className="underline decoration-dotted cursor-help">
-                        {p.modelName}
-                      </span>
+                  {isEditing(p.id, 'modelName') ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={getEditingValue(p.id, 'modelName')}
+                        onChange={(e) => updateEditingValue(p.id, 'modelName', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'modelName')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'modelName')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'modelName')}
+                        className="input input-xs w-full min-w-[120px]"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'modelName'}
+                      />
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'modelName')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'modelName')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <span>{p.modelName}</span>
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'modelName', p.modelName)}
+                      title="Click para editar"
+                    >
+                      {p.notes ? (
+                        <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
+                          <span className="underline decoration-dotted">
+                            {p.modelName}
+                          </span>
+                        </div>
+                      ) : (
+                        p.modelName
+                      )}
+                    </span>
                   )}
                 </td>
-                <td>{p.imei}</td>
                 <td>
-                  {p.batteryPct != null ? (
-                    <>
-                      {p.batteryPct}<span className="text-xs text-base-content/50"> %</span>
-                    </>
+                  {isEditing(p.id, 'imei') ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={getEditingValue(p.id, 'imei')}
+                        onChange={(e) => updateEditingValue(p.id, 'imei', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'imei')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'imei')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'imei')}
+                        className="input input-xs w-full min-w-[100px]"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'imei'}
+                      />
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'imei')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'imei')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   ) : (
-                    '-'
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'imei', p.imei)}
+                      title="Click para editar"
+                    >
+                      {p.imei || '-'}
+                    </span>
                   )}
                 </td>
-                <td>{p.color ?? '-'}</td>
                 <td>
-                  {p.capacityGB != null ?
-                    (
-                      <>
-                        {p.capacityGB}<span className="text-xs text-base-content/50"> GB</span>
-                      </>
-                    ) : (
-                      '-'
-                    )
-                  }
+                  {isEditing(p.id, 'batteryPct') ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={getEditingValue(p.id, 'batteryPct')}
+                        onChange={(e) => updateEditingValue(p.id, 'batteryPct', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'batteryPct')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'batteryPct')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'batteryPct')}
+                        className="input input-xs w-20"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'batteryPct'}
+                      />
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'batteryPct')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'batteryPct')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'batteryPct', p.batteryPct)}
+                      title="Click para editar"
+                    >
+                      {p.batteryPct != null ? (
+                        <>
+                          {p.batteryPct}<span className="text-xs text-base-content/50"> %</span>
+                        </>
+                      ) : (
+                        '-'
+                      )}
+                    </span>
+                  )}
                 </td>
                 <td>
-                  {p.condition == null ? '-' : conditionLabelMap[p.condition] ?? p.condition}
+                  {isEditing(p.id, 'color') ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={getEditingValue(p.id, 'color')}
+                        onChange={(e) => updateEditingValue(p.id, 'color', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'color')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'color')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'color')}
+                        className="input input-xs w-full min-w-[80px]"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'color'}
+                      />
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'color')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'color')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'color', p.color)}
+                      title="Click para editar"
+                    >
+                      {p.color ?? '-'}
+                    </span>
+                  )}
                 </td>
-                <td><span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).costPrice)}</td>
-                <td><span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).salePrice)}</td>
                 <td>
-                  {editingStockId === p.id ? (
-                    <div className="flex items-center gap-2">
+                  {isEditing(p.id, 'capacityGB') ? (
+                    <div className="flex items-center gap-1">
+                      <select
+                        autoFocus
+                        name="capacityGB"
+                        value={getEditingValue(p.id, 'capacityGB')}
+                        onChange={(e) => updateEditingValue(p.id, 'capacityGB', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'capacityGB')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'capacityGB')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'capacityGB')}
+                        className="select select-xs w-24"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'capacityGB'}
+                      >
+                        <option value="">Seleccionar</option>
+                        <option value="64">64 GB</option>
+                        <option value="128">128 GB</option>
+                        <option value="256">256 GB</option>
+                        <option value="512">512 GB</option>
+                        <option value="1024">1024 GB (1 TB)</option>
+                        <option value="2048">2048 GB (2 TB)</option>
+                      </select>
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'capacityGB')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'capacityGB')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'capacityGB', p.capacityGB)}
+                      title="Click para editar"
+                    >
+                      {p.capacityGB != null ? (
+                        <>
+                          {p.capacityGB}<span className="text-xs text-base-content/50"> GB</span>
+                        </>
+                      ) : (
+                        '-'
+                      )}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {isEditing(p.id, 'condition') ? (
+                    <div className="flex items-center gap-1">
+                      <select
+                        autoFocus
+                        value={getEditingValue(p.id, 'condition')}
+                        onChange={(e) => updateEditingValue(p.id, 'condition', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'condition')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'condition')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'condition')}
+                        className="select select-xs w-full min-w-[100px]"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'condition'}
+                      >
+                        <option value="">-</option>
+                        {conditionOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {conditionLabelMap[opt] ?? opt}
+                          </option>
+                        ))}
+                      </select>
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'condition')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'condition')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'condition', p.condition)}
+                      title="Click para editar"
+                    >
+                      {p.condition == null ? '-' : conditionLabelMap[p.condition] ?? p.condition}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {isEditing(p.id, 'costPrice') ? (
+                    <div className="flex items-center gap-1">
+                      <span className='text-xs text-base-content/50'>$ </span>
+                      <input
+                        autoFocus
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={getEditingValue(p.id, 'costPrice')}
+                        onChange={(e) => updateEditingValue(p.id, 'costPrice', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'costPrice')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'costPrice')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'costPrice')}
+                        className="input input-xs w-24"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'costPrice'}
+                      />
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'costPrice')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'costPrice')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'costPrice', p.costPrice)}
+                      title="Click para editar"
+                    >
+                      <span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).costPrice)}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {isEditing(p.id, 'salePrice') ? (
+                    <div className="flex items-center gap-1">
+                      <span className='text-xs text-base-content/50'>$ </span>
+                      <input
+                        autoFocus
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={getEditingValue(p.id, 'salePrice')}
+                        onChange={(e) => updateEditingValue(p.id, 'salePrice', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'salePrice')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'salePrice')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'salePrice')}
+                        className="input input-xs w-24"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'salePrice'}
+                      />
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'salePrice')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'salePrice')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'salePrice', p.salePrice)}
+                      title="Click para editar"
+                    >
+                      <span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).salePrice)}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {isEditing(p.id, 'stockInitial') ? (
+                    <div className="flex items-center gap-1">
                       <input
                         autoFocus
                         type="number"
                         min={0}
                         step={1}
-                        value={editingStockValue}
-                        onChange={(e) => setEditingStockValue(e.target.value)}
+                        value={getEditingValue(p.id, 'stockInitial')}
+                        onChange={(e) => updateEditingValue(p.id, 'stockInitial', e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditStock(p.id)
-                          if (e.key === 'Escape') cancelEditStock()
+                          if (e.key === 'Enter') commitEditField(p.id, 'stockInitial')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'stockInitial')
                         }}
-                        onBlur={() => commitEditStock(p.id)}
-                        className="input input-sm w-20"
+                        onBlur={() => commitEditField(p.id, 'stockInitial')}
+                        className="input input-xs w-20"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'stockInitial'}
                       />
-                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditStock(p.id)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'stockInitial')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
                       </button>
-                      <button className="btn btn-ghost btn-xs" onClick={cancelEditStock}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'stockInitial')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'stockInitial', p.stockInitial)}
+                      title="Click para editar"
+                    >
+                      {p.stockInitial}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {isEditing(p.id, 'stock') ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={getEditingValue(p.id, 'stock')}
+                        onChange={(e) => updateEditingValue(p.id, 'stock', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'stock')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'stock')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'stock')}
+                        className="input input-xs w-20"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
+                      />
+                      <button className="btn btn-ghost btn-xs" onClick={() => commitEditField(p.id, 'stock')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      </button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => cancelEditField(p.id, 'stock')}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
                       </button>
@@ -528,18 +1053,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                         <button
                           className="btn btn-ghost btn-xs"
                           aria-label="decrement stock"
-                          disabled={savingStockId === p.id}
+                          disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
                           onClick={() => changeStockBy(p.id, -1)}
                         >
                           ▼
                         </button>
-                        <span className="cursor-pointer" onClick={() => startEditStock(p.id, p.stock)}>
+                        <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditStock(p.id, p.stock)} title="Click para editar">
                           {p.stock}
                         </span>
                         <button
                           className="btn btn-ghost btn-xs"
                           aria-label="increment stock"
-                          disabled={savingStockId === p.id}
+                          disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
                           onClick={() => changeStockBy(p.id, 1)}
                         >
                           ▲
@@ -549,9 +1074,9 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   )}
                 </td>
                 <td>
-                  <div className="dropdown dropdown-end relative">
-                    <label tabIndex={0} className="btn btn-ghost btn-sm gap-2">
-                      <span className={`badge ${stateColorMap[p.state] ?? 'badge-ghost'}`}>{p.state}</span>
+                  <div className="dropdown dropdown-start relative">
+                    <div tabIndex={0} role="button" className="flex flex-row flex-nowrap gap-2 items-center cursor-pointer btn btn-xs btn-ghost py-2">
+                      <span className={`badge badge-sm ${stateColorMap[p.state] ?? 'badge-ghost'}`}>{p.state}</span>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-4 w-4"
@@ -562,16 +1087,17 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
-                    </label>
-                    <ul tabIndex={0} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
+                    </div>
+                    <ul tabIndex={-1} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
                       {stateOptions.map((s) => (
-                        <li key={s}>
+                        <li key={s} className='py-2 flex flex-row items-center gap-2'>
                           <button
-                            className={`w-full text-left btn btn-ghost justify-start ${stateColorMap[s] ?? ''}`}
+                            className={`w-full text-left btn btn-ghost btn-xs justify-start ${stateColorMap[s] ?? ''}`}
                             disabled={savingStateId === p.id}
                             onClick={() => changeState(p.id, s)}
                           >
-                            <span className={`badge ${stateColorMap[s] ?? 'badge-ghost'} mr-2`}>{s}</span>
+                            {s}
+                            <div className={`w-2 h-2 rounded-full border ${stateColorMap[s] ?? ''}`}></div>
                           </button>
                         </li>
                       ))}
@@ -579,11 +1105,11 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   </div>
                 </td>
                 <td className="flex items-center gap-2">
-                  <Link href={`/products/${p.id}/edit`} className="btn btn-sm btn-soft">
-                    <svg width="800px" height="800px" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="size-6"><path fillRule="evenodd" clipRule="evenodd" d="m3.99 16.854-1.314 3.504a.75.75 0 0 0 .966.965l3.503-1.314a3 3 0 0 0 1.068-.687L18.36 9.175s-.354-1.061-1.414-2.122c-1.06-1.06-2.122-1.414-2.122-1.414L4.677 15.786a3 3 0 0 0-.687 1.068zm12.249-12.63 1.383-1.383c.248-.248.579-.406.925-.348.487.08 1.232.322 1.934 1.025.703.703.945 1.447 1.025 1.934.058.346-.1.677-.348.925L19.774 7.76s-.353-1.06-1.414-2.12c-1.06-1.062-2.121-1.415-2.121-1.415z" /></svg>
+                  <Link href={`/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
+                    <svg width="800px" height="800px" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="size-[1.2em]"><path fillRule="evenodd" clipRule="evenodd" d="m3.99 16.854-1.314 3.504a.75.75 0 0 0 .966.965l3.503-1.314a3 3 0 0 0 1.068-.687L18.36 9.175s-.354-1.061-1.414-2.122c-1.06-1.06-2.122-1.414-2.122-1.414L4.677 15.786a3 3 0 0 0-.687 1.068zm12.249-12.63 1.383-1.383c.248-.248.579-.406.925-.348.487.08 1.232.322 1.934 1.025.703.703.945 1.447 1.025 1.934.058.346-.1.677-.348.925L19.774 7.76s-.353-1.06-1.414-2.12c-1.06-1.062-2.121-1.415-2.121-1.415z" /></svg>
                   </Link>
                   <button
-                    className="btn btn-sm btn-soft btn-error"
+                    className="btn btn-xs btn-square btn-soft btn-error"
                     onClick={() => deleteProduct(p.id)}
                     disabled={deletingId === p.id}
                     aria-disabled={deletingId === p.id}
@@ -595,7 +1121,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       </>
                       :
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-[1.2em]">
                           <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clipRule="evenodd" />
                         </svg>
                       </>

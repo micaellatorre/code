@@ -29,6 +29,9 @@ export default async function ProductsPage() {
     createdAt: p.createdAt ? p.createdAt.toISOString() : null,
     updatedAt: p.updatedAt ? p.updatedAt.toISOString() : null,
     notes: p.notes ?? '',
+    stockInitial: p.stockInitial ?? 0,
+    stock: p.stock ?? 0,
+    stockAvailable: p.stockAvailable ?? 0,
   }))
 
   return (

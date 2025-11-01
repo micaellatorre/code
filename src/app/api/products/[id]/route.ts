@@ -38,11 +38,81 @@ export async function PATCH(request: Request, { params }: Params) {
       }
       updateData.stock = stock
     }
+    if (Object.prototype.hasOwnProperty.call(body, 'stockAvailable')) {
+      const stockAvailable = Number(body.stockAvailable)
+      if (!Number.isInteger(stockAvailable) || stockAvailable < 0) {
+        return NextResponse.json({ error: 'Valor de stock disponible inválido' }, { status: 400 })
+      }
+      updateData.stockAvailable = stockAvailable
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'stockInitial')) {
+      const stockInitial = Number(body.stockInitial)
+      if (!Number.isInteger(stockInitial) || stockInitial < 0) {
+        return NextResponse.json({ error: 'Valor de stock inicial inválido' }, { status: 400 })
+      }
+      updateData.stockInitial = stockInitial
+    }
+    // Handle decimal fields with proper validation
+    if (Object.prototype.hasOwnProperty.call(body, 'costPrice')) {
+      const costPrice = parseFloat(body.costPrice)
+      if (!Number.isFinite(costPrice) || costPrice < 0) {
+        return NextResponse.json({ error: 'Valor de costo inválido' }, { status: 400 })
+      }
+      updateData.costPrice = costPrice
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'salePrice')) {
+      const salePrice = parseFloat(body.salePrice)
+      if (!Number.isFinite(salePrice) || salePrice < 0) {
+        return NextResponse.json({ error: 'Valor de precio de venta inválido' }, { status: 400 })
+      }
+      updateData.salePrice = salePrice
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'shippingCost')) {
+      if (body.shippingCost === null || body.shippingCost === '') {
+        updateData.shippingCost = null
+      } else {
+        const shippingCost = parseFloat(body.shippingCost)
+        if (!Number.isFinite(shippingCost) || shippingCost < 0) {
+          return NextResponse.json({ error: 'Valor de costo de envío inválido' }, { status: 400 })
+        }
+        updateData.shippingCost = shippingCost
+      }
+    }
+    
+    // Handle integer fields
+    if (Object.prototype.hasOwnProperty.call(body, 'capacityGB')) {
+      if (body.capacityGB === null || body.capacityGB === '') {
+        updateData.capacityGB = null
+      } else {
+        const capacityGB = Number(body.capacityGB)
+        if (!Number.isInteger(capacityGB) || capacityGB < 0) {
+          return NextResponse.json({ error: 'Valor de capacidad inválido' }, { status: 400 })
+        }
+        updateData.capacityGB = capacityGB
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'batteryPct')) {
+      if (body.batteryPct === null || body.batteryPct === '') {
+        updateData.batteryPct = null
+      } else {
+        const batteryPct = Number(body.batteryPct)
+        if (!Number.isInteger(batteryPct) || batteryPct < 0 || batteryPct > 100) {
+          return NextResponse.json({ error: 'Valor de batería inválido (debe ser entre 0 y 100)' }, { status: 400 })
+        }
+        updateData.batteryPct = batteryPct
+      }
+    }
+    
     // Permit other partial updates if needed
-  const allowed = ['modelName', 'brand', 'capacityGB', 'condition', 'color', 'batteryPct', 'costPrice', 'salePrice', 'shippingCost', 'status', 'state', 'imei', 'notes']
+    const allowed = ['modelName', 'brand', 'condition', 'color', 'status', 'state', 'imei', 'notes']
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
-        updateData[key] = body[key]
+        // Handle empty strings as null for nullable fields
+        if (['brand', 'imei', 'color', 'notes'].includes(key) && body[key] === '') {
+          updateData[key] = null
+        } else {
+          updateData[key] = body[key]
+        }
       }
     }
 
