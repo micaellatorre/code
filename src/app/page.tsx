@@ -34,6 +34,16 @@ export default async function HomePage() {
       prisma.wholesaleOrder.count(),
     ])
 
+  // Inversión en stock (suma de costPrice * stock para productos EN_STOCK)
+  const productsEnStock = await prisma.product.findMany({
+    where: { state: 'EN_STOCK' },
+    select: { costPrice: true, stock: true },
+  })
+  const inversionEnStock = productsEnStock.reduce(
+    (acc, p) => acc + Number(p.costPrice) * p.stock,
+    0,
+  )
+
   // Facturación y ganancia del día
   const now = new Date()
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -51,12 +61,16 @@ export default async function HomePage() {
       <h1 className="text-2xl font-bold mb-4">Panel de Control</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <DashboardKpiCard title="Productos" value={totalProducts} />
+        <DashboardKpiCard title="Stock total" value={`${stockTotal} u.`} />
+        <DashboardKpiCard
+          title="Inversión En Stock"
+          value={`U$D ${inversionEnStock.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        />
         <DashboardKpiCard title="Proveedores" value={totalSuppliers} />
         <DashboardKpiCard title="Compras" value={totalPurchases} />
         <DashboardKpiCard title="Ventas" value={totalSales} />
         <DashboardKpiCard title="Perfiles de Costo" value={totalCostProfiles} />
         <DashboardKpiCard title="Pedidos Mayoristas" value={totalWholesaleOrders} />
-        <DashboardKpiCard title="Stock total" value={`${stockTotal} u.`} />
         <DashboardKpiCard title="Facturación del día" value={`$${facturacionDia.toFixed(2)}`} />
         <DashboardKpiCard title="Ganancia del día" value={`$${gananciaDia.toFixed(2)}`} />
       </div>
