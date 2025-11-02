@@ -73,6 +73,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [savingStateId, setSavingStateId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isTableExpanded, setIsTableExpanded] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Product states from prisma schema enum ProductState
   const stateOptions = [
@@ -425,7 +426,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   }
 
   return (
-    <div className="flex flex-col gap-4 !h-full flex-1">
+    <div className="flex flex-col gap-4 !h-full flex-1 relative">
       <div className="flex justify-between items-center">
         <div className="flex flex-row items-center justify-between gap-2">
           <h2 className="text-2xl font-bold">
@@ -488,7 +489,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
           {search ? (
             <button
@@ -500,119 +501,317 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               ✕
             </button>
           ) : null}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <select
-            value={conditionFilter}
-            onChange={(e) => setConditionFilter(e.target.value)}
-            className="select select-bordered w-full max-w-xs"
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => setDrawerOpen(true)}
           >
-            <option value="">Filtrar por Condición</option>
-            {conditionOptions
-              .filter((opt) => conditions.includes(opt))
-              .map((c) => (
-                <option key={c} value={c}>
-                  {conditionLabelMap[c] ?? c}
-                </option>
-              ))}
-          </select>
-          {conditionFilter ? (
-            <button className="btn btn-ghost btn-sm" onClick={() => setConditionFilter('')}>✕</button>
-          ) : null}
-        </div>
-
-        <div className="join join-vertical relative -mt-0.5 max-w-[150px]">
-          <label className='flex flex-row text-right items-center join-item input input-bordered input-xs w-full min-w-[140px]'>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-[2.5em] opacity-55 mx-1">
-              <path d="M4.5 9.75a.75.75 0 0 0-.75.75V15c0 .414.336.75.75.75h6.75A.75.75 0 0 0 12 15v-4.5a.75.75 0 0 0-.75-.75H4.5Z" />
-              <path fillRule="evenodd" d="M3.75 6.75a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3v-.037c.856-.174 1.5-.93 1.5-1.838v-2.25c0-.907-.644-1.664-1.5-1.837V9.75a3 3 0 0 0-3-3h-15Zm15 1.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5h15Z" clipRule="evenodd" />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
             </svg>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={batteryMin}
-              placeholder="Min"
-              onChange={(e) => setBatteryMin(e.target.value)}
-              className='w-full'
-            />
-          </label>
-          {batteryMin ? <button className="absolute right-0 top-0 btn btn-ghost btn-xs" onClick={() => setBatteryMin('')}>✕</button> : null}
-          <label className='flex flex-row text-right items-center join-item input input-bordered input-xs w-full min-w-[140px]'>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-[2.5em] opacity-55 mx-1">
-              <path fillRule="evenodd" d="M3.75 6.75a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3v-.037c.856-.174 1.5-.93 1.5-1.838v-2.25c0-.907-.644-1.664-1.5-1.837V9.75a3 3 0 0 0-3-3h-15Zm15 1.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5v-6a1.5 1.5 0 0 1 1.5-1.5h15ZM4.5 9.75a.75.75 0 0 0-.75.75V15c0 .414.336.75.75.75H18a.75.75 0 0 0 .75-.75v-4.5a.75.75 0 0 0-.75-.75H4.5Z" clipRule="evenodd" />
-            </svg>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              placeholder="Max"
-              value={batteryMax}
-              onChange={(e) => setBatteryMax(e.target.value)}
-              className='w-full'
-            />
-          </label>
-          {batteryMax ? <button className="absolute right-0 bottom-0 btn btn-ghost btn-xs" onClick={() => setBatteryMax('')}>✕</button> : null}
-        </div>
+            Filtros
+          </button>
+          {/* Add a chip for each activeFilters */}
+          {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) &&
+            <div className="flex items-center gap-2">
+              {brandFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Marca: {brandFilter}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setBrandFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {conditionFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Condición: {conditionLabelMap[conditionFilter]}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setConditionFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {colorFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Color: {colorFilter}
+                  <button
 
-        <div className="flex items-center gap-2">
-          <select
-            value={colorFilter}
-            onChange={(e) => setColorFilter(e.target.value)}
-            className="select select-bordered w-full max-w-xs"
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setColorFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {capacityFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Capacidad: {capacityFilter} GB
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setCapacityFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {stateFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Estado: {stateLabelMap[stateFilter]}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setStateFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {(batteryMin || batteryMax) && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Batería: {batteryMin ? `Min ${batteryMin}%` : ''}{batteryMin && batteryMax ? ' - ' : ''}{batteryMax ? `Max ${batteryMax}%` : ''}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => {
+                      setBatteryMin('')
+                      setBatteryMax('')
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+            </div>
+          }
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => clearFilters()}
           >
-            <option value="">Todos los colores</option>
-            {colors.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          {colorFilter ? <button className="btn btn-ghost btn-sm" onClick={() => setColorFilter('')}>✕</button> : null}
+            Limpiar
+          </button>
         </div>
-
-        <div className="flex items-center gap-2">
-          <select
-            value={capacityFilter}
-            onChange={(e) => setCapacityFilter(e.target.value)}
-            className="select select-bordered w-full max-w-xs"
-          >
-            <option value="">Todas las capacidades</option>
-            {capacities.map((cap) => (
-              <option key={cap} value={String(cap)}>
-                {cap} GB
-              </option>
-            ))}
-          </select>
-          {capacityFilter ? <button className="btn btn-ghost btn-sm" onClick={() => setCapacityFilter('')}>✕</button> : null}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <select
-            value={stateFilter}
-            onChange={(e) => setStateFilter(e.target.value)}
-            className="select select-bordered w-full max-w-xs"
-          >
-            <option value="">Todos los estados</option>
-            {stateOptions.map((s) => (
-              <option key={s} value={s}>
-                {stateLabelMap[s] ?? s}
-              </option>
-            ))}
-          </select>
-          {stateFilter ? <button className="btn btn-ghost btn-sm" onClick={() => setStateFilter('')}>✕</button> : null}
-        </div>
-
-        <button className="btn btn-ghost" onClick={clearFilters}>Limpiar filtros</button>
       </div>
+
+      {/* Drawer for filters - positioned fixed to overlay content */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-[100] pointer-events-none">
+          <label
+            htmlFor="filters-drawer"
+            className="fixed inset-0 bg-black/50 cursor-pointer pointer-events-auto backdrop-blur-[0.1em]"
+            onClick={() => setDrawerOpen(false)}
+          ></label>
+          <div className="fixed right-0 top-0 h-full w-80 bg-base-200 text-base-content shadow-xl pointer-events-auto overflow-y-auto">
+            <div className="menu p-4 min-h-full">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Filtros</h3>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-circle btn-ghost"
+                  onClick={() => setDrawerOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {/* Condition Filter */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold">Condición</span>
+                  </label>
+                  <select
+                    value={conditionFilter}
+                    onChange={(e) => setConditionFilter(e.target.value)}
+                    className="select select-bordered select-sm"
+                  >
+                    <option value="">Todas las condiciones</option>
+                    {conditionOptions
+                      .filter((opt) => conditions.includes(opt))
+                      .map((c) => (
+                        <option key={c} value={c}>
+                          {conditionLabelMap[c] ?? c}
+                        </option>
+                      ))}
+                  </select>
+                  {conditionFilter && (
+                    <button
+                      className="btn btn-ghost btn-xs mt-1"
+                      onClick={() => setConditionFilter('')}
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* Battery Range */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold">Batería (%)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="form-control flex-1">
+                      <label className="label">
+                        <span className="label-text text-xs">Mínimo</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={batteryMin}
+                        placeholder="Min"
+                        onChange={(e) => setBatteryMin(e.target.value)}
+                        className="input input-bordered input-sm"
+                      />
+                    </div>
+                    <div className="form-control flex-1">
+                      <label className="label">
+                        <span className="label-text text-xs">Máximo</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        placeholder="Max"
+                        value={batteryMax}
+                        onChange={(e) => setBatteryMax(e.target.value)}
+                        className="input input-bordered input-sm"
+                      />
+                    </div>
+                  </div>
+                  {(batteryMin || batteryMax) && (
+                    <button
+                      className="btn btn-ghost btn-xs mt-1"
+                      onClick={() => {
+                        setBatteryMin('')
+                        setBatteryMax('')
+                      }}
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* Color Filter */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold">Color</span>
+                  </label>
+                  <select
+                    value={colorFilter}
+                    onChange={(e) => setColorFilter(e.target.value)}
+                    className="select select-bordered select-sm"
+                  >
+                    <option value="">Todos los colores</option>
+                    {colors.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  {colorFilter && (
+                    <button
+                      className="btn btn-ghost btn-xs mt-1"
+                      onClick={() => setColorFilter('')}
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* Capacity Filter */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold">Capacidad (GB)</span>
+                  </label>
+                  <select
+                    value={capacityFilter}
+                    onChange={(e) => setCapacityFilter(e.target.value)}
+                    className="select select-bordered select-sm"
+                  >
+                    <option value="">Todas las capacidades</option>
+                    {capacities.map((cap) => (
+                      <option key={cap} value={String(cap)}>
+                        {cap} GB
+                      </option>
+                    ))}
+                  </select>
+                  {capacityFilter && (
+                    <button
+                      className="btn btn-ghost btn-xs mt-1"
+                      onClick={() => setCapacityFilter('')}
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* State Filter */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-semibold">Estado</span>
+                  </label>
+                  <select
+                    value={stateFilter}
+                    onChange={(e) => setStateFilter(e.target.value)}
+                    className="select select-bordered select-sm"
+                  >
+                    <option value="">Todos los estados</option>
+                    {stateOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {stateLabelMap[s] ?? s}
+                      </option>
+                    ))}
+                  </select>
+                  {stateFilter && (
+                    <button
+                      className="btn btn-ghost btn-xs mt-1"
+                      onClick={() => setStateFilter('')}
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* Clear All Filters */}
+                <div className="divider"></div>
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => {
+                    clearFilters()
+                    setDrawerOpen(false)
+                  }}
+                >
+                  Limpiar todos los filtros
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <input
+        id="filters-drawer"
+        type="checkbox"
+        className="hidden"
+        checked={drawerOpen}
+        onChange={(e) => setDrawerOpen(e.target.checked)}
+      />
 
       <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
         <table className={`table table-zebra w-full table-pin-rows table-pin-cols ${isTableExpanded ? '' : 'table-xs'}`}>
           <thead>
             <tr>
               <th>Agregado</th>
-              {/* <th>Editado</th> */}
               <th>Modelo</th>
               <th>IMEI</th>
               <th>Bateria %</th>
