@@ -440,8 +440,8 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               {products.length}
             </span>
           </h2>
-          <div className="ml-2 flex rounded-box border border-base-content/10 items-center gap-2">
-            <div className="join">
+          <div className="ml-2 flex items-center gap-2">
+            <div className="join border-[0.1em] border-base-content/10 ">
               <button
                 type="button"
                 className={`join-item btn btn-sm ${typeFilter === 'PHONE' ? 'btn-active' : ''}`}
@@ -459,12 +459,12 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               </button>
             </div>
             {typeFilter ? (
-              <button className="btn btn-ghost btn-sm" onClick={() => setTypeFilter('')}>✕</button>
+              <button className="btn btn-ghost btn-xs" onClick={() => setTypeFilter('')}>✕</button>
             ) : null}
           </div>
           <button
             type="button"
-            className="btn btn-ghost btn-sm btn-outline border border-base-content/10"
+            className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
             onClick={() => setIsTableExpanded(!isTableExpanded)}
             title={isTableExpanded ? 'Contraer tabla' : 'Expandir tabla'}
           >
@@ -608,7 +608,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       </div>
 
       <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
-        <table className={`table table-zebra w-full table-pin-rows ${isTableExpanded ? '' : 'table-xs'}`}>
+        <table className={`table table-zebra w-full table-pin-rows table-pin-cols ${isTableExpanded ? '' : 'table-xs'}`}>
           <thead>
             <tr>
               <th>Agregado</th>
