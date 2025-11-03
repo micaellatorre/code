@@ -490,17 +490,11 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
         <div className="flex items-center gap-2 flex-1">
-          <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
-          {search ? (
-            <button
-              type="button"
-              aria-label="Limpiar búsqueda"
-              onClick={() => setSearch('')}
-              className="btn btn-ghost btn-sm"
-            >
-              ✕
-            </button>
-          ) : null}
+          <SearchBar
+            placeholder="Buscar por modelo..."
+            onSearch={setSearch}
+            search={search}
+          />
           <button
             type="button"
             className="btn btn-outline btn-sm"
