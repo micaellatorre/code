@@ -824,14 +824,49 @@ export default function FilterableProductsTable({ products }: FilterableProducts
             {filteredProducts.map((p) => (
               <tr key={p.id}>
                 <td className='text-xs text-base-content/60'>
-                  <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
-                    <span className="underline decoration-dotted cursor-help">
-                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                      }) : '-'}
+                  {isEditing(p.id, 'createdAt') ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        type="date"
+                        value={getEditingValue(p.id, 'createdAt')}
+                        onChange={(e) => updateEditingValue(p.id, 'createdAt', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'createdAt')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'createdAt')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'createdAt')}
+                        className="input input-xs w-full min-w-[120px]"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'createdAt'}
+                      />
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'createdAt')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'createdAt')}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'createdAt', p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '')}
+                      title="Click para editar">
+                      <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
+                        <span className="underline decoration-dotted cursor-help">
+                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          }) : '-'}
+                        </span>
+                      </div>
                     </span>
-                  </div>
+                  )}
                 </td>
                 <td>
                   {isEditing(p.id, 'modelName') ? (
