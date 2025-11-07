@@ -54,7 +54,6 @@ export async function GET(request: Request) {
         instagram: true,
       },
     });
-    console.log(buyers)
 
     return NextResponse.json(buyers);
   } catch (error) {

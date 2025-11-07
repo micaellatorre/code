@@ -38,7 +38,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
                     <input 
                         type="datetime-local"
                         name="date"
-                        value={meta.date.toISOString().substring(0, 16)} // Format for datetime-local input
+                        value={meta.date.toISOString().substring(0, 16)}
                         onChange={handleDateChange}
                         className="input input-bordered"
                     />

@@ -41,7 +41,6 @@ export async function GET(request: Request) {
       },
     });
 
-    console.log(products)
     return NextResponse.json(products);
   } catch (error) {
     console.error('Error fetching products:', error);

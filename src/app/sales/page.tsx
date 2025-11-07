@@ -14,7 +14,6 @@ export const metadata: Metadata = {
 
 // Fuerza render del lado del servidor y runtime Node (Prisma)
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 // Helper de serialización (evita BigInt/Decimal en cliente)
 function toStr(v: any) {
