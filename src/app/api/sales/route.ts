@@ -18,9 +18,6 @@ export async function GET() {
 
 // POST: crea una venta y sus items/pagos; descuenta stock y controla estado
 export async function POST(request: Request) {
-  const debug = process.env.NODE_ENV !== "production";
-  const startedAt = Date.now();
-
   let body: any;
   try {
     body = await request.json();
@@ -43,15 +40,9 @@ export async function POST(request: Request) {
     );
   }
 
-  if (debug) {
-    console.group("[POST /api/sales] ▶︎ Nueva venta");
-    console.log("Payload bruto:", JSON.stringify(body, null, 2));
-  }
-
   let newSaleId: string | null = null;
 
   try {
-    // Hacemos SOLO las escrituras dentro del $transaction y devolvemos el ID.
     const txResult = await prisma.$transaction(
       async (tx) => {
         const tenantId = process.env.DEFAULT_TENANT_ID as string | undefined;
@@ -119,19 +110,6 @@ export async function POST(request: Request) {
           } else if (raw.kind === "IN_TOTAL") {
             extraCosts = extraCosts.add(lineCost);
           }
-
-          if (debug) {
-            console.log("Ítem ⇢", {
-              productId: prod.id,
-              modelName: prod.modelName,
-              kind: raw.kind,
-              units: units.toString(),
-              unitPrice: unitPrice.toString(),
-              unitCostDB: unitCost.toString(),
-              extraCost: extra.toString(),
-              lineCost: lineCost.toString(),
-            });
-          }
         }
 
         const total = subtotal.add(extraCosts);
@@ -149,17 +127,6 @@ export async function POST(request: Request) {
           );
           err.statusCode = 400;
           throw err;
-        }
-
-        if (debug) {
-          console.log("Totales ⇢", {
-            subtotal: subtotal.toString(),
-            extraCosts: extraCosts.toString(),
-            costTotal: costTotal.toString(),
-            total: total.toString(),
-            profit: profit.toString(),
-            totalPaid: totalPaid.toString(),
-          });
         }
 
         // Crear Sale + Payments
@@ -246,32 +213,19 @@ export async function POST(request: Request) {
             });
           }
 
-          if (debug) {
-            console.log("Stock ⇢", {
-              productId: prod.id,
-              modelName: updated.modelName,
-              beforeStock: prod.stock,
-              unitsDecrement: unitsNum,
-              afterStock: updated.stock,
-              prevState: prod.state,
-              nextState: nextState ?? updated.state,
-            });
-          }
-
-          // Sync local para siguientes logs
+          // Sync snapshot local para consistencia si hubiera más iteraciones
           prod.stock = updated.stock;
           prod.state = (nextState ?? updated.state) as ProductSate;
         }
 
         return { saleId: sale.id };
       },
-      // Ajustamos timeout para dev con logs; prod suele ir rápido igual
       { timeout: 15000, maxWait: 5000 }
     );
 
     newSaleId = txResult.saleId;
 
-    // ⚠️ Lectura FUERA de la transacción (ya está commiteada)
+    // Lectura FUERA de la transacción
     const created = await prisma.sale.findUnique({
       where: { id: newSaleId },
       include: {
@@ -281,20 +235,8 @@ export async function POST(request: Request) {
       },
     });
 
-    if (debug) {
-      console.log(
-        "[POST /api/sales] ✔︎ OK en",
-        `${Date.now() - startedAt}ms`
-      );
-      console.groupEnd();
-    }
-
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
-    if (debug) {
-      console.error("[POST /api/sales] ✖ Error:", err?.message || err);
-      console.groupEnd?.();
-    }
     if (err?.statusCode) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
