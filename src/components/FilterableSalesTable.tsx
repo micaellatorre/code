@@ -66,7 +66,7 @@ function normalizeSales(input: any[]): SerializedSale[] {
   }));
 }
 
-// Modelo principal: prioriza PHONE; heurística; fallback
+// Modelo principal (para la columna “Modelo”)
 const getMainModel = (items: any[] | undefined) => {
   if (!Array.isArray(items) || items.length === 0) return "-";
   const phoneByType = items.find(
@@ -85,11 +85,7 @@ const getMainModel = (items: any[] | undefined) => {
 };
 
 // ====== Componente ======
-export default function FilterableSalesTable({
-  initial,
-}: {
-  initial: SerializedSale[];
-}) {
+export default function FilterableSalesTable({ initial }: { initial: SerializedSale[] }) {
   // Normaliza SSR inicial
   const [items, setItems] = useState<SerializedSale[]>(() =>
     normalizeSales(initial)
@@ -116,7 +112,7 @@ export default function FilterableSalesTable({
   const [minProfit, setMinProfit] = useState<string>("");
   const [maxProfit, setMaxProfit] = useState<string>("");
 
-  // Inline edit por campo
+  // Inline edit por campo (mismo patrón que Products)
   const [editingFields, setEditingFields] = useState<
     Record<string, Record<string, string>>
   >({});
@@ -130,6 +126,12 @@ export default function FilterableSalesTable({
 
   // Abort de fetch para evitar race
   const abortRef = useRef<AbortController | null>(null);
+  const ctrlAbort = (ref: React.MutableRefObject<AbortController | null>) => {
+    if (ref.current) {
+      ref.current.abort();
+      ref.current = null;
+    }
+  };
 
   // Fetch cuando cambia la búsqueda (si hay endpoint de search)
   useEffect(() => {
@@ -175,13 +177,6 @@ export default function FilterableSalesTable({
     };
   }, [debouncedQuery, initial]);
 
-  const ctrlAbort = (ref: React.MutableRefObject<AbortController | null>) => {
-    if (ref.current) {
-      ref.current.abort();
-      ref.current = null;
-    }
-  };
-
   // Formato fecha AR (solo fecha)
   const formatArgentina = (iso: string | null) => {
     if (!iso) return "-";
@@ -189,7 +184,6 @@ export default function FilterableSalesTable({
     if (isNaN(d.getTime())) return "-";
     try {
       return d.toLocaleString("es-AR", {
-        timeZone: "America/Argentina/Buenos_Aires",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -257,18 +251,14 @@ export default function FilterableSalesTable({
     });
   }, [items, debouncedQuery, startDate, endDate, minTotal, maxTotal, minProfit, maxProfit]);
 
-  // ====== Inline Edit ======
+  // ====== Inline Edit (patrón Products) ======
   const isEditing = (saleId: string, fieldName: string) =>
     editingFields[saleId]?.[fieldName] !== undefined;
 
   const getEditingValue = (saleId: string, fieldName: string) =>
     editingFields[saleId]?.[fieldName] ?? "";
 
-  const startEditField = (
-    saleId: string,
-    fieldName: string,
-    currentValue: any
-  ) => {
+  const startEditField = (saleId: string, fieldName: string, currentValue: any) => {
     setEditingFields((prev) => ({
       ...prev,
       [saleId]: {
@@ -278,11 +268,7 @@ export default function FilterableSalesTable({
     }));
   };
 
-  const updateEditingValue = (
-    saleId: string,
-    fieldName: string,
-    value: string
-  ) => {
+  const updateEditingValue = (saleId: string, fieldName: string, value: string) => {
     setEditingFields((prev) => ({
       ...prev,
       [saleId]: {
@@ -303,134 +289,107 @@ export default function FilterableSalesTable({
     });
   };
 
-  const commitEditField = async (saleId: string, fieldName: string) => {
-    // Si es edición de Buyer (name/surname), tratamos ambos valores en una sola llamada
-    if (fieldName.startsWith('buyer.')) {
-      const originalSale = items.find((s) => s.id === saleId)
-      if (!originalSale) return
-
-      // Tomamos lo que el usuario esté editando o el valor actual
-      const name = (editingFields[saleId]?.['buyer.name'] ?? originalSale.buyer?.name ?? '').trim()
-      const surname = (editingFields[saleId]?.['buyer.surname'] ?? originalSale.buyer?.surname ?? '').trim()
-
-      // Optimistic update: buyer + customerName concatenado
-      const snapshot = items
-      const newCustomerName = [name, surname].join(' ').trim() || null
-      setItems((prev) =>
-        prev.map((s) =>
-          s.id === saleId
-            ? {
-              ...s,
-              customerName: newCustomerName,
-              buyer: { ...(s.buyer ?? { name: '', surname: '' }), name, surname },
-            }
-            : s
-        )
-      )
-
-      try {
-        const res = await fetch(`/api/sales/${saleId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ buyer: { name, surname } }),
-        })
-        if (!res.ok) throw new Error(await res.text())
-        const body = await res.json()
-        // Normalizamos la respuesta y pisamos la fila
-        setItems((prev) =>
-          prev.map((s) => (s.id === saleId ? (normalizeSales([body.sale])[0] ?? s) : s))
-        )
-      } catch (err) {
-        console.error('Save buyer failed', err)
-        alert('No se pudo guardar el cliente. Revirtiendo cambios.')
-        setItems(snapshot)
-      } finally {
-        // limpiamos ambos campos de edición
-        setEditingFields((prev) => {
-          const copy = { ...prev }
-          if (copy[saleId]) {
-            const row = { ...copy[saleId] }
-            delete row['buyer.name']
-            delete row['buyer.surname']
-            if (Object.keys(row).length) copy[saleId] = row
-            else delete copy[saleId]
-          }
-          return copy
-        })
-      }
-      return
-    }
-
-    // ---- flujo original para campos simples ----
-    const vals = editingFields[saleId]
-    if (!vals) return
-
-    const originalSale = items.find((s) => s.id === saleId)
-    if (!originalSale) return
-
-    let processedValue: any = vals[fieldName]
-    if (processedValue === undefined) return
-    processedValue = typeof processedValue === 'string' ? processedValue.trim() : processedValue
-    if (processedValue === '') processedValue = null
-
-    // Casos numéricos
-    if (['total', 'profit', 'extraCosts'].includes(fieldName)) {
-      if (processedValue === null) {
-        // Permitimos null manual, el route decide si lo ignora
-      } else {
-        const num = parseFloat(String(processedValue))
-        if (!Number.isFinite(num)) {
-          alert(`Valor inválido para ${fieldName}`)
-          return
-        }
-        processedValue = num
-      }
-    }
-
-    // Fecha
-    if (fieldName === 'date' && processedValue) {
-      const d = new Date(processedValue)
-      if (isNaN(d.getTime())) {
-        alert('Fecha inválida')
-        return
-      }
-      processedValue = d.toISOString()
-    }
-
-    // Optimistic para el campo puntual
-    const snapshot = items
-    setItems((prev) =>
-      prev.map((s) => (s.id === saleId ? { ...s, [fieldName]: processedValue } : s))
-    )
-
+  // === NUEVO: persistFieldUpdate (estilo Products) ===
+  async function persistFieldUpdate(saleId: string, fieldName: string, value: any) {
+    setSavingField({ saleId, fieldName });
     try {
+      // Caso especial: buyer.name / buyer.surname -> mandamos ambos juntos
+      if (fieldName.startsWith("buyer.")) {
+        const original = items.find((x) => x.id === saleId);
+        const name =
+          (editingFields[saleId]?.["buyer.name"] ??
+            original?.buyer?.name ??
+            "") || "";
+        const surname =
+          (editingFields[saleId]?.["buyer.surname"] ??
+            original?.buyer?.surname ??
+            "") || "";
+
+        const res = await fetch(`/api/sales/${saleId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ buyer: { name: name.trim(), surname: surname.trim() } }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const body = await res.json();
+        setItems((prev) =>
+          prev.map((s) => (s.id === saleId ? normalizeSales([body.sale])[0] ?? s : s))
+        );
+
+        // limpia ambos campos
+        setEditingFields((prev) => {
+          const copy = { ...prev };
+          if (copy[saleId]) {
+            const row = { ...copy[saleId] };
+            delete row["buyer.name"];
+            delete row["buyer.surname"];
+            if (Object.keys(row).length) copy[saleId] = row;
+            else delete copy[saleId];
+          }
+          return copy;
+        });
+        return;
+      }
+
       const res = await fetch(`/api/sales/${saleId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [fieldName]: processedValue }),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const body = await res.json()
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [fieldName]: value }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const body = await res.json();
       setItems((prev) =>
-        prev.map((s) => (s.id === saleId ? (normalizeSales([body.sale])[0] ?? s) : s))
-      )
+        prev.map((s) => (s.id === saleId ? normalizeSales([body.sale])[0] ?? s : s))
+      );
+
+      // limpia estado de edición
+      cancelEditField(saleId, fieldName);
     } catch (err) {
-      console.error('Save failed', err)
-      alert('No se pudo guardar. Revirtiendo cambios.')
-      setItems(snapshot)
+      console.error(`Failed to persist ${fieldName} update`, err);
+      alert("No se pudo guardar. Se revirtieron los cambios.");
+      // revertimos a initial (o a la última versión known-good si la tuvieras)
+      setItems((_) => normalizeSales(initial));
     } finally {
-      // limpiar el campo puntual
-      setEditingFields((prev) => {
-        const copy = { ...prev }
-        if (copy[saleId]) {
-          const row = { ...copy[saleId] }
-          delete row[fieldName]
-          if (Object.keys(row).length) copy[saleId] = row
-          else delete copy[saleId]
-        }
-        return copy
-      })
+      setSavingField(null);
     }
+  }
+
+  function commitEditField(saleId: string, fieldName: string) {
+    const editingValue = editingFields[saleId]?.[fieldName];
+    if (editingValue === undefined) return;
+
+    const row = items.find((s) => s.id === saleId);
+    if (!row) return;
+
+    let processed: any =
+      typeof editingValue === "string" ? editingValue.trim() : editingValue;
+    if (processed === "") processed = null;
+
+    // Tipos específicos
+    if (["subtotal", "extraCosts", "total", "profit", "costTotal"].includes(fieldName)) {
+      if (processed == null) {
+        // permitimos null
+      } else {
+        const n = parseFloat(String(processed));
+        if (!Number.isFinite(n)) return;
+        processed = n;
+      }
+    } else if (fieldName === "date" && processed) {
+      const d = new Date(processed);
+      if (isNaN(d.getTime())) return;
+      processed = d.toISOString();
+    } else if (["customerName", "origin", "payment", "notes"].includes(fieldName)) {
+      // strings: null si vacío
+      processed = processed ?? null;
+    }
+
+    // Optimistic update del campo puntual
+    setItems((prev) =>
+      prev.map((s) => (s.id === saleId ? { ...s, [fieldName]: processed } : s))
+    );
+
+    // Persistir
+    persistFieldUpdate(saleId, fieldName, processed);
   }
 
   // ====== Delete ======
@@ -469,7 +428,6 @@ export default function FilterableSalesTable({
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
         <div className="flex flex-row items-center justify-between gap-2">
-          {/* Título + contador */}
           <h2 className="text-2xl font-bold">
             Ventas
             <span className="ml-4 text-sm text-base-content/60">
@@ -484,7 +442,7 @@ export default function FilterableSalesTable({
             type="button"
             className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
             onClick={() => setIsTableExpanded(!isTableExpanded)}
-            title={isTableExpanded ? 'Contraer tabla' : 'Expandir tabla'}
+            title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
           >
             {isTableExpanded ? 'Comprimir' : 'Expandir '} Tabla
             {isTableExpanded ? (
@@ -504,7 +462,8 @@ export default function FilterableSalesTable({
           </Link>
         </div>
       </div>
-      {/* Header: búsqueda, filtros, expandir/comprimir */}
+
+      {/* Header: búsqueda, filtros */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 w-full">
           <SearchBar
@@ -517,7 +476,6 @@ export default function FilterableSalesTable({
             onClick={() => setDrawerOpen(true)}
             title="Abrir filtros"
           >
-            {/* ícono genérico de filtros */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="w-5 h-5 mr-1"
@@ -654,7 +612,7 @@ export default function FilterableSalesTable({
         </div>
       )}
 
-      {/* switch oculto para controlled drawer (consistente con patrón) */}
+      {/* switch oculto para controlled drawer */}
       <input
         id="filters-drawer"
         type="checkbox"
@@ -696,33 +654,73 @@ export default function FilterableSalesTable({
               </tr>
             </thead>
             <tbody>
-              {displayed.map((s) => (
-                <tr key={s.id}>
-                  <td>{formatArgentina(s.date)}</td>
-                  {/* Cliente (edición buyer.name + buyer.surname) */}
+              {displayed.map((s, idx) => (
+                <tr key={s.id ?? `sale-${idx}`}>
+                  {/* Fecha (click para editar) */}
                   <td>
-                    {isEditing(s.id, 'buyer.name') || isEditing(s.id, 'buyer.surname') ? (
+                    {isEditing(s.id, "date") ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          autoFocus
+                          type="date"
+                          className="input input-xs w-36"
+                          value={
+                            getEditingValue(s.id, "date") ||
+                            (s.date ? new Date(s.date).toISOString().slice(0, 10) : "")
+                          }
+                          onChange={(e) => updateEditingValue(s.id, "date", e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitEditField(s.id, "date");
+                            if (e.key === "Escape") cancelEditField(s.id, "date");
+                          }}
+                          onBlur={() => commitEditField(s.id, "date")}
+                          disabled={savingField?.saleId === s.id && savingField?.fieldName === "date"}
+                        />
+                        <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'date')}>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                          </button>
+                          <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'date')}>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <span
+                        className="cursor-pointer hover:bg-base-200 rounded px-1"
+                        onClick={() => startEditField(s.id, "date", s.date ? new Date(s.date).toISOString().split('T')[0] : '')}
+                        title="Click para editar"
+                      >
+                        <div className='tooltip tooltip-right' data-tip={s.date ? new Date(s.date).toLocaleString('es-AR') : ''}>
+                          <span className="underline decoration-dotted cursor-help">
+                            {s.date ? new Date(s.date).toLocaleDateString('es-AR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                            }) : '-'}
+                          </span>
+                        </div>
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Cliente (buyer.name + buyer.surname) */}
+                  <td>
+                    {isEditing(s.id, "buyer.name") || isEditing(s.id, "buyer.surname") ? (
                       <div className="flex items-center gap-2">
                         <input
                           className="input input-xs w-24"
                           placeholder="Nombre"
-                          value={getEditingValue(s.id, 'buyer.name')}
-                          onChange={(e) => updateEditingValue(s.id, 'buyer.name', e.target.value)}
+                          value={getEditingValue(s.id, "buyer.name")}
+                          onChange={(e) => updateEditingValue(s.id, "buyer.name", e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitEditField(s.id, 'buyer.name') // commit especial buyer.*
-                            if (e.key === 'Escape') {
-                              // limpiar ambos
-                              setEditingFields((prev) => {
-                                const copy = { ...prev }
-                                if (copy[s.id]) {
-                                  const row = { ...copy[s.id] }
-                                  delete row['buyer.name']
-                                  delete row['buyer.surname']
-                                  if (Object.keys(row).length) copy[s.id] = row
-                                  else delete copy[s.id]
-                                }
-                                return copy
-                              })
+                            if (e.key === "Enter") commitEditField(s.id, "buyer.name"); // unifica
+                            if (e.key === "Escape") {
+                              cancelEditField(s.id, "buyer.name");
+                              cancelEditField(s.id, "buyer.surname");
                             }
                           }}
                           autoFocus
@@ -730,77 +728,40 @@ export default function FilterableSalesTable({
                         <input
                           className="input input-xs w-24"
                           placeholder="Apellido"
-                          value={getEditingValue(s.id, 'buyer.surname')}
-                          onChange={(e) => updateEditingValue(s.id, 'buyer.surname', e.target.value)}
+                          value={getEditingValue(s.id, "buyer.surname")}
+                          onChange={(e) => updateEditingValue(s.id, "buyer.surname", e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitEditField(s.id, 'buyer.name') // siempre unificamos en buyer.name
-                            if (e.key === 'Escape') {
-                              setEditingFields((prev) => {
-                                const copy = { ...prev }
-                                if (copy[s.id]) {
-                                  const row = { ...copy[s.id] }
-                                  delete row['buyer.name']
-                                  delete row['buyer.surname']
-                                  if (Object.keys(row).length) copy[s.id] = row
-                                  else delete copy[s.id]
-                                }
-                                return copy
-                              })
+                            if (e.key === "Enter") commitEditField(s.id, "buyer.name");
+                            if (e.key === "Escape") {
+                              cancelEditField(s.id, "buyer.name");
+                              cancelEditField(s.id, "buyer.surname");
                             }
                           }}
                         />
-                        <div className="flex join join-horizontal border border-base-content/10">
-                          <button
-                            className="btn btn-ghost btn-xs join-item"
-                            onMouseDown={(e) => { e.preventDefault(); commitEditField(s.id, 'buyer.name') }}
-                            title="Guardar"
-                          >
-                            ✓
+                        <div className="join join-horizontal">
+                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, "buyer.name")}>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
                           </button>
-                          <button
-                            className="btn btn-ghost btn-xs join-item"
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              setEditingFields((prev) => {
-                                const copy = { ...prev }
-                                if (copy[s.id]) {
-                                  const row = { ...copy[s.id] }
-                                  delete row['buyer.name']
-                                  delete row['buyer.surname']
-                                  if (Object.keys(row).length) copy[s.id] = row
-                                  else delete copy[s.id]
-                                }
-                                return copy
-                              })
-                            }}
-                            title="Cancelar"
-                          >
-                            ✕
+                          <button className="btn btn-ghost btn-xs join-item" onClick={() => {
+                            cancelEditField(s.id, "buyer.name");
+                            cancelEditField(s.id, "buyer.surname");
+                          }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
                           </button>
                         </div>
                       </div>
                     ) : (
                       <span
-                        className="cursor-text"
-                        onClick={() => {
-                          // siembra inicial: desde buyer si existe; si no, split de customerName
-                          const full = (s.buyer
-                            ? `${s.buyer.name ?? ''} ${s.buyer.surname ?? ''}`
-                            : (s.customerName ?? '')
-                          ).trim()
-                          let seedName = '', seedSurname = ''
-                          if (s.buyer) {
-                            seedName = s.buyer.name ?? ''
-                            seedSurname = s.buyer.surname ?? ''
-                          } else if (full) {
-                            const parts = full.split(' ')
-                            seedSurname = parts.length > 1 ? parts.pop()! : ''
-                            seedName = parts.join(' ')
-                          }
-                          startEditField(s.id, 'buyer.name', seedName)
-                          startEditField(s.id, 'buyer.surname', seedSurname)
-                        }}
+                        className="cursor-pointer hover:bg-base-200 rounded px-1"
                         title="Click para editar"
+                        onClick={() => {
+                          startEditField(s.id, "buyer.name", s.buyer?.name ?? "");
+                          startEditField(s.id, "buyer.surname", s.buyer?.surname ?? "");
+                        }}
                       >
                         {s.buyer
                           ? `${s.buyer.name ?? ''} ${s.buyer.surname ?? ''}`.trim() || '-'
@@ -821,16 +782,22 @@ export default function FilterableSalesTable({
                           {s.items.length} items
                         </div>
                         <ul
-                          tabIndex={0}
+                          tabIndex={-1}
                           className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-60"
                         >
-                          {s.items.map((item: any, idx: number) => (
-                            <li key={idx}>
-                              <span>
-                                {item?.product?.modelName ?? "-"} ({item?.units ?? 0})
-                              </span>
-                            </li>
-                          ))}
+                          {s.items.map((item: any, idx: number) => {
+                            const k =
+                              item?.id ??
+                              item?.product?.id ??
+                              `${item?.product?.modelName ?? "item"}-${idx}`;
+                            return (
+                              <li key={String(k)}>
+                                <span>
+                                  {item?.product?.modelName ?? "-"} ({item?.units ?? 0})
+                                </span>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     ) : (
@@ -892,6 +859,7 @@ export default function FilterableSalesTable({
                             if (e.key === "Escape") cancelEditField(s.id, "total");
                           }}
                           onBlur={() => commitEditField(s.id, "total")}
+                          disabled={savingField?.saleId === s.id && savingField?.fieldName === "total"}
                         />
                         <div className='flex flex-col join join-horizontal border border-base-content/10'>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'total')}>
@@ -908,7 +876,7 @@ export default function FilterableSalesTable({
                       </div>
                     ) : (
                       <span
-                        className="cursor-text"
+                        className="cursor-pointer hover:bg-base-200 rounded px-1"
                         onClick={() => startEditField(s.id, "total", s.total)}
                         title="Click para editar"
                       >
@@ -950,7 +918,7 @@ export default function FilterableSalesTable({
                       </div>
                     ) : (
                       <span
-                        className="cursor-text"
+                        className="cursor-pointer hover:bg-base-200 rounded px-1"
                         onClick={() => startEditField(s.id, "profit", s.profit)}
                         title="Click para editar"
                       >
@@ -962,29 +930,43 @@ export default function FilterableSalesTable({
                   {/* Origen (editable select) */}
                   <td>
                     {isEditing(s.id, "origin") ? (
-                      <select
-                        className="select select-sm select-bordered w-full"
-                        value={getEditingValue(s.id, "origin")}
-                        onChange={(e) =>
-                          updateEditingValue(s.id, "origin", e.target.value)
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") commitEditField(s.id, "origin");
-                          if (e.key === "Escape") cancelEditField(s.id, "origin");
-                        }}
-                        onBlur={() => commitEditField(s.id, "origin")}
-                        autoFocus
-                      >
-                        <option value="">Seleccionar</option>
-                        {originOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="select select-xs w-20"
+                          value={getEditingValue(s.id, "origin")}
+                          onChange={(e) =>
+                            updateEditingValue(s.id, "origin", e.target.value)
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitEditField(s.id, "origin");
+                            if (e.key === "Escape") cancelEditField(s.id, "origin");
+                          }}
+                          onBlur={() => commitEditField(s.id, "origin")}
+                          autoFocus
+                        >
+                          <option value="">Seleccionar</option>
+                          {originOptions.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                        <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'origin')}>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                          </button>
+                          <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'origin')}>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     ) : (
                       <span
-                        className="cursor-text"
+                        className="cursor-pointer hover:bg-base-200 rounded px-1"
                         onClick={() => startEditField(s.id, "origin", s.origin)}
                         title="Click para editar"
                       >
