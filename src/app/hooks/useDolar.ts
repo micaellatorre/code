@@ -8,7 +8,6 @@ export function useDolar() {
     refreshInterval: 60_000, // consulta cada 60s
     dedupingInterval: 30_000
   });
-  console.log(data)
   return {
     data: data?.data, // por nuestro shape { ok, data }
     error,

@@ -1,93 +1,156 @@
-"use client"
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/DashboardLayout'
-import Breadcrumbs from '@/components/Breadcrumbs'
+"use client";
 
-interface Product {
-  id: string
-  modelName: string
-  costPrice: any
-}
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import DashboardLayout from '@/components/DashboardLayout';
+import Breadcrumbs from '@/components/Breadcrumbs';
+import { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from '@prisma/client';
+
+// --- TYPE DEFINITIONS ---
+// These types will be used by the child components.
+
+export type SaleItemDraft = {
+  productId: string;
+  product: Product; // Store the whole product for UI purposes
+  units: number;
+  unitPrice: string;
+  unitCost: string;
+  extraCost: string;
+  kind: SaleItemKind;
+  // UI-only fields
+  _id: string; // for react keys
+};
+
+export type PaymentDraft = {
+  method: PaymentMethod;
+  currency: Currency;
+  amount: string;
+  note?: string;
+  paidAt?: Date;
+  // UI-only fields
+  _id: string; // for react keys
+};
+
+export type SaleMeta = {
+  date: Date;
+  origin: string;
+  customOrigin?: string;
+  notes?: string;
+};
+
+// --- MOCK COMPONENTS (to be implemented) ---
+// I will create these components in subsequent steps.
+
+import BuyerSection from '@/components/sales/BuyerSection';
+
+import SaleMetaSection from '@/components/sales/SaleMetaSection';
+
+import SaleItemsSection from '@/components/sales/SaleItemsSection';
+
+import PaymentsSection from '@/components/sales/PaymentsSection';
+
+import TotalsBar from '@/components/sales/TotalsBar';
+
+import SubmitBar from '@/components/sales/SubmitBar';
+
+
+// --- MAIN PAGE COMPONENT ---
 
 export default function NewSalePage() {
-  const router = useRouter()
-  const [products, setProducts] = useState<Product[]>([])
-  const [form, setForm] = useState({
-    customerName: '',
-    origin: '',
-    payment: '',
-    notes: '',
-  })
-  const [items, setItems] = useState<{
-    productId: string
-    units: number
-    unitPrice: number
-    unitCost: number
-    extraCost?: number
-  }[]>([])
-  const [itemForm, setItemForm] = useState({ productId: '', units: '', unitPrice: '', unitCost: '', extraCost: '' })
+  const router = useRouter();
+  
+  // Main state for the entire sale form
+  const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
+  const [meta, setMeta] = useState<SaleMeta>({ date: new Date(), origin: 'Instagram' });
+  const [items, setItems] = useState<SaleItemDraft[]>([]);
+  const [payments, setPayments] = useState<PaymentDraft[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    async function fetchData() {
-      const prodRes = await fetch('/api/products')
-      if (prodRes.ok) {
-        setProducts(await prodRes.json())
-      }
+  // TODO: Replace with big.js or similar for client-side calculations to avoid floating point issues.
+  // For now, using standard numbers for UI and sending strings to backend.
+  const totals = useMemo(() => {
+    const subtotal = items
+      .filter(it => it.kind === 'NORMAL')
+      .reduce((acc, it) => acc + parseFloat(it.unitPrice) * it.units, 0);
+
+    const extraCosts = items
+      .filter(it => it.kind === 'IN_TOTAL')
+      .reduce((acc, it) => acc + (parseFloat(it.unitCost) + parseFloat(it.extraCost)) * it.units, 0);
+
+    const total = subtotal + extraCosts;
+
+    const totalPaid = payments.reduce((acc, p) => acc + parseFloat(p.amount), 0);
+
+    return {
+        total: total.toFixed(2),
+        remaining: (total - totalPaid).toFixed(2),
     }
-    fetchData()
-  }, [])
+  }, [items, payments]);
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setError(null);
 
-  const handleItemChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setItemForm((prev) => ({ ...prev, [name]: value }))
-  }
+    if (items.length === 0) {
+        setError('Debe agregar al menos un producto a la venta.');
+        setIsSubmitting(false);
+        return;
+    }
 
-  const addItem = () => {
-    if (!itemForm.productId || !itemForm.units || !itemForm.unitPrice || !itemForm.unitCost) return
-    setItems((prev) => [
-      ...prev,
-      {
-        productId: itemForm.productId,
-        units: Number(itemForm.units),
-        unitPrice: Number(itemForm.unitPrice),
-        unitCost: Number(itemForm.unitCost),
-        extraCost: itemForm.extraCost ? Number(itemForm.extraCost) : 0,
-      },
-    ])
-    setItemForm({ productId: '', units: '', unitPrice: '', unitCost: '', extraCost: '' })
-  }
+    if (totals.remaining !== '0.00') {
+        setError(`El monto de los pagos no coincide con el total. Restan ${totals.remaining} USD.`);
+        setIsSubmitting(false);
+        return;
+    }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
     const payload = {
-      customerName: form.customerName || null,
-      origin: form.origin || null,
-      payment: form.payment || null,
-      notes: form.notes || null,
-      items,
+      date: meta.date.toISOString(),
+      buyerId: selectedBuyer?.id,
+      customerName: !selectedBuyer ? 'Consumidor Final' : null,
+      origin: meta.origin === 'Otro' ? meta.customOrigin : meta.origin,
+      notes: meta.notes,
+      items: items.map(it => ({
+        productId: it.productId,
+        units: it.units,
+        unitPrice: it.unitPrice,
+        unitCost: it.unitCost,
+        extraCost: it.extraCost,
+        kind: it.kind,
+      })),
+      payments: payments.map(p => ({
+        method: p.method,
+        currency: p.currency,
+        amount: p.amount,
+        note: p.note,
+        paidAt: p.paidAt?.toISOString(),
+      })),
+    };
+
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        // TODO: Show success toast
+        router.push('/sales');
+      } else {
+        const errorData = await res.json();
+        setError(errorData.error || 'Ocurrió un error al crear la venta.');
+      }
+    } catch (e: any) {
+      setError('No se pudo conectar con el servidor.');
+    } finally {
+      setIsSubmitting(false);
     }
-    const res = await fetch('/api/sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (res.ok) {
-      router.push('/sales')
-    } else {
-      console.error('Error al crear venta')
-    }
-  }
+  };
 
   return (
     <DashboardLayout activeTab="sales">
-      {/* Breadcrumbs de navegación */}
       <Breadcrumbs
         items={[
           { label: 'Inicio', href: '/' },
@@ -95,188 +158,30 @@ export default function NewSalePage() {
           { label: 'Nueva Venta' },
         ]}
       />
-      <div className="max-w-xl mx-auto">
-        <h2 className="text-2xl font-bold mb-4">Nueva Venta</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset className="border border-base-300 p-4 rounded-box">
-            <legend className="text-lg font-medium mb-2">Datos de la venta</legend>
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Cliente</span>
-              </label>
-              <input
-                type="text"
-                name="customerName"
-                value={form.customerName}
-                onChange={handleFormChange}
-                className="input input-bordered"
-              />
-            </div>
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Origen</span>
-              </label>
-              <input
-                type="text"
-                name="origin"
-                value={form.origin}
-                onChange={handleFormChange}
-                className="input input-bordered"
-              />
-            </div>
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Medio de pago</span>
-              </label>
-              <select
-                name="payment"
-                value={form.payment}
-                onChange={handleFormChange}
-                className="select select-bordered"
-              >
-                <option value="">Seleccionar</option>
-                <option value="EFECTIVO_PESOS">Efectivo Pesos</option>
-                <option value="EFECTIVO_USD">Efectivo USD</option>
-                <option value="TRANSFERENCIA_ARS">Transferencia ARS</option>
-                <option value="TRANSFERENCIA_USD">Transferencia USD</option>
-                <option value="TARJETA">Tarjeta</option>
-                <option value="USDT">USDT</option>
-              </select>
-            </div>
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Notas</span>
-              </label>
-              <input
-                type="text"
-                name="notes"
-                value={form.notes}
-                onChange={handleFormChange}
-                className="input input-bordered"
-              />
-            </div>
-          </fieldset>
-          <fieldset className="border border-base-300 p-4 rounded-box">
-            <legend className="text-lg font-medium mb-2">Items</legend>
-            <div className="space-y-2">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Producto</span>
-                </label>
-                <select
-                  name="productId"
-                  value={itemForm.productId}
-                  onChange={handleItemChange}
-                  className="select select-bordered"
-                >
-                  <option value="">Seleccionar</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.modelName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Unidades</span>
-                </label>
-                <input
-                  type="number"
-                  name="units"
-                  value={itemForm.units}
-                  onChange={handleItemChange}
-                  className="input input-bordered"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
+        
+        {/* Left Column: Main Data Entry */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+            <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} />
+            <SaleMetaSection meta={meta} setMeta={setMeta} />
+            <SaleItemsSection items={items} setItems={setItems} />
+            <PaymentsSection payments={payments} setPayments={setPayments} total={totals.total} />
+        </div>
+
+        {/* Right Column: Totals & Actions */}
+        <div className="lg:col-span-1">
+            <div className="sticky top-4 flex flex-col gap-6">
+                <TotalsBar items={items} payments={payments} />
+                <SubmitBar 
+                    disabled={isSubmitting || totals.remaining !== '0.00' || items.length === 0}
+                    error={error}
+                    onSubmit={handleSubmit}
+                    isSubmitting={isSubmitting}
                 />
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Precio unitario (USD)</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="unitPrice"
-                  value={itemForm.unitPrice}
-                  onChange={handleItemChange}
-                  className="input input-bordered"
-                />
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Costo unitario (USD)</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="unitCost"
-                  value={itemForm.unitCost}
-                  onChange={handleItemChange}
-                  className="input input-bordered"
-                />
-              </div>
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Costo extra unitario (USD)</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="extraCost"
-                  value={itemForm.extraCost}
-                  onChange={handleItemChange}
-                  className="input input-bordered"
-                />
-              </div>
-              <button type="button" onClick={addItem} className="btn btn-outline w-full">
-                Agregar Ítem
-              </button>
             </div>
-            {items.length > 0 && (
-              <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
-                <table className="table table-zebra w-full">
-                  <thead>
-                    <tr>
-                      <th>Producto</th>
-                      <th>Unidades</th>
-                      <th>Precio unitario</th>
-                      <th>Costo unitario</th>
-                      <th>Costo extra</th>
-                      <th>Total</th>
-                      <th>Ganancia</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item, idx) => {
-                      const product = products.find((p) => p.id === item.productId)
-                      const lineTotal = item.units * item.unitPrice
-                      const lineCost = item.units * (item.unitCost + (item.extraCost ?? 0))
-                      const lineProfit = lineTotal - lineCost
-                      return (
-                        <tr key={idx}>
-                          <td>{product?.modelName ?? item.productId}</td>
-                          <td>{item.units}</td>
-                          <td>{item.unitPrice.toFixed(2)}</td>
-                          <td>{item.unitCost.toFixed(2)}</td>
-                          <td>{(item.extraCost ?? 0).toFixed(2)}</td>
-                          <td>{lineTotal.toFixed(2)}</td>
-                          <td>{lineProfit.toFixed(2)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </fieldset>
-          <button type="submit" className="btn btn-primary w-full mt-2">
-            Crear Venta
-          </button>
-        </form>
+        </div>
+
       </div>
     </DashboardLayout>
-  )
+  );
 }
-
-// Ensure the new sale page is rendered server-side on each request.
-export const dynamic = 'force-dynamic'

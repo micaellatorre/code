@@ -109,7 +109,7 @@ export async function fetchDolarUpstream(options?: {
     process.env.DOLAR_API_ENDPOINT ??
     "https://backend-ifa-production-a92c.up.railway.app/api/dolar/v2/general";
 
-  const timeoutMs = options?.timeoutMs ?? Number(process.env.DOLAR_API_TIMEOUT_MS || 8000);
+  const timeoutMs = options?.timeoutMs ?? Number(process.env.DOLAR_API_TIMEOUT_MS || 15000);
   const maxRetries = options?.maxRetries ?? Number(process.env.DOLAR_API_MAX_RETRIES || 3);
   const useStaleOnError = options?.useStaleOnError ?? true;
 

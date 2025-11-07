@@ -79,6 +79,8 @@ model Buyer {
   phone     String?
   instagram String?
   email     String?
+  cuit      String?
+  dni       String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -110,6 +112,7 @@ model Sale {
 
   // Totales (recomendado recalcular en servidor)
   subtotal   Decimal  @db.Decimal(12, 2) // Σ (NORMAL line: units*unitPrice)
+  costTotal  Decimal  @db.Decimal(12, 2)  @default(0)// Σ (items.unitCost)
   extraCosts Decimal  @db.Decimal(12, 2) // Σ (IN_TOTAL items + extraCost de CostProfile en PHONE)
   total      Decimal  @db.Decimal(12, 2) // subtotal + extraCosts
   profit     Decimal  @db.Decimal(12, 2) // total - costo_total
@@ -176,7 +179,7 @@ model Payment {
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   method   PaymentMethod
-  currency Currency      @default(USD)
+  currency Currency      @default(USD) // es mas complejo porque puede estar en diferentes currencies, pero lo ideal seria llevar los payments con currency != USD a su valor equivalente en USD
   amount   Decimal       @db.Decimal(12, 2)
   paidAt   DateTime      @default(now())
   note     String?

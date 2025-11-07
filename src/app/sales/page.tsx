@@ -1,48 +1,99 @@
+// /sales/page.tsx
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
-import SearchBar from '@/components/SearchBar'
 import FilterableSalesTable from '@/components/FilterableSalesTable'
 import { prisma } from '@/lib/prisma'
 import type { Metadata } from 'next'
 
+// SEO
 export const metadata: Metadata = {
   title: 'Ventas',
   description: 'Listado y gestión de ventas realizadas',
 }
 
-// Force server rendering for sales listing to keep data fresh and consistent
+// Fuerza render del lado del servidor y runtime Node (Prisma)
 export const dynamic = 'force-dynamic'
-/**
- * Listado de ventas.
- * Se beneficia del layout compartido y ofrece un campo de búsqueda.
- */
+export const runtime = 'nodejs'
+
+// Helper de serialización (evita BigInt/Decimal en cliente)
+function toStr(v: any) {
+  return v == null ? null : String(v)
+}
+
 export default async function SalesPage() {
-  const sales = await prisma.sale.findMany({ orderBy: { date: 'desc' }, include: { payments: true } })
+  // Trae solo lo necesario y con shape estable para el cliente
+  const sales = await prisma.sale.findMany({
+    orderBy: { date: 'desc' },
+    take: 200,
+    include: {
+      buyer: { select: { name: true, surname: true } },
+      payments: { select: { method: true }, orderBy: { paidAt: 'asc' } },
+      items: {
+        include: {
+          product: {
+            select: {
+              modelName: true,
+              type: true,          // <- clave para el Modelo
+              capacityGB: true,    // <- heurística en el cliente
+              imei: true,          // <- heurística en el cliente
+              costPrice: true,
+              salePrice: true,
+              shippingCost: true,
+            },
+          },
+        },
+      },
+    },
+  })
 
   const serialized = sales.map((s) => ({
-    ...s,
+    id: s.id,
+    tenantId: s.tenantId,
     date: s.date ? s.date.toISOString() : null,
-    subtotal: s.subtotal != null ? String(s.subtotal) : null,
-    extraCosts: s.extraCosts != null ? String(s.extraCosts) : null,
-    total: s.total != null ? String(s.total) : null,
-    profit: s.profit != null ? String(s.profit) : null,
+    customerName: s.customerName,
+    origin: s.origin,
+    // por compat: primer método si existe, pero la UI nueva usa payments aparte
+    payment: s.payments.length > 0 ? s.payments[0].method : null,
+    notes: s.notes,
+    subtotal: toStr(s.subtotal),
+    extraCosts: toStr(s.extraCosts),
+    total: toStr(s.total),
+    profit: toStr(s.profit),
+    costTotal: toStr(s.costTotal),
     createdAt: s.createdAt ? s.createdAt.toISOString() : null,
-    // pick first payment method if payments were created; keep null otherwise
-    payment: s.payments && s.payments.length > 0 ? s.payments[0].method : null,
+    buyer: s.buyer ? { name: s.buyer.name, surname: s.buyer.surname } : null,
+    items: s.items.map((item) => ({
+      id: item.id,
+      saleId: item.saleId,
+      productId: item.productId,
+      units: item.units,
+      kind: item.kind,
+      parentItemId: item.parentItemId,
+      unitPrice: toStr(item.unitPrice),
+      unitCost: toStr(item.unitCost),
+      extraCost: toStr(item.extraCost),
+      lineTotal: toStr(item.lineTotal),
+      lineCost: toStr(item.lineCost),
+      lineProfit: toStr(item.lineProfit),
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
+      product: {
+        modelName: item.product.modelName,
+        type: typeof item.product.type === 'string' ? item.product.type.toUpperCase() : item.product.type,
+        capacityGB: item.product.capacityGB,
+        imei: item.product.imei,
+        costPrice: toStr(item.product.costPrice),
+        salePrice: toStr(item.product.salePrice),
+        shippingCost: item.product.shippingCost ? toStr(item.product.shippingCost) : null,
+      },
+    })),
   }))
 
   return (
     <DashboardLayout activeTab="sales">
-      {/* Breadcrumbs de navegación */}
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Ventas' }]} />
       <div className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Ventas</h2>
-          <Link href="/sales/new" className="btn btn-primary">
-            Nueva Venta
-          </Link>
-        </div>
         <FilterableSalesTable initial={serialized} />
       </div>
     </DashboardLayout>

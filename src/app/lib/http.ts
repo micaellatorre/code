@@ -9,7 +9,7 @@ export type RetryOptions = {
     input: RequestInfo | URL,
     init: RequestInit & { timeoutMs?: number } = {}
   ) {
-    const { timeoutMs = 8000, ...rest } = init;
+    const { timeoutMs = 15000, ...rest } = init;
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {

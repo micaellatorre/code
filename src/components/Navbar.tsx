@@ -45,9 +45,6 @@ export default function Navbar({
     if (error) {
       console.error("Error obteniendo cotizaciones del dólar:", error);
     }
-    if (dolarData) {
-      console.log("Dolar data received:", dolarData);
-    }
   }, [error, dolarData]);
 
   const handleThemeChange = (value: string) => {
