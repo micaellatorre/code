@@ -316,38 +316,76 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
   // Legacy functions for stock arrows (keep for backwards compatibility)
   async function persistStockUpdate(id: string, newStock: number, newStockAvailable?: number) {
-    setSavingField({ productId: id, fieldName: 'stock' })
+    setSavingField({ productId: id, fieldName: "stock" });
+    // Snapshot para rollback si falla
+    const original = products.find((p) => p.id === id);
+
+    // 🎯 (Opcional) Optimistic UI: estimamos el nextState para evitar parpadeos
+    // Si no te interesa optimista, puedes quitar este bloque y dejar que sólo el response mande el estado
+    const optimisticNext = (() => {
+      if (!original) return null;
+      const prevState = original.state;
+      if (newStock < 1 && prevState !== "FUERA_DE_STOCK") return "FUERA_DE_STOCK";
+      if (newStock >= 1 && prevState === "FUERA_DE_STOCK") return "EN_STOCK";
+      return prevState;
+    })();
+
+    // Aplicamos optimista de stock + state
+    if (original) {
+      setProductsLocal((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+              ...p,
+              stock: newStock,
+              stockAvailable:
+                newStockAvailable !== undefined ? newStockAvailable : p.stockAvailable,
+              state: optimisticNext ?? p.state,
+            }
+            : p
+        )
+      );
+    }
+
     try {
-      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock }
+      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock };
       if (newStockAvailable !== undefined) {
-        updateBody.stockAvailable = newStockAvailable
+        updateBody.stockAvailable = newStockAvailable;
       }
       const res = await fetch(`/api/products/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateBody),
-      })
-      if (!res.ok) throw new Error('server error')
-      const updated = await res.json()
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      // 🔁 Aseguramos sincronizar lo que diga el servidor (incluye `state`)
+      const updated = await res.json();
       setProductsLocal((prev) =>
         prev.map((p) =>
           p.id === id
             ? {
               ...p,
               stock: updated.stock,
-              stockAvailable: updated.stockAvailable ?? p.stockAvailable,
+              stockAvailable:
+                updated.stockAvailable ?? p.stockAvailable,
+              state: updated.state, // 👈 aquí está la clave
             }
-            : p,
-        ),
-      )
+            : p
+        )
+      );
     } catch (err) {
-      const original = products.find((p) => p.id === id)
-      if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
-      console.error('Failed to persist stock update', err)
+      // Rollback a original
+      if (original) {
+        setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)));
+      }
+      console.error("Failed to persist stock update", err);
     } finally {
-      setSavingField(null)
+      setSavingField(null);
     }
   }
+
 
   function startEditStock(id: string, value: number) {
     startEditField(id, 'stock', value)
