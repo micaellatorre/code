@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Stock de Productos',
+  title: 'Stock',
   description: 'Listado y gestión de productos en stock',
 }
 
