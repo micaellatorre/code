@@ -1,63 +1,37 @@
+// src/app/api/buyers/search/route.ts
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const q = searchParams.get('q')
 
-// GET /api/buyers/search?q=...
-// Searches for buyers by name, surname, dni, or instagram
-export async function GET(request: Request) {
+  if (!q) {
+    return NextResponse.json({ results: [] })
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q');
-
-    if (!query) {
-      return NextResponse.json({ error: 'Query parameter "q" is required' }, { status: 400 });
-    }
-
-    const tenantId = process.env.DEFAULT_TENANT_ID as string;
-
-    const buyers = await prisma.buyer.findMany({
+    const results = await prisma.buyer.findMany({
       where: {
-        tenantId,
         OR: [
-          {
-            name: {
-              contains: query,
-              mode: 'insensitive',
-            },
-          },
-          {
-            surname: {
-              contains: query,
-              mode: 'insensitive',
-            },
-          },
-          {
-            dni: {
-              contains: query,
-              mode: 'insensitive',
-            },
-          },
-          {
-            instagram: {
-              contains: query,
-              mode: 'insensitive',
-            },
-          },
+          { name: { contains: q, mode: 'insensitive' } },
+          { surname: { contains: q, mode: 'insensitive' } },
+          { phone: { contains: q, mode: 'insensitive' } },
+          { instagram: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+          { cuit: { contains: q, mode: 'insensitive' } },
+          { dni: { contains: q, mode: 'insensitive' } },
         ],
       },
-      take: 8,
-      select: {
-        id: true,
-        name: true,
-        surname: true,
-        dni: true,
-        instagram: true,
-      },
-    });
+      take: 50, // Limitar resultados
+    })
 
-    return NextResponse.json(buyers);
+    return NextResponse.json({ results })
   } catch (error) {
-    console.error('Error searching buyers:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Buyer search failed:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

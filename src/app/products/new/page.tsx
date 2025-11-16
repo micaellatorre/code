@@ -77,202 +77,202 @@ export default function NewProductPage() {
           { label: 'Nuevo Producto' },
         ]}
       />
-      <div className="max-w-xl mx-auto">
-        <h2 className="text-2xl font-bold mb-4">Nuevo Producto</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset className="border border-base-300 p-4 rounded-box">
-            <legend className="text-lg font-medium mb-2">Datos del producto</legend>
-            {/* Tipo */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Tipo</span>
-              </label>
-              <select
-                name="type"
-                value={form.type}
-                onChange={handleChange}
-                className="select select-bordered"
+      <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6 p-4">
+        <div className='card bg-base-100 shadow-md lg:col-span-2 grid grid-cols-2'>
+        <fieldset className="lg:col-span-1 p-4 space-y-2">
+          <h2 className="text-lg font-bold mb-1">1. Datos del producto</h2>
+          {/* Tipo */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Tipo</span>
+            </label>
+            <select
+              name="type"
+              value={form.type}
+              onChange={handleChange}
+              className="select select-bordered"
+            >
+              <option value="PHONE">Teléfono</option>
+              <option value="ACCESSORY">Accesorio</option>
+            </select>
+          </div>
+          {/* Modelo */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Modelo</span>
+            </label>
+            <input
+              type="text"
+              name="modelName"
+              value={form.modelName}
+              onChange={handleChange}
+              required
+              className="input input-bordered"
+            />
+          </div>
+          {/* IMEI */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">IMEI</span>
+            </label>
+            <input
+              type="text"
+              name="imei"
+              value={form.imei}
+              onChange={handleChange}
+              className="input input-bordered"
+            />
+          </div>
+          {/* Capacidad */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Capacidad (GB)</span>
+            </label>
+            <select
+              name="capacityGB"
+              value={form.capacityGB}
+              onChange={handleChange}
+              className="select select-bordered"
+            >
+              <option value="">Seleccionar</option>
+              <option value="64">64 GB</option>
+              <option value="128">128 GB</option>
+              <option value="256">256 GB</option>
+              <option value="512">512 GB</option>
+              <option value="1024">1024 GB (1 TB)</option>
+              <option value="2048">2048 GB (2 TB)</option>
+            </select>
+          </div>
+          {/* Condición */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Condición</span>
+            </label>
+            <select
+              name="condition"
+              value={form.condition}
+              onChange={handleChange}
+              className="select select-bordered"
+            >
+              <option value="">Seleccionar</option>
+              <option value="A_PLUS">A+</option>
+              <option value="OEM">OEM</option>
+              <option value="ASIS">ASIS</option>
+              <option value="ASIS_PLUS">ASIS+</option>
+              <option value="SEALED">Sellado</option>
+            </select>
+          </div>
+          {/* Color */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Color</span>
+            </label>
+            <input
+              type="text"
+              name="color"
+              value={form.color}
+              onChange={handleChange}
+              className="input input-bordered"
+            />
+          </div>
+        </fieldset>
+        <fieldset className="lg:col-span-1 p-4 space-y-2">
+          {/* % Batería */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">% Batería</span>
+            </label>
+            <input
+              type="number"
+              name="batteryPct"
+              value={form.batteryPct}
+              onChange={handleChange}
+              className="input input-bordered"
+            />
+          </div>
+          {/* Costo */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Costo (USD)</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              name="costPrice"
+              value={form.costPrice}
+              onChange={handleChange}
+              required
+              className="input input-bordered"
+            />
+          </div>
+          {/* Precio de venta */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Precio de venta (USD)</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              name="salePrice"
+              value={form.salePrice}
+              onChange={handleChange}
+              required
+              className="input input-bordered"
+            />
+          </div>
+          {/* Costo de envío */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Costo de envío (USD)</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              name="shippingCost"
+              value={form.shippingCost}
+              onChange={handleChange}
+              className="input input-bordered"
+            />
+          </div>
+          {/* Notas */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text">Notas</span>
+            </label>
+            <textarea
+              className="textarea textarea-bordered"
+              name="notes"
+              value={form.notes}
+              onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+            ></textarea>
+          </div>
+        </fieldset>
+        </div>
+        <div className="card bg-base-100 shadow-md max-h-fit">
+          {/* {error && (
+            <div role="alert" className="alert alert-error">
+              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span>{error}</span>
+            </div>
+          )} */}
+          <div className="card-body">
+            <div className="card-actions">
+              <button
+                type="submit"
+                className={`btn btn-primary w-full mt-2`}
+                disabled={isSubmitting}
               >
-                <option value="PHONE">Teléfono</option>
-                <option value="ACCESSORY">Accesorio</option>
-              </select>
+                {isSubmitting ?
+                  <>
+                    Creando
+                    <span className="loading loading-bars loading-xs"></span>
+                  </>
+                  : 'Crear'}
+              </button>
             </div>
-            {/* Modelo */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Modelo</span>
-              </label>
-              <input
-                type="text"
-                name="modelName"
-                value={form.modelName}
-                onChange={handleChange}
-                required
-                className="input input-bordered"
-              />
-            </div>
-            {/* Marca */}
-            {/* <div className="form-control">
-              <label className="label">
-                <span className="label-text">Marca</span>
-              </label>
-              <input
-                type="text"
-                name="brand"
-                value={form.brand}
-                onChange={handleChange}
-                className="input input-bordered"
-              />
-            </div> */}
-            {/* IMEI */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">IMEI</span>
-              </label>
-              <input
-                type="text"
-                name="imei"
-                value={form.imei}
-                onChange={handleChange}
-                className="input input-bordered"
-              />
-            </div>
-            {/* Capacidad */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Capacidad (GB)</span>
-              </label>
-              <select
-                name="capacityGB"
-                value={form.capacityGB}
-                onChange={handleChange}
-                className="select select-bordered"
-              >
-                <option value="">Seleccionar</option>
-                <option value="64">64 GB</option>
-                <option value="128">128 GB</option>
-                <option value="256">256 GB</option>
-                <option value="512">512 GB</option>
-                <option value="1024">1024 GB (1 TB)</option>
-                <option value="2048">2048 GB (2 TB)</option>
-              </select>
-            </div>
-            {/* Condición */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Condición</span>
-              </label>
-              <select
-                name="condition"
-                value={form.condition}
-                onChange={handleChange}
-                className="select select-bordered"
-              >
-                <option value="">Seleccionar</option>
-                <option value="A_PLUS">A+</option>
-                <option value="OEM">OEM</option>
-                <option value="ASIS">ASIS</option>
-                <option value="ASIS_PLUS">ASIS+</option>
-                <option value="SEALED">Sellado</option>
-              </select>
-            </div>
-            {/* Color */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Color</span>
-              </label>
-              <input
-                type="text"
-                name="color"
-                value={form.color}
-                onChange={handleChange}
-                className="input input-bordered"
-              />
-            </div>
-            {/* % Batería */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">% Batería</span>
-              </label>
-              <input
-                type="number"
-                name="batteryPct"
-                value={form.batteryPct}
-                onChange={handleChange}
-                className="input input-bordered"
-              />
-            </div>
-            {/* Costo */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Costo (USD)</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                name="costPrice"
-                value={form.costPrice}
-                onChange={handleChange}
-                required
-                className="input input-bordered"
-              />
-            </div>
-            {/* Precio de venta */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Precio de venta (USD)</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                name="salePrice"
-                value={form.salePrice}
-                onChange={handleChange}
-                required
-                className="input input-bordered"
-              />
-            </div>
-            {/* Costo de envío */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Costo de envío (USD)</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                name="shippingCost"
-                value={form.shippingCost}
-                onChange={handleChange}
-                className="input input-bordered"
-              />
-            </div>
-            {/* Notas */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Notas</span>
-              </label>
-              <textarea
-                className="textarea textarea-bordered"
-                name="notes"
-                value={form.notes}
-                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-              ></textarea>
-            </div>
-          </fieldset>
-          <button
-            type="submit"
-            className={`btn btn-primary w-full mt-2`}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ?
-              <>
-                Creando
-                <span className="loading loading-bars loading-xs"></span>
-              </>
-              : 'Crear'}
-          </button>
-        </form>
-      </div>
-    </DashboardLayout>
+          </div>
+        </div>
+      </form>
+    </DashboardLayout >
   )
 }

@@ -1,37 +1,40 @@
+// src/app/api/buyers/route.ts
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-
-// POST /api/buyers
-// Creates a new buyer
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { name, surname, dob, phone, instagram, email, cuit, dni } = body;
-
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+async function getDefaultTenantId() {
+    const tenant = await prisma.tenant.findFirst({
+        where: { name: 'Default' },
+    });
+    if (!tenant) {
+        // if there is no default tenant, create one
+        const newTenant = await prisma.tenant.create({
+            data: {
+                name: 'Default',
+            },
+        });
+        return newTenant.id;
     }
+    return tenant.id;
+}
 
-    const tenantId = process.env.DEFAULT_TENANT_ID as string;
+export async function POST(req: Request) {
+  const data = await req.json()
+  const tenantId = await getDefaultTenantId()
 
+  try {
     const newBuyer = await prisma.buyer.create({
       data: {
+        ...data,
         tenantId,
-        name,
-        surname,
-        dob: dob ? new Date(dob) : null,
-        phone,
-        instagram,
-        email,
-        cuit,
-        dni,
       },
-    });
-
-    return NextResponse.json(newBuyer, { status: 201 });
+    })
+    return NextResponse.json({ buyer: newBuyer }, { status: 201 })
   } catch (error) {
-    console.error('Error creating buyer:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Failed to create buyer:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
