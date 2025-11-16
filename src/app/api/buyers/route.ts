@@ -4,16 +4,10 @@ import { prisma } from '@/lib/prisma'
 
 async function getDefaultTenantId() {
     const tenant = await prisma.tenant.findFirst({
-        where: { name: 'Default' },
+        where: { id: process.env.DEFAULT_TENANT_ID as string | undefined },
     });
     if (!tenant) {
-        // if there is no default tenant, create one
-        const newTenant = await prisma.tenant.create({
-            data: {
-                name: 'Default',
-            },
-        });
-        return newTenant.id;
+        return process.env.DEFAULT_TENANT_ID as string | undefined;
     }
     return tenant.id;
 }
