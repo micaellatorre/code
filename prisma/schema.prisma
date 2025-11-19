@@ -30,6 +30,9 @@ model Tenant {
   purchases    Purchase[]
   suppliers    Supplier[]
   buyers       Buyer[]
+
+  // NUEVO
+  appointments Appointment[]
 }
 
 /// Catálogo unificado: iPhones y accesorios.
@@ -63,6 +66,9 @@ model Product {
   updatedAt    DateTime       @updatedAt
   PurchaseItem PurchaseItem[]
 
+  // NUEVO: productos marcados como “de interés” en citas
+  appointmentInterests AppointmentInterest[]
+
   @@index([tenantId, type, modelName])
   @@index([tenantId, modelName, capacityGB, condition])
 }
@@ -87,6 +93,9 @@ model Buyer {
 
   sales Sale[]
 
+  // NUEVO
+  appointments Appointment[]
+
   @@index([tenantId, name])
   @@index([tenantId, instagram])
   @@index([tenantId, phone])
@@ -110,9 +119,12 @@ model Sale {
   items    SaleItem[]
   payments Payment[]
 
+  // NUEVO: citas que terminaron en esta venta (en la práctica suele ser 0 o 1)
+  appointments Appointment[]
+
   // Totales (recomendado recalcular en servidor)
   subtotal   Decimal  @db.Decimal(12, 2) // Σ (NORMAL line: units*unitPrice)
-  costTotal  Decimal  @db.Decimal(12, 2)  @default(0)// Σ (items.unitCost)
+  costTotal  Decimal  @db.Decimal(12, 2) @default(0)// Σ (items.unitCost)
   extraCosts Decimal  @db.Decimal(12, 2) // Σ (IN_TOTAL items + extraCost de CostProfile en PHONE)
   total      Decimal  @db.Decimal(12, 2) // subtotal + extraCosts
   profit     Decimal  @db.Decimal(12, 2) // total - costo_total
@@ -292,6 +304,65 @@ model PurchaseItem {
   @@index([productId])
 }
 
+/// Cita presencial / turno con un Buyer para ver productos.
+model Appointment {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  /// Buyer asociado a la cita (opcional, se puede cargar sólo nombre suelto si querés en el futuro)
+  buyerId String?
+  buyer   Buyer? @relation(fields: [buyerId], references: [id])
+
+  /// Venta que se concretó a partir de esta cita (opcional)
+  saleId String?
+  sale   Sale? @relation(fields: [saleId], references: [id])
+
+  /// Fecha y hora agendada (inicio de la cita)
+  scheduledAt DateTime
+
+  /// Duración estimada en minutos (opcional, por si querés dibujar el bloque en un calendario)
+  durationMinutes Int?
+
+  /// Estado operativo de la cita (agendada, completada, cancelada, etc.)
+  status AppointmentStatus @default(SCHEDULED)
+
+  /// Resultado comercial de la cita (si hubo venta/no venta)
+  outcome AppointmentOutcome @default(PENDING)
+
+  /// Motivo de no venta cuando outcome = NO_SALE
+  noSaleReason       AppointmentNoSaleReason?
+  noSaleReasonOther  String?  // texto libre cuando se elige OTHER
+  resultNotes        String?  // notas internas sobre cómo fue la cita
+
+  /// Productos de interés del Buyer para esta cita
+  interests AppointmentInterest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, scheduledAt])
+  @@index([buyerId, scheduledAt])
+  @@index([status])
+}
+
+/// Productos que el Buyer quiere ver en una cita concreta.
+model AppointmentInterest {
+  id            String       @id @default(cuid())
+  appointmentId String
+  appointment   Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  /// Opcional: prioridad (1 = principal, 2 = secundario, etc.)
+  priority Int?
+  notes    String?
+
+  @@unique([appointmentId, productId])
+  @@index([productId])
+}
+
 // ====================== Enums =========================
 
 enum ProductType {
@@ -349,4 +420,29 @@ enum Currency {
   ARS
   USD
   USDT
+}
+
+/// Estado operativo de la cita.
+enum AppointmentStatus {
+  SCHEDULED   // Agendada, futura
+  COMPLETED   // Se concretó (haya o no venta)
+  CANCELLED   // Cancelada antes de que ocurra
+  NO_SHOW     // El cliente no se presentó
+}
+
+/// Resultado comercial de la cita.
+enum AppointmentOutcome {
+  PENDING     // Aún no se sabe (cita futura / sin registrar)
+  SALE_COMPLETED // Se concretó una venta (podés linkear Sale)
+  NO_SALE        // No se concretó venta
+}
+
+/// Motivo principal de que no haya venta (cuando outcome = NO_SALE).
+enum AppointmentNoSaleReason {
+  PRICE_TOO_HIGH        // Precio muy alto
+  MODEL_NOT_AVAILABLE   // No se consiguió el modelo deseado
+  FOUND_BETTER_OFFER    // Encontró mejor oferta
+  THINKING_ABOUT_IT     // Lo está pensando / "me lo llevo a pensar"
+  NO_SHOW               // Directamente no vino / no se pudo hacer la demo
+  OTHER                 // Otro motivo (se detalla en noSaleReasonOther)
 }

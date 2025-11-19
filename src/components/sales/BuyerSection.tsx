@@ -35,7 +35,7 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
             const res = await fetch(`/api/buyers/search?q=${encodeURIComponent(searchQuery)}`);
             if (res.ok) {
                 const data = await res.json();
-                setResults(data);
+                setResults(data.results);
             }
         } catch (error) {
             console.error('Failed to search buyers', error);
@@ -58,7 +58,7 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                 body: JSON.stringify(newBuyer),
             });
             if (res.ok) {
-                const createdBuyer = await res.json();
+                const { buyer: createdBuyer } = await res.json();
                 setSelectedBuyer(createdBuyer);
                 setShowNewBuyerForm(false);
                 setQuery('');
@@ -131,6 +131,8 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                         <input type="text" placeholder="Instagram" value={newBuyer.instagram || ''} onChange={e => setNewBuyer({ ...newBuyer, instagram: e.target.value })} className="input input-bordered" />
                         <input type="text" placeholder="Teléfono" value={newBuyer.phone || ''} onChange={e => setNewBuyer({ ...newBuyer, phone: e.target.value })} className="input input-bordered" />
                         <input type="email" placeholder="Email" value={newBuyer.email || ''} onChange={e => setNewBuyer({ ...newBuyer, email: e.target.value })} className="input input-bordered" />
+                        <input type="date" placeholder="Fecha de Nacimiento" value={newBuyer.dob ? new Date(newBuyer.dob).toISOString().split('T')[0] : ''} onChange={e => setNewBuyer({ ...newBuyer, dob: new Date(e.target.value) })} className="input input-bordered" />
+                        <input type="text" placeholder="CUIT" value={newBuyer.cuit || ''} onChange={e => setNewBuyer({ ...newBuyer, cuit: e.target.value })} className="input input-bordered" />
                     </div>
                     <div className="mt-4 flex justify-end gap-2">
                         <button onClick={() => setShowNewBuyerForm(false)} className="btn btn-ghost">Cancelar</button>
