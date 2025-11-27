@@ -41,7 +41,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const txResult = await prisma.$transaction(async (tx) => {
+    //  En este caso transacción para crear la cita y los intereses asociados
+    // inetereses como: productId, notes, priority y tx deberia tiparse como Prisma.TransactionClient
+    const txResult = await prisma.$transaction(async (tx: any) => {
       const tenantId = process.env.DEFAULT_TENANT_ID;
       if (!tenantId) {
         throw new Error("DEFAULT_TENANT_ID no configurado");
