@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useDolar } from "@/app/hooks/useDolar"
 import { DolarPanelItem } from "@/app/lib/dolar"
+import { Bars3Icon, ArrowTopRightOnSquareIcon, ChevronDownIcon, SunIcon, MoonIcon } from '@heroicons/react/24/solid'
 
 export default function Navbar({
   onToggleSidebar,
@@ -64,9 +65,7 @@ export default function Navbar({
           onClick={onToggleSidebar}
           className="btn btn-ghost normal-case text-xl"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
-            <path strokeLinecap="round" strok-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
+          <Bars3Icon className="size-6" />
 
         </button>
       </div>
@@ -74,9 +73,7 @@ export default function Navbar({
         {/* add link to new tab for https://www.finanzasargy.com */}
         <a className="flex flex-row gap-2 items-center text-blue-500 hover:text-blue-700" href="https://www.finanzasargy.com" target="_blank" rel="noopener noreferrer">
           FinanzasArgy
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-          </svg>
+          <ArrowTopRightOnSquareIcon className="size-4" />
         </a>
         <div className="px-3 py-1 rounded-full bg-base-content/5 text-blue-700 text-sm font-medium border border-blue-400">
           Dólar Blue:{" "}
@@ -98,15 +95,7 @@ export default function Navbar({
         <div className="dropdown dropdown-end">
           <div tabIndex={0} role="button" className="btn m-1">
             Tema
-            <svg
-              width="12px"
-              height="12px"
-              className="inline-block h-2 w-2 fill-current opacity-60 ml-1"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 2048 2048"
-            >
-              <path d="M1799 349l242 241-1017 1017L7 590l242-241 775 775 775-775z" />
-            </svg>
+            <ChevronDownIcon className="inline-block h-2 w-2 fill-current opacity-60 ml-1" />
           </div>
           <ul
             tabIndex={0}
@@ -125,13 +114,9 @@ export default function Navbar({
                     onChange={() => handleThemeChange(t.value)}
                   />
                   {t.type === 'light' ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-5 absolute right-2 pointer-events-none">
-                      <path d="M12 2.25a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.5 12a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM18.894 6.166a.75.75 0 0 0-1.06-1.06l-1.591 1.59a.75.75 0 1 0 1.06 1.061l1.591-1.59ZM21.75 12a.75.75 0 0 1-.75.75h-2.25a.75.75 0 0 1 0-1.5H21a.75.75 0 0 1 .75.75ZM17.834 18.894a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 1 0-1.061 1.06l1.59 1.591ZM12 18a.75.75 0 0 1 .75.75V21a.75.75 0 0 1-1.5 0v-2.25A.75.75 0 0 1 12 18ZM7.758 17.303a.75.75 0 0 0-1.061-1.06l-1.591 1.59a.75.75 0 0 0 1.06 1.061l1.591-1.59ZM6 12a.75.75 0 0 1-.75.75H3a.75.75 0 0 1 0-1.5h2.25A.75.75 0 0 1 6 12ZM6.697 7.757a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 0 0-1.061 1.06l1.59 1.591Z" />
-                    </svg>
+                    <SunIcon className="size-5 absolute right-2 pointer-events-none" />
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-4 absolute right-2 pointer-events-none">
-                      <path fillRule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clipRule="evenodd" />
-                    </svg>
+                    <MoonIcon className="size-4 absolute right-2 pointer-events-none" />
                   )}
                 </label>
               </li>

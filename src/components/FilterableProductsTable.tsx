@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, ChevronDownIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
+import { SWRResponse } from 'swr'
 // SerializedProduct mirrors the shape we send from the server page:
 // Decimal and Date fields are converted to strings (or null) so they can
 // be safely passed into a Client Component.
@@ -30,10 +32,7 @@ type SerializedProduct = {
   updatedAt: string | null
 }
 import SearchBar from '@/components/SearchBar'
-
-type FilterableProductsTableProps = {
-  products: SerializedProduct[]
-}
+import { Product } from '@prisma/client'
 
 function formatDecimal(value: unknown) {
   if (value == null) return '-'
@@ -52,11 +51,11 @@ function formatDecimal(value: unknown) {
   }
 }
 
-export default function FilterableProductsTable({ products }: FilterableProductsTableProps) {
+export default function FilterableProductsTable({ data: products, error, isLoading }: SWRResponse<SerializedProduct[]>) {
   // Keep a local copy of products so we can do optimistic updates when
   // changing stock from the UI.
-  const [productsLocal, setProductsLocal] = useState<SerializedProduct[]>(products)
-  useEffect(() => setProductsLocal(products), [products])
+  const [productsLocal, setProductsLocal] = useState<SerializedProduct[]>(products || [])
+  useEffect(() => setProductsLocal(products || []), [products])
 
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState<string>('')
@@ -233,7 +232,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       // Clear editing state
       cancelEditField(productId, fieldName)
     } catch (err) {
-      const original = products.find((p) => p.id === productId)
+      const original = productsLocal.find((p) => p.id === productId)
       if (original) {
         setProductsLocal((prev) => prev.map((p) => (p.id === productId ? original : p)))
       }
@@ -316,76 +315,38 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
   // Legacy functions for stock arrows (keep for backwards compatibility)
   async function persistStockUpdate(id: string, newStock: number, newStockAvailable?: number) {
-    setSavingField({ productId: id, fieldName: "stock" });
-    // Snapshot para rollback si falla
-    const original = products.find((p) => p.id === id);
-
-    // 🎯 (Opcional) Optimistic UI: estimamos el nextState para evitar parpadeos
-    // Si no te interesa optimista, puedes quitar este bloque y dejar que sólo el response mande el estado
-    const optimisticNext = (() => {
-      if (!original) return null;
-      const prevState = original.state;
-      if (newStock < 1 && prevState !== "FUERA_DE_STOCK") return "FUERA_DE_STOCK";
-      if (newStock >= 1 && prevState === "FUERA_DE_STOCK") return "EN_STOCK";
-      return prevState;
-    })();
-
-    // Aplicamos optimista de stock + state
-    if (original) {
-      setProductsLocal((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? {
-              ...p,
-              stock: newStock,
-              stockAvailable:
-                newStockAvailable !== undefined ? newStockAvailable : p.stockAvailable,
-              state: optimisticNext ?? p.state,
-            }
-            : p
-        )
-      );
-    }
-
+    setSavingField({ productId: id, fieldName: 'stock' })
     try {
-      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock };
+      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock }
       if (newStockAvailable !== undefined) {
-        updateBody.stockAvailable = newStockAvailable;
+        updateBody.stockAvailable = newStockAvailable
       }
       const res = await fetch(`/api/products/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateBody),
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(await res.text());
-
-      // 🔁 Aseguramos sincronizar lo que diga el servidor (incluye `state`)
-      const updated = await res.json();
+      })
+      if (!res.ok) throw new Error('server error')
+      const updated = await res.json()
       setProductsLocal((prev) =>
         prev.map((p) =>
           p.id === id
             ? {
               ...p,
               stock: updated.stock,
-              stockAvailable:
-                updated.stockAvailable ?? p.stockAvailable,
-              state: updated.state, // 👈 aquí está la clave
+              stockAvailable: updated.stockAvailable ?? p.stockAvailable,
             }
-            : p
-        )
-      );
+            : p,
+        ),
+      )
     } catch (err) {
-      // Rollback a original
-      if (original) {
-        setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)));
-      }
-      console.error("Failed to persist stock update", err);
+      const original = (products ?? []).find((p) => p.id === id)
+      if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
+      console.error('Failed to persist stock update', err)
     } finally {
-      setSavingField(null);
+      setSavingField(null)
     }
   }
-
 
   function startEditStock(id: string, value: number) {
     startEditField(id, 'stock', value)
@@ -419,7 +380,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       const updated = await res.json()
       setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: updated.state } : p)))
     } catch (err) {
-      const original = products.find((p) => p.id === id)
+      const original = (products ?? []).find((p) => p.id === id)
       if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
       console.error('Failed to persist state update', err)
     } finally {
@@ -463,6 +424,8 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     }
   }
 
+  if (error) return <div className="p-8 text-center text-error">Error al cargar los productos.</div>;
+
   return (
     <div className="flex flex-col gap-4 !h-full flex-1 relative">
       <div className="flex justify-between items-center">
@@ -476,7 +439,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               de
             </span>
             <span className="ml-1 text-sm text-base-content/30">
-              {products.length}
+              {products?.length || 0}
             </span>
           </h2>
           <div className="ml-2 flex items-center gap-2">
@@ -509,13 +472,9 @@ export default function FilterableProductsTable({ products }: FilterableProducts
           >
             {isTableExpanded ? 'Comprimir' : 'Expandir '} Tabla
             {isTableExpanded ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
-                <path fillRule="evenodd" d="M3.22 3.22a.75.75 0 0 1 1.06 0l3.97 3.97V4.5a.75.75 0 0 1 1.5 0V9a.75.75 0 0 1-.75.75H4.5a.75.75 0 0 1 0-1.5h2.69L3.22 4.28a.75.75 0 0 1 0-1.06Zm17.56 0a.75.75 0 0 1 0 1.06l-3.97 3.97h2.69a.75.75 0 0 1 0 1.5H15a.75.75 0 0 1-.75-.75V4.5a.75.75 0 0 1 1.5 0v2.69l3.97-3.97a.75.75 0 0 1 1.06 0ZM3.75 15a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-2.69l-3.97 3.97a.75.75 0 0 1-1.06-1.06l3.97-3.97H4.5a.75.75 0 0 1-.75-.75Zm10.5 0a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-2.69l3.97 3.97a.75.75 0 1 1-1.06 1.06l-3.97-3.97v2.69a.75.75 0 0 1-1.5 0V15Z" clipRule="evenodd" />
-              </svg>
+              <ArrowsPointingInIcon className="size-6" />
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
-                <path fillRule="evenodd" d="M15 3.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0V5.56l-3.97 3.97a.75.75 0 1 1-1.06-1.06l3.97-3.97h-2.69a.75.75 0 0 1-.75-.75Zm-12 0A.75.75 0 0 1 3.75 3h4.5a.75.75 0 0 1 0 1.5H5.56l3.97 3.97a.75.75 0 0 1-1.06 1.06L4.5 5.56v2.69a.75.75 0 0 1-1.5 0v-4.5Zm11.47 11.78a.75.75 0 1 1 1.06-1.06l3.97 3.97v-2.69a.75.75 0 0 1 1.5 0v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1 0-1.5h2.69l-3.97-3.97Zm-4.94-1.06a.75.75 0 0 1 0 1.06L5.56 19.5h2.69a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 1 1.5 0v2.69l3.97-3.97a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
-              </svg>
+              <ArrowsPointingOutIcon className="size-6" />
             )}
           </button>
         </div>
@@ -528,113 +487,193 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
         <div className="flex items-center gap-2 flex-1">
-          <SearchBar
-            placeholder="Buscar por modelo..."
-            onSearch={setSearch}
-            search={search}
-          />
+          <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
+          {search ? (
+            <button
+              type="button"
+              aria-label="Limpiar búsqueda"
+              onClick={() => setSearch('')}
+              className="btn btn-ghost btn-sm"
+            >
+              ✕
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-outline btn-sm"
             onClick={() => setDrawerOpen(true)}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 mr-1"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 6h18M6 12h12m-8 6h4"
-              />
-            </svg>
+            <FunnelIcon className="w-5 h-5" />
             Filtros
           </button>
-          {/* Add a chip for each activeFilters */}
-          {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) &&
-            <div className="flex items-center gap-2">
-              {brandFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Marca: {brandFilter}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setBrandFilter('')}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {conditionFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Condición: {conditionLabelMap[conditionFilter]}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setConditionFilter('')}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {colorFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+          {[
+            conditionFilter && {
+              key: 'condition',
+              label: (
+                <>
+                  Condición: {conditionLabelMap[conditionFilter] ?? conditionFilter}
+                </>
+              ),
+              className: 'badge-primary',
+              onClear: () => setConditionFilter(''),
+            },
+            batteryMin && {
+              key: 'minBattery',
+              label: (
+                <>
+                  Batería ≥ {batteryMin}%
+                </>
+              ),
+              className: 'badge-warning',
+              onClear: () => setBatteryMin(''),
+            },
+            batteryMax && {
+              key: 'maxBattery',
+              label: (
+                <>
+                  Batería ≤ {batteryMax}%
+                </>
+              ),
+              className: 'badge-warning',
+              onClear: () => setBatteryMax(''),
+            },
+            colorFilter && {
+              key: 'color',
+              label: (
+                <>
                   Color: {colorFilter}
-                  <button
-
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setColorFilter('')}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {capacityFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                </>
+              ),
+              className: 'badge-neutral',
+              onClear: () => setColorFilter(''),
+            },
+            capacityFilter && {
+              key: 'capacity',
+              label: (
+                <>
                   Capacidad: {capacityFilter} GB
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setCapacityFilter('')}
+                </>
+              ),
+              className: 'badge-accent',
+              onClear: () => setCapacityFilter(''),
+            },
+            stateFilter && {
+              key: 'state',
+              label: (
+                <>
+                  Estado: {stateLabelMap[stateFilter] ?? stateFilter}
+                </>
+              ),
+              className: 'badge-secondary',
+              onClear: () => setStateFilter(''),
+            },
+            search && {
+              key: 'search',
+              label: (
+                <>
+                  Búsqueda: {search}
+                </>
+              ),
+              className: 'badge-info',
+              onClear: () => setSearch(''),
+            }
+          ]
+          .filter(Boolean)
+          .length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              {[
+                conditionFilter && {
+                  key: 'condition',
+                  label: (
+                    <>
+                      Condición: {conditionLabelMap[conditionFilter] ?? conditionFilter}
+                    </>
+                  ),
+                  className: 'badge-primary',
+                  onClear: () => setConditionFilter(''),
+                },
+                batteryMin && {
+                  key: 'minBattery',
+                  label: (
+                    <>
+                      Batería ≥ {batteryMin}%
+                    </>
+                  ),
+                  className: 'badge-warning',
+                  onClear: () => setBatteryMin(''),
+                },
+                batteryMax && {
+                  key: 'maxBattery',
+                  label: (
+                    <>
+                      Batería ≤ {batteryMax}%
+                    </>
+                  ),
+                  className: 'badge-warning',
+                  onClear: () => setBatteryMax(''),
+                },
+                colorFilter && {
+                  key: 'color',
+                  label: (
+                    <>
+                      Color: {colorFilter}
+                    </>
+                  ),
+                  className: 'badge-neutral',
+                  onClear: () => setColorFilter(''),
+                },
+                capacityFilter && {
+                  key: 'capacity',
+                  label: (
+                    <>
+                      Capacidad: {capacityFilter} GB
+                    </>
+                  ),
+                  className: 'badge-accent',
+                  onClear: () => setCapacityFilter(''),
+                },
+                stateFilter && {
+                  key: 'state',
+                  label: (
+                    <>
+                      Estado: {stateLabelMap[stateFilter] ?? stateFilter}
+                    </>
+                  ),
+                  className: 'badge-secondary',
+                  onClear: () => setStateFilter(''),
+                },
+                search && {
+                  key: 'search',
+                  label: (
+                    <>
+                      Búsqueda: {search}
+                    </>
+                  ),
+                  className: 'badge-info',
+                  onClear: () => setSearch(''),
+                }
+              ]
+                .filter(Boolean)
+                // despues revisa q es ese any capaz puedo traer una interfaz de prisma
+                .map((f: any | Product ) => (
+                  <span
+                    key={f.key}
+                    className={`badge badge-outline badge-xs ${f.className} group cursor-pointer flex items-center gap-1 transition`}
                   >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {stateFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Estado: {stateLabelMap[stateFilter]}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setStateFilter('')}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {(batteryMin || batteryMax) && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Batería: {batteryMin ? `Min ${batteryMin}%` : ''}{batteryMin && batteryMax ? ' - ' : ''}{batteryMax ? `Max ${batteryMax}%` : ''}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => {
-                      setBatteryMin('')
-                      setBatteryMax('')
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
+                    <span>{f.label}</span>
+                    <button
+                      type="button"
+                      aria-label="Limpiar filtro"
+                      onClick={f.onClear}
+                      className="opacity-0 group-hover:opacity-100 ml-1 text-xs transition-opacity duration-200"
+                      tabIndex={-1}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
             </div>
-          }
+          )}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -650,7 +689,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         <div className="fixed inset-0 z-[100] pointer-events-none">
           <label
             htmlFor="filters-drawer"
-            className="fixed inset-0 bg-black/50 cursor-pointer pointer-events-auto backdrop-blur-[0.1em]"
+            className="fixed inset-0 bg-black/50 cursor-pointer pointer-events-auto"
             onClick={() => setDrawerOpen(false)}
           ></label>
           <div className="fixed right-0 top-0 h-full w-80 bg-base-200 text-base-content shadow-xl pointer-events-auto overflow-y-auto">
@@ -851,6 +890,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       />
 
       <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
+        {isLoading && <div className="p-8 text-center text-base-content/60">Cargando...</div>}
         <table className={`table table-zebra w-full table-pin-rows table-pin-cols ${isTableExpanded ? '' : 'table-xs'}`}>
           <thead>
             <tr>
@@ -873,49 +913,14 @@ export default function FilterableProductsTable({ products }: FilterableProducts
             {filteredProducts.map((p) => (
               <tr key={p.id}>
                 <td className='text-xs text-base-content/60'>
-                  {isEditing(p.id, 'createdAt') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="date"
-                        value={getEditingValue(p.id, 'createdAt')}
-                        onChange={(e) => updateEditingValue(p.id, 'createdAt', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'createdAt')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'createdAt')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'createdAt')}
-                        className="input input-xs w-full min-w-[120px]"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'createdAt'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'createdAt')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'createdAt')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'createdAt', p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '')}
-                      title="Click para editar">
-                      <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
-                        <span className="underline decoration-dotted cursor-help">
-                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                          }) : '-'}
-                        </span>
-                      </div>
+                  <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
+                    <span className="underline decoration-dotted cursor-help">
+                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                      }) : '-'}
                     </span>
-                  )}
+                  </div>
                 </td>
                 <td>
                   {isEditing(p.id, 'modelName') ? (
@@ -935,14 +940,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'modelName')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'modelName')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -982,14 +983,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'imei')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'imei')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1023,14 +1020,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'batteryPct')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'batteryPct')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1068,14 +1061,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'color')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'color')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1115,14 +1104,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       </select>
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'capacityGB')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'capacityGB')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1166,14 +1151,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       </select>
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'condition')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'condition')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1208,14 +1189,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'costPrice')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'costPrice')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1250,14 +1227,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'salePrice')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'salePrice')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1291,14 +1264,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stockInitial')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stockInitial')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1332,14 +1301,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       />
                       <div className='flex flex-col join join-horizontal border border-base-content/10'>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stock')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                          </svg>
+                          <CheckIcon className="h-[1em]" />
                         </button>
                         <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stock')}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <XMarkIcon className="h-[1em]" />
                         </button>
                       </div>
                     </div>
@@ -1373,16 +1338,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   <div className="dropdown dropdown-start relative">
                     <div tabIndex={0} role="button" className="flex flex-row flex-nowrap gap-2 items-center cursor-pointer btn btn-xs btn-ghost py-2">
                       <span className={`badge badge-sm ${stateColorMap[p.state] ?? 'badge-ghost'}`}>{p.state}</span>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <ChevronDownIcon className="h-4 w-4" />
                     </div>
                     <ul tabIndex={-1} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
                       {stateOptions.map((s) => (
@@ -1402,7 +1358,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </td>
                 <td className="flex items-center gap-2">
                   <Link href={`/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
-                    <svg width="800px" height="800px" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="size-[1.2em]"><path fillRule="evenodd" clipRule="evenodd" d="m3.99 16.854-1.314 3.504a.75.75 0 0 0 .966.965l3.503-1.314a3 3 0 0 0 1.068-.687L18.36 9.175s-.354-1.061-1.414-2.122c-1.06-1.06-2.122-1.414-2.122-1.414L4.677 15.786a3 3 0 0 0-.687 1.068zm12.249-12.63 1.383-1.383c.248-.248.579-.406.925-.348.487.08 1.232.322 1.934 1.025.703.703.945 1.447 1.025 1.934.058.346-.1.677-.348.925L19.774 7.76s-.353-1.06-1.414-2.12c-1.06-1.062-2.121-1.415-2.121-1.415z" /></svg>
+                    <PencilIcon className="size-[1.2em]" />
                   </Link>
                   <button
                     className="btn btn-xs btn-square btn-soft btn-error"
@@ -1417,9 +1373,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       </>
                       :
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-[1.2em]">
-                          <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clipRule="evenodd" />
-                        </svg>
+                        <TrashIcon className="size-[1.2em]" />
                       </>
                     }
                   </button>

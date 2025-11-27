@@ -32,8 +32,8 @@ export default function EditAppointmentPage() {
   const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
   const [scheduledAt, setScheduledAt] = useState(new Date());
   const [durationMinutes, setDurationMinutes] = useState(60);
-  const [status, setStatus] = useState<AppointmentStatus>('SCHEDULED');
-  const [outcome, setOutcome] = useState<AppointmentOutcome>('PENDING');
+  const [status, setStatus] = useState<AppointmentStatus>('PROGRAMADA');
+  const [outcome, setOutcome] = useState<AppointmentOutcome>('PENDIENTE');
   const [noSaleReason, setNoSaleReason] = useState<AppointmentNoSaleReason | null>(null);
   const [noSaleReasonOther, setNoSaleReasonOther] = useState('');
   const [resultNotes, setResultNotes] = useState('');
@@ -82,8 +82,8 @@ export default function EditAppointmentPage() {
       durationMinutes,
       status,
       outcome,
-      noSaleReason: outcome === 'NO_SALE' ? noSaleReason : null,
-      noSaleReasonOther: outcome === 'NO_SALE' && noSaleReason === 'OTHER' ? noSaleReasonOther : null,
+      noSaleReason: outcome === 'NO_SE_CONCRETO' ? noSaleReason : null,
+      noSaleReasonOther: outcome === 'NO_SE_CONCRETO' && noSaleReason === 'OTRO' ? noSaleReasonOther : null,
       resultNotes,
       interests: items.map(it => ({
         productId: it.productId,
@@ -158,7 +158,7 @@ export default function EditAppointmentPage() {
                         </select>
                     </div>
                 </div>
-                {outcome === 'NO_SALE' && (
+                {outcome === 'NO_SE_CONCRETO' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div className="form-control">
                             <label className="label"><span className="label-text">Razón de no-venta</span></label>
@@ -167,7 +167,7 @@ export default function EditAppointmentPage() {
                                 {Object.values(AppointmentNoSaleReason).map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
                         </div>
-                        {noSaleReason === 'OTHER' && (
+                        {noSaleReason === 'OTRO' && (
                             <div className="form-control">
                                 <label className="label"><span className="label-text">Otro Motivo</span></label>
                                 <input type="text" value={noSaleReasonOther} onChange={e => setNoSaleReasonOther(e.target.value)} className="input input-bordered" />

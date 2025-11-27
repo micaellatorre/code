@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AppointmentStatus, AppointmentOutcome } from '@prisma/client';
+import { useRouter } from 'next/navigation';
 
 type SerializedAppointment = {
     id: string;
@@ -26,6 +27,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<AppointmentStatus | 'ALL'>('ALL');
     const [outcomeFilter, setOutcomeFilter] = useState<AppointmentOutcome | 'ALL'>('ALL');
+    const router = useRouter();
 
     const filteredAppointments = useMemo(() => {
         return appointments.filter(a => {
@@ -50,6 +52,27 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
         hour: '2-digit',
         minute: '2-digit',
     });
+
+    const handleDelete = async (id: string) => {
+        if (window.confirm('¿Estás seguro de que quieres eliminar esta cita?')) {
+            try {
+                const response = await fetch(`/api/appointments/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    setAppointments(prev => prev.filter(a => a.id !== id));
+                    // Optionally, show a success toast/notification
+                } else {
+                    // Handle error response
+                    console.error('Failed to delete appointment');
+                    // Optionally, show an error toast/notification
+                }
+            } catch (error) {
+                console.error('An error occurred:', error);
+            }
+        }
+    };
 
     return (
         <div className="card bg-base-100 shadow-md">
@@ -107,12 +130,18 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                                         {a.buyer?.instagram && <div>📷 {a.buyer.instagram}</div>}
                                     </td>
                                     <td className="max-w-xs truncate">{a.interests}</td>
-                                    <td><span className={`badge badge-outline badge-${a.status === 'COMPLETED' ? 'success' : 'warning'}`}>{a.status}</span></td>
-                                    <td><span className={`badge badge-outline badge-${a.outcome === 'SALE_COMPLETED' ? 'success' : 'ghost'}`}>{a.outcome}</span></td>
-                                    <td>
+                                    <td><span className={`badge badge-outline badge-${a.status === 'CONCRETADA' ? 'success' : 'warning'}`}>{a.status}</span></td>
+                                    <td><span className={`badge badge-outline badge-${a.outcome === 'VENTA_CONCRETADA' ? 'success' : 'ghost'}`}>{a.outcome}</span></td>
+                                    <td className="space-x-2">
                                         <Link href={`/appointments/${a.id}/edit`} className="btn btn-xs btn-ghost">
                                             Editar
                                         </Link>
+                                        <button
+                                            onClick={() => handleDelete(a.id)}
+                                            className="btn btn-xs btn-error btn-ghost"
+                                        >
+                                            Eliminar
+                                        </button>
                                     </td>
                                 </tr>
                             ))}

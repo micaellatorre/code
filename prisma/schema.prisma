@@ -1,7 +1,6 @@
 // prisma/schema.prisma
 // Venta con Buyer y Payments; accesorios pueden ser:
 // - NORMAL (cobra precio)
-// - ZERO_COST (regalo: baja stock, no cobra)
 // - IN_TOTAL (costo x producto: baja stock y suma a Sale.extraCosts)
 // Además, SaleItem puede vincularse a un teléfono via parentItemId.
 // Se mantiene CostProfile para extras por teléfono; SaleItem guarda selección/desglose en JSON.
@@ -9,10 +8,6 @@
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
 }
 
 /// Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
@@ -33,6 +28,10 @@ model Tenant {
 
   // NUEVO
   appointments Appointment[]
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 /// Catálogo unificado: iPhones y accesorios.
@@ -325,10 +324,10 @@ model Appointment {
   durationMinutes Int?
 
   /// Estado operativo de la cita (agendada, completada, cancelada, etc.)
-  status AppointmentStatus @default(SCHEDULED)
+  status AppointmentStatus @default(PROGRAMADA)
 
   /// Resultado comercial de la cita (si hubo venta/no venta)
-  outcome AppointmentOutcome @default(PENDING)
+  outcome AppointmentOutcome @default(PENDIENTE)
 
   /// Motivo de no venta cuando outcome = NO_SALE
   noSaleReason       AppointmentNoSaleReason?
@@ -424,25 +423,25 @@ enum Currency {
 
 /// Estado operativo de la cita.
 enum AppointmentStatus {
-  SCHEDULED   // Agendada, futura
-  COMPLETED   // Se concretó (haya o no venta)
-  CANCELLED   // Cancelada antes de que ocurra
-  NO_SHOW     // El cliente no se presentó
+  PROGRAMADA   // Agendada, futura
+  CONCRETADA   // Se concretó (haya o no venta)
+  CANCELADA   // Cancelada antes de que ocurra
+  NO_SE_PRESENTO     // El cliente no se presentó
 }
 
 /// Resultado comercial de la cita.
 enum AppointmentOutcome {
-  PENDING     // Aún no se sabe (cita futura / sin registrar)
-  SALE_COMPLETED // Se concretó una venta (podés linkear Sale)
-  NO_SALE        // No se concretó venta
+  PENDIENTE     // Aún no se sabe (cita futura / sin registrar)
+  VENTA_CONCRETADA // Se concretó una venta (podés linkear Sale)
+  NO_SE_CONCRETO        // No se concretó venta
 }
 
 /// Motivo principal de que no haya venta (cuando outcome = NO_SALE).
 enum AppointmentNoSaleReason {
-  PRICE_TOO_HIGH        // Precio muy alto
-  MODEL_NOT_AVAILABLE   // No se consiguió el modelo deseado
-  FOUND_BETTER_OFFER    // Encontró mejor oferta
-  THINKING_ABOUT_IT     // Lo está pensando / "me lo llevo a pensar"
-  NO_SHOW               // Directamente no vino / no se pudo hacer la demo
-  OTHER                 // Otro motivo (se detalla en noSaleReasonOther)
+  MUY_CARO        // Precio muy alto
+  MODELO_NO_DISPONIBLE   // No se consiguió el modelo deseado
+  ENCONTRO_MEJOR_OFERTA    // Encontró mejor oferta
+  LO_ESTA_PENSANDO     // Lo está pensando / "me lo llevo a pensar"
+  NO_SE_PRESENTO               // Directamente no vino / no se pudo hacer la demo
+  OTRO                 // Otro motivo (se detalla en noSaleReasonOther)
 }

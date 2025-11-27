@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import SearchBar from "@/components/SearchBar";
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
 
 // ====== Tipos ======
 type SerializedSale = {
@@ -446,13 +447,9 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
           >
             {isTableExpanded ? 'Comprimir' : 'Expandir '} Tabla
             {isTableExpanded ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
-                <path fillRule="evenodd" d="M3.22 3.22a.75.75 0 0 1 1.06 0l3.97 3.97V4.5a.75.75 0 0 1 1.5 0V9a.75.75 0 0 1-.75.75H4.5a.75.75 0 0 1 0-1.5h2.69L3.22 4.28a.75.75 0 0 1 0-1.06Zm17.56 0a.75.75 0 0 1 0 1.06l-3.97 3.97h2.69a.75.75 0 0 1 0 1.5H15a.75.75 0 0 1-.75-.75V4.5a.75.75 0 0 1 1.5 0v2.69l3.97-3.97a.75.75 0 0 1 1.06 0ZM3.75 15a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-2.69l-3.97 3.97a.75.75 0 0 1-1.06-1.06l3.97-3.97H4.5a.75.75 0 0 1-.75-.75Zm10.5 0a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-2.69l3.97 3.97a.75.75 0 1 1-1.06 1.06l-3.97-3.97v2.69a.75.75 0 0 1-1.5 0V15Z" clipRule="evenodd" />
-              </svg>
+              <ArrowsPointingInIcon className="size-6" />
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-6">
-                <path fillRule="evenodd" d="M15 3.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0V5.56l-3.97 3.97a.75.75 0 1 1-1.06-1.06l3.97-3.97h-2.69a.75.75 0 0 1-.75-.75Zm-12 0A.75.75 0 0 1 3.75 3h4.5a.75.75 0 0 1 0 1.5H5.56l3.97 3.97a.75.75 0 0 1-1.06 1.06L4.5 5.56v2.69a.75.75 0 0 1-1.5 0v-4.5Zm11.47 11.78a.75.75 0 1 1 1.06-1.06l3.97 3.97v-2.69a.75.75 0 0 1 1.5 0v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1 0-1.5h2.69l-3.97-3.97Zm-4.94-1.06a.75.75 0 0 1 0 1.06L5.56 19.5h2.69a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 1 1.5 0v2.69l3.97-3.97a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
-              </svg>
+              <ArrowsPointingOutIcon className="size-6" />
             )}
           </button>
         </div>
@@ -476,20 +473,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
             onClick={() => setDrawerOpen(true)}
             title="Abrir filtros"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 mr-1"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 6h18M6 12h12m-8 6h4"
-              />
-            </svg>
+            <FunnelIcon className="w-5 h-5 mr-1" />
             Filtros
           </button>
         </div>
@@ -678,14 +662,10 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         />
                         <div className='flex flex-col join join-horizontal border border-base-content/10'>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'date')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
+                            <CheckIcon className="h-[1em]" />
                           </button>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'date')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
+                            <XMarkIcon className="h-[1em]" />
                           </button>
                         </div>
                       </div>
@@ -740,17 +720,13 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         />
                         <div className="join join-horizontal">
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, "buyer.name")}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
+                            <CheckIcon className="h-[1em]" />
                           </button>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => {
                             cancelEditField(s.id, "buyer.name");
                             cancelEditField(s.id, "buyer.surname");
                           }}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
+                            <XMarkIcon className="h-[1em]" />
                           </button>
                         </div>
                       </div>
@@ -823,14 +799,10 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         />
                         <div className='flex flex-col join join-horizontal border border-base-content/10'>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'costTotal')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
+                            <CheckIcon className="h-[1em]" />
                           </button>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'costTotal')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
+                            <XMarkIcon className="h-[1em]" />
                           </button>
                         </div>
                       </div>
@@ -863,14 +835,10 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         />
                         <div className='flex flex-col join join-horizontal border border-base-content/10'>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'total')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
+                            <CheckIcon className="h-[1em]" />
                           </button>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'total')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
+                            <XMarkIcon className="h-[1em]" />
                           </button>
                         </div>
                       </div>
@@ -905,14 +873,10 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         />
                         <div className='flex flex-col join join-horizontal border border-base-content/10'>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'profit')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
+                            <CheckIcon className="h-[1em]" />
                           </button>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'profit')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
+                            <XMarkIcon className="h-[1em]" />
                           </button>
                         </div>
                       </div>
@@ -953,14 +917,10 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         </select>
                         <div className='flex flex-col join join-horizontal border border-base-content/10'>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'origin')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
+                            <CheckIcon className="h-[1em]" />
                           </button>
                           <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'origin')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-[1em]">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
+                            <XMarkIcon className="h-[1em]" />
                           </button>
                         </div>
                       </div>
@@ -982,7 +942,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         href={`/sales/${s.id}/edit`}
                         className="btn btn-xs btn-square btn-soft"
                       >
-                        <svg width="800px" height="800px" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className="size-[1.2em]"><path fillRule="evenodd" clipRule="evenodd" d="m3.99 16.854-1.314 3.504a.75.75 0 0 0 .966.965l3.503-1.314a3 3 0 0 0 1.068-.687L18.36 9.175s-.354-1.061-1.414-2.122c-1.06-1.06-2.122-1.414-2.122-1.414L4.677 15.786a3 3 0 0 0-.687 1.068zm12.249-12.63 1.383-1.383c.248-.248.579-.406.925-.348.487.08 1.232.322 1.934 1.025.703.703.945 1.447 1.025 1.934.058.346-.1.677-.348.925L19.774 7.76s-.353-1.06-1.414-2.12c-1.06-1.062-2.121-1.415-2.121-1.415z" /></svg>
+                        <PencilIcon className="size-[1.2em]" />
                       </Link>
                       <button
                         className="btn btn-xs btn-square btn-soft btn-error"
@@ -996,9 +956,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                           </>
                           :
                           <>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-[1.2em]">
-                              <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clipRule="evenodd" />
-                            </svg>
+                            <TrashIcon className="size-[1.2em]" />
                           </>
                         }
                       </button>

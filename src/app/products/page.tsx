@@ -1,25 +1,23 @@
+"use client";
 import DashboardLayout from '@/components/DashboardLayout'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableProductsTable from '@/components/FilterableProductsTable'
-import { prisma } from '@/lib/prisma'
+import useSWR from 'swr';
 
-// Force this page to be server-rendered on every request because it relies on
-// up-to-date DB data and should not be statically prerendered.
-export const dynamic = 'force-dynamic'
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-export const metadata: Metadata = {
-  title: 'Stock',
-  description: 'Listado y gestión de productos en stock',
-}
-
-export default async function ProductsPage() {
-  const products = await prisma.product.findMany({ orderBy: { createdAt: 'desc' } })
+export default function ProductsPage() {
+  const swrResponse = useSWR('/api/products', fetcher, {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    refreshInterval: 30000,
+  });
 
   // Serialize Decimal and Date values into plain JS types so they can be
   // safely passed into Client Components.
-  const serialized = products.map((p) => ({
+  const serialized = swrResponse.data?.map((p: any) => ({
     ...p,
     imei: p.imei ?? '',
     costPrice: p.costPrice != null ? String(p.costPrice) : null,
@@ -34,11 +32,13 @@ export default async function ProductsPage() {
     stockAvailable: p.stockAvailable ?? 0,
   }))
 
+  const serializedSWRResponse = { ...swrResponse, data: serialized }
+
   return (
     <DashboardLayout activeTab="products">
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Productos' }]} />
       <div className="flex flex-col gap-4 h-full">
-        <FilterableProductsTable products={serialized} />
+        <FilterableProductsTable {...serializedSWRResponse} />
       </div>
     </DashboardLayout>
   )

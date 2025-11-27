@@ -54,8 +54,8 @@ export async function POST(request: Request) {
           scheduledAt: new Date(scheduledAt),
           durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : null,
           resultNotes: notes || null,
-          status: 'SCHEDULED',
-          outcome: 'PENDING',
+          status: 'PROGRAMADA',
+          outcome: 'PENDIENTE',
           interests: {
             create: interests?.map((interest: any) => ({
               productId: interest.productId,
