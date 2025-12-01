@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import SearchBar from "@/components/SearchBar";
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
-import { SWRResponse } from "swr";
 
 // ====== Tipos ======
 type SerializedBuyer = {
@@ -35,16 +34,10 @@ function normalizeBuyers(input: any[]): SerializedBuyer[] {
 }
 
 // ====== Componente ======
-export default function FilterableBuyersTable({ data, error, isLoading }: SWRResponse<SerializedBuyer[]>) {
+export default function FilterableBuyersTable({ initial }: { initial: SerializedBuyer[] }) {
   const [buyers, setBuyers] = useState<SerializedBuyer[]>(() =>
-    normalizeBuyers(data as any[] || [])
+    normalizeBuyers(initial)
   );
-
-  useEffect(() => {
-    if (data) {
-      setBuyers(normalizeBuyers(data));
-    }
-  }, [data]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -53,7 +46,7 @@ export default function FilterableBuyersTable({ data, error, isLoading }: SWRRes
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isTableExpanded, setIsTableExpanded] = useState(false);
 
@@ -89,7 +82,7 @@ export default function FilterableBuyersTable({ data, error, isLoading }: SWRRes
     let mounted = true;
 
     const doFetch = async () => {
-      setSearchLoading(true);
+      setLoading(true);
       if (abortRef.current) {
         abortRef.current.abort();
       }
@@ -108,14 +101,14 @@ export default function FilterableBuyersTable({ data, error, isLoading }: SWRRes
           const body = await r.json();
           if (mounted) setBuyers(normalizeBuyers(body?.results ?? []));
         } else {
-          if (mounted && data) setBuyers(normalizeBuyers(data));
+          if (mounted) setBuyers(normalizeBuyers(initial));
         }
       } catch (e: any) {
         if (e?.name !== "AbortError") {
           console.error("search fetch failed:", e);
         }
       } finally {
-        if (mounted) setSearchLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
@@ -124,7 +117,7 @@ export default function FilterableBuyersTable({ data, error, isLoading }: SWRRes
       mounted = false;
       ctrlAbort(abortRef);
     };
-  }, [debouncedQuery, data]);
+  }, [debouncedQuery, initial]);
 
   const formatArgentina = (iso: string | null) => {
     if (!iso) return "-";
@@ -228,8 +221,7 @@ export default function FilterableBuyersTable({ data, error, isLoading }: SWRRes
     } catch (err) {
       console.error(`Failed to persist ${fieldName} update`, err);
       alert("No se pudo guardar. Se revirtieron los cambios.");
-      // Revert to the original data from SWR
-      if(data) setBuyers((_) => normalizeBuyers(data));
+      setBuyers((_) => normalizeBuyers(initial));
     } finally {
       setSavingField(null);
     }
@@ -277,10 +269,6 @@ export default function FilterableBuyersTable({ data, error, isLoading }: SWRRes
       setDeletingId(null);
     }
   };
-
-  if (error) {
-    return <div className="p-8 text-center text-error">Error al cargar los clientes.</div>
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -419,13 +407,13 @@ export default function FilterableBuyersTable({ data, error, isLoading }: SWRRes
       />
 
       <div className="relative overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
-        {(isLoading || searchLoading) && (
+        {loading && (
           <div className="absolute inset-0 bg-base-100/70 backdrop-blur-[1px] z-10 flex items-center justify-center text-sm text-base-content/60">
-            Cargando…
+            Buscando…
           </div>
         )}
 
-        {displayed.length === 0 && !isLoading && !searchLoading ? (
+        {displayed.length === 0 ? (
           <div className="p-8 text-center text-base-content/60">
             {debouncedQuery || name || surname || phone || instagram || email || cuit || dni
               ? "No hay resultados con los filtros aplicados."

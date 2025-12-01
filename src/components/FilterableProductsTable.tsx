@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, ChevronDownIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
-import { SWRResponse } from 'swr'
+
 // SerializedProduct mirrors the shape we send from the server page:
 // Decimal and Date fields are converted to strings (or null) so they can
 // be safely passed into a Client Component.
@@ -32,7 +32,10 @@ type SerializedProduct = {
   updatedAt: string | null
 }
 import SearchBar from '@/components/SearchBar'
-import { Product } from '@prisma/client'
+
+type FilterableProductsTableProps = {
+  products: SerializedProduct[]
+}
 
 function formatDecimal(value: unknown) {
   if (value == null) return '-'
@@ -51,11 +54,11 @@ function formatDecimal(value: unknown) {
   }
 }
 
-export default function FilterableProductsTable({ data: products, error, isLoading }: SWRResponse<SerializedProduct[]>) {
+export default function FilterableProductsTable({ products }: FilterableProductsTableProps) {
   // Keep a local copy of products so we can do optimistic updates when
   // changing stock from the UI.
-  const [productsLocal, setProductsLocal] = useState<SerializedProduct[]>(products || [])
-  useEffect(() => setProductsLocal(products || []), [products])
+  const [productsLocal, setProductsLocal] = useState<SerializedProduct[]>(products)
+  useEffect(() => setProductsLocal(products), [products])
 
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState<string>('')
@@ -232,7 +235,7 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
       // Clear editing state
       cancelEditField(productId, fieldName)
     } catch (err) {
-      const original = productsLocal.find((p) => p.id === productId)
+      const original = products.find((p) => p.id === productId)
       if (original) {
         setProductsLocal((prev) => prev.map((p) => (p.id === productId ? original : p)))
       }
@@ -315,38 +318,76 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
 
   // Legacy functions for stock arrows (keep for backwards compatibility)
   async function persistStockUpdate(id: string, newStock: number, newStockAvailable?: number) {
-    setSavingField({ productId: id, fieldName: 'stock' })
+    setSavingField({ productId: id, fieldName: "stock" });
+    // Snapshot para rollback si falla
+    const original = products.find((p) => p.id === id);
+
+    // 🎯 (Opcional) Optimistic UI: estimamos el nextState para evitar parpadeos
+    // Si no te interesa optimista, puedes quitar este bloque y dejar que sólo el response mande el estado
+    const optimisticNext = (() => {
+      if (!original) return null;
+      const prevState = original.state;
+      if (newStock < 1 && prevState !== "FUERA_DE_STOCK") return "FUERA_DE_STOCK";
+      if (newStock >= 1 && prevState === "FUERA_DE_STOCK") return "EN_STOCK";
+      return prevState;
+    })();
+
+    // Aplicamos optimista de stock + state
+    if (original) {
+      setProductsLocal((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+              ...p,
+              stock: newStock,
+              stockAvailable:
+                newStockAvailable !== undefined ? newStockAvailable : p.stockAvailable,
+              state: optimisticNext ?? p.state,
+            }
+            : p
+        )
+      );
+    }
+
     try {
-      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock }
+      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock };
       if (newStockAvailable !== undefined) {
-        updateBody.stockAvailable = newStockAvailable
+        updateBody.stockAvailable = newStockAvailable;
       }
       const res = await fetch(`/api/products/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateBody),
-      })
-      if (!res.ok) throw new Error('server error')
-      const updated = await res.json()
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      // 🔁 Aseguramos sincronizar lo que diga el servidor (incluye `state`)
+      const updated = await res.json();
       setProductsLocal((prev) =>
         prev.map((p) =>
           p.id === id
             ? {
               ...p,
               stock: updated.stock,
-              stockAvailable: updated.stockAvailable ?? p.stockAvailable,
+              stockAvailable:
+                updated.stockAvailable ?? p.stockAvailable,
+              state: updated.state, // 👈 aquí está la clave
             }
-            : p,
-        ),
-      )
+            : p
+        )
+      );
     } catch (err) {
-      const original = (products ?? []).find((p) => p.id === id)
-      if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
-      console.error('Failed to persist stock update', err)
+      // Rollback a original
+      if (original) {
+        setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)));
+      }
+      console.error("Failed to persist stock update", err);
     } finally {
-      setSavingField(null)
+      setSavingField(null);
     }
   }
+
 
   function startEditStock(id: string, value: number) {
     startEditField(id, 'stock', value)
@@ -380,7 +421,7 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
       const updated = await res.json()
       setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: updated.state } : p)))
     } catch (err) {
-      const original = (products ?? []).find((p) => p.id === id)
+      const original = products.find((p) => p.id === id)
       if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
       console.error('Failed to persist state update', err)
     } finally {
@@ -424,8 +465,6 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
     }
   }
 
-  if (error) return <div className="p-8 text-center text-error">Error al cargar los productos.</div>;
-
   return (
     <div className="flex flex-col gap-4 !h-full flex-1 relative">
       <div className="flex justify-between items-center">
@@ -439,7 +478,7 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
               de
             </span>
             <span className="ml-1 text-sm text-base-content/30">
-              {products?.length || 0}
+              {products.length}
             </span>
           </h2>
           <div className="ml-2 flex items-center gap-2">
@@ -487,17 +526,11 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
         <div className="flex items-center gap-2 flex-1">
-          <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} />
-          {search ? (
-            <button
-              type="button"
-              aria-label="Limpiar búsqueda"
-              onClick={() => setSearch('')}
-              className="btn btn-ghost btn-sm"
-            >
-              ✕
-            </button>
-          ) : null}
+          <SearchBar
+            placeholder="Buscar por modelo..."
+            onSearch={setSearch}
+            search={search}
+          />
           <button
             type="button"
             className="btn btn-outline btn-sm"
@@ -506,174 +539,87 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
             <FunnelIcon className="w-5 h-5" />
             Filtros
           </button>
-          {[
-            conditionFilter && {
-              key: 'condition',
-              label: (
-                <>
-                  Condición: {conditionLabelMap[conditionFilter] ?? conditionFilter}
-                </>
-              ),
-              className: 'badge-primary',
-              onClear: () => setConditionFilter(''),
-            },
-            batteryMin && {
-              key: 'minBattery',
-              label: (
-                <>
-                  Batería ≥ {batteryMin}%
-                </>
-              ),
-              className: 'badge-warning',
-              onClear: () => setBatteryMin(''),
-            },
-            batteryMax && {
-              key: 'maxBattery',
-              label: (
-                <>
-                  Batería ≤ {batteryMax}%
-                </>
-              ),
-              className: 'badge-warning',
-              onClear: () => setBatteryMax(''),
-            },
-            colorFilter && {
-              key: 'color',
-              label: (
-                <>
-                  Color: {colorFilter}
-                </>
-              ),
-              className: 'badge-neutral',
-              onClear: () => setColorFilter(''),
-            },
-            capacityFilter && {
-              key: 'capacity',
-              label: (
-                <>
-                  Capacidad: {capacityFilter} GB
-                </>
-              ),
-              className: 'badge-accent',
-              onClear: () => setCapacityFilter(''),
-            },
-            stateFilter && {
-              key: 'state',
-              label: (
-                <>
-                  Estado: {stateLabelMap[stateFilter] ?? stateFilter}
-                </>
-              ),
-              className: 'badge-secondary',
-              onClear: () => setStateFilter(''),
-            },
-            search && {
-              key: 'search',
-              label: (
-                <>
-                  Búsqueda: {search}
-                </>
-              ),
-              className: 'badge-info',
-              onClear: () => setSearch(''),
-            }
-          ]
-          .filter(Boolean)
-          .length > 0 && (
-            <div className="flex flex-wrap gap-2 items-center">
-              {[
-                conditionFilter && {
-                  key: 'condition',
-                  label: (
-                    <>
-                      Condición: {conditionLabelMap[conditionFilter] ?? conditionFilter}
-                    </>
-                  ),
-                  className: 'badge-primary',
-                  onClear: () => setConditionFilter(''),
-                },
-                batteryMin && {
-                  key: 'minBattery',
-                  label: (
-                    <>
-                      Batería ≥ {batteryMin}%
-                    </>
-                  ),
-                  className: 'badge-warning',
-                  onClear: () => setBatteryMin(''),
-                },
-                batteryMax && {
-                  key: 'maxBattery',
-                  label: (
-                    <>
-                      Batería ≤ {batteryMax}%
-                    </>
-                  ),
-                  className: 'badge-warning',
-                  onClear: () => setBatteryMax(''),
-                },
-                colorFilter && {
-                  key: 'color',
-                  label: (
-                    <>
-                      Color: {colorFilter}
-                    </>
-                  ),
-                  className: 'badge-neutral',
-                  onClear: () => setColorFilter(''),
-                },
-                capacityFilter && {
-                  key: 'capacity',
-                  label: (
-                    <>
-                      Capacidad: {capacityFilter} GB
-                    </>
-                  ),
-                  className: 'badge-accent',
-                  onClear: () => setCapacityFilter(''),
-                },
-                stateFilter && {
-                  key: 'state',
-                  label: (
-                    <>
-                      Estado: {stateLabelMap[stateFilter] ?? stateFilter}
-                    </>
-                  ),
-                  className: 'badge-secondary',
-                  onClear: () => setStateFilter(''),
-                },
-                search && {
-                  key: 'search',
-                  label: (
-                    <>
-                      Búsqueda: {search}
-                    </>
-                  ),
-                  className: 'badge-info',
-                  onClear: () => setSearch(''),
-                }
-              ]
-                .filter(Boolean)
-                // despues revisa q es ese any capaz puedo traer una interfaz de prisma
-                .map((f: any | Product ) => (
-                  <span
-                    key={f.key}
-                    className={`badge badge-outline badge-xs ${f.className} group cursor-pointer flex items-center gap-1 transition`}
+          {/* Add a chip for each activeFilters */}
+          {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) &&
+            <div className="flex items-center gap-2">
+              {brandFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Marca: {brandFilter}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setBrandFilter('')}
                   >
-                    <span>{f.label}</span>
-                    <button
-                      type="button"
-                      aria-label="Limpiar filtro"
-                      onClick={f.onClear}
-                      className="opacity-0 group-hover:opacity-100 ml-1 text-xs transition-opacity duration-200"
-                      tabIndex={-1}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
+                    ✕
+                  </button>
+                </span>
+              )}
+              {conditionFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Condición: {conditionLabelMap[conditionFilter]}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setConditionFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {colorFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Color: {colorFilter}
+                  <button
+
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setColorFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {capacityFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Capacidad: {capacityFilter} GB
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setCapacityFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {stateFilter && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Estado: {stateLabelMap[stateFilter]}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => setStateFilter('')}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {(batteryMin || batteryMax) && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Batería: {batteryMin ? `Min ${batteryMin}%` : ''}{batteryMin && batteryMax ? ' - ' : ''}{batteryMax ? `Max ${batteryMax}%` : ''}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => {
+                      setBatteryMin('')
+                      setBatteryMax('')
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
             </div>
-          )}
+          }
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -689,7 +635,7 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
         <div className="fixed inset-0 z-[100] pointer-events-none">
           <label
             htmlFor="filters-drawer"
-            className="fixed inset-0 bg-black/50 cursor-pointer pointer-events-auto"
+            className="fixed inset-0 bg-black/50 cursor-pointer pointer-events-auto backdrop-blur-[0.1em]"
             onClick={() => setDrawerOpen(false)}
           ></label>
           <div className="fixed right-0 top-0 h-full w-80 bg-base-200 text-base-content shadow-xl pointer-events-auto overflow-y-auto">
@@ -890,7 +836,6 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
       />
 
       <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
-        {isLoading && <div className="p-8 text-center text-base-content/60">Cargando...</div>}
         <table className={`table table-zebra w-full table-pin-rows table-pin-cols ${isTableExpanded ? '' : 'table-xs'}`}>
           <thead>
             <tr>
@@ -913,14 +858,45 @@ export default function FilterableProductsTable({ data: products, error, isLoadi
             {filteredProducts.map((p) => (
               <tr key={p.id}>
                 <td className='text-xs text-base-content/60'>
-                  <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
-                    <span className="underline decoration-dotted cursor-help">
-                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                      }) : '-'}
+                  {isEditing(p.id, 'createdAt') ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        type="date"
+                        value={getEditingValue(p.id, 'createdAt')}
+                        onChange={(e) => updateEditingValue(p.id, 'createdAt', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitEditField(p.id, 'createdAt')
+                          if (e.key === 'Escape') cancelEditField(p.id, 'createdAt')
+                        }}
+                        onBlur={() => commitEditField(p.id, 'createdAt')}
+                        className="input input-xs w-full min-w-[120px]"
+                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'createdAt'}
+                      />
+                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'createdAt')}>
+                          <CheckIcon className="h-[1em]" />
+                        </button>
+                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'createdAt')}>
+                          <XMarkIcon className="h-[1em]" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span
+                      className="cursor-pointer hover:bg-base-200 rounded px-1"
+                      onClick={() => startEditField(p.id, 'createdAt', p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '')}
+                      title="Click para editar">
+                      <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
+                        <span className="underline decoration-dotted cursor-help">
+                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          }) : '-'}
+                        </span>
+                      </div>
                     </span>
-                  </div>
+                  )}
                 </td>
                 <td>
                   {isEditing(p.id, 'modelName') ? (
