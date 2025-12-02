@@ -1,4 +1,6 @@
 import './globals.css'
+// import type { Metadata } from "next"
+import { AuthSessionProvider } from "@/components/auth-session-provider"
 
 export const metadata = {
   title: 'GP Importaciones',
@@ -32,7 +34,7 @@ export default function RootLayout({
         pantalla.
       */}
       <body className="bg-base-200 text-base-content min-h-screen">
-        {children}
+        <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>
     </html>
   )

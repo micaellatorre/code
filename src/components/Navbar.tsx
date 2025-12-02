@@ -5,11 +5,16 @@ import { useDolar } from "@/app/hooks/useDolar"
 import { DolarPanelItem } from "@/app/lib/dolar"
 import { Bars3Icon, ArrowTopRightOnSquareIcon, ChevronDownIcon, SunIcon, MoonIcon } from '@heroicons/react/24/solid'
 
+// 🔥 Auth
+import { signIn, signOut, useSession } from "next-auth/react"
+
 export default function Navbar({
   onToggleSidebar,
 }: {
   onToggleSidebar: () => void
 }) {
+  const { data: session, status } = useSession()
+
   const themes = [
     { value: 'luxury', label: 'Luxury', type: 'dark' },
     { value: 'halloween', label: 'Halloween', type: 'dark' },
@@ -25,6 +30,7 @@ export default function Navbar({
     { value: 'lemonade', label: 'Lemonade', type: 'light' },
     { value: 'winter', label: 'Winter', type: 'light' },
   ]
+
   const [theme, setTheme] = useState('light')
   const { data: dolarData, error, isLoading } = useDolar()
 
@@ -37,9 +43,14 @@ export default function Navbar({
     }
   }, [])
 
-  // Process dolar data when it's available
-  const dolarBlueVenta = dolarData?.panel?.find((d: DolarPanelItem) => d.titulo === "Dólar Blue")?.venta?.toLocaleString("es-AR", { minimumFractionDigits: 2 }) ?? null;
-  const dolarCriptoVenta = dolarData?.panel?.find((d: DolarPanelItem) => d.titulo === "Dólar Cripto")?.venta?.toLocaleString("es-AR", { minimumFractionDigits: 2 }) ?? null;
+  // Cotizaciones
+  const dolarBlueVenta =
+    dolarData?.panel?.find((d: DolarPanelItem) => d.titulo === "Dólar Blue")
+      ?.venta?.toLocaleString("es-AR", { minimumFractionDigits: 2 }) ?? null
+
+  const dolarCriptoVenta =
+    dolarData?.panel?.find((d: DolarPanelItem) => d.titulo === "Dólar Cripto")
+      ?.venta?.toLocaleString("es-AR", { minimumFractionDigits: 2 }) ?? null
 
   // Debug logging
   useEffect(() => {
@@ -58,6 +69,7 @@ export default function Navbar({
 
   return (
     <div className="navbar bg-base-100 shadow mb-4">
+      {/* Left: Sidebar toggle */}
       <div className="flex-1">
         {/* Botón para alternar el menú lateral */}
         <button
@@ -69,9 +81,15 @@ export default function Navbar({
 
         </button>
       </div>
+
+      {/* Middle: Links + USD info */}
       <div className="flex items-center gap-4 mr-4">
-        {/* add link to new tab for https://www.finanzasargy.com */}
-        <a className="flex flex-row gap-2 items-center text-blue-500 hover:text-blue-700" href="https://www.finanzasargy.com" target="_blank" rel="noopener noreferrer">
+        <a
+          className="flex flex-row gap-2 items-center text-blue-500 hover:text-blue-700"
+          href="https://www.finanzasargy.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           FinanzasArgy
           <ArrowTopRightOnSquareIcon className="size-4" />
         </a>
@@ -90,8 +108,10 @@ export default function Navbar({
           <span className="text-xs text-base-content/60"> vta</span>
         </div>
       </div>
-      <div className="flex-none">
-        {/* Menú desplegable para seleccionar el tema */}
+
+      {/* Right: Theme + Auth */}
+      <div className="flex items-center gap-4">
+        {/* Theme Selector */}
         <div className="dropdown dropdown-end">
           <div tabIndex={0} role="button" className="btn m-1">
             Tema
@@ -122,6 +142,24 @@ export default function Navbar({
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* AUTH BUTTON */}
+        <div>
+          {status === "loading" ? (
+            <span className="text-sm opacity-70">Cargando...</span>
+          ) : session?.user ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{session.user.email}</span>
+              <button className="btn btn-sm" onClick={() => signOut()}>
+                Cerrar sesión
+              </button>
+            </div>
+          ) : (
+            <button className="btn btn-sm" onClick={() => signIn("google")}>
+              Ingresar con Google
+            </button>
+          )}
         </div>
       </div>
     </div>
