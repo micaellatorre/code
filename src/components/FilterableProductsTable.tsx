@@ -3,6 +3,8 @@
 import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, ChevronDownIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
+import { formatInTimeZone } from 'date-fns-tz'
+import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
 
 // SerializedProduct mirrors the shape we send from the server page:
 // Decimal and Date fields are converted to strings (or null) so they can
@@ -280,6 +282,13 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         if (!Number.isFinite(num) || num < 0) return
         processedValue = num
       }
+    } else if (fieldName === 'createdAt') {
+        if (processedValue === null || processedValue === '') {
+            processedValue = null;
+        } else {
+            // processedValue is "yyyy-MM-dd" from the input
+            processedValue = fromArgDateInputValue(processedValue).toISOString();
+        }
     } else if (['imei', 'color', 'brand', 'notes'].includes(fieldName)) {
       // For nullable string fields, empty string becomes null
       processedValue = processedValue === '' ? null : processedValue
@@ -885,14 +894,11 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   ) : (
                     <span
                       className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'createdAt', p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '')}
+                      onClick={() => startEditField(p.id, 'createdAt', p.createdAt ? toArgDateInputValue(new Date(p.createdAt)) : '')}
                       title="Click para editar">
-                      <div className='tooltip tooltip-right' data-tip={p.createdAt ? new Date(p.createdAt).toLocaleString('es-AR') : ''}>
+                      <div className='tooltip tooltip-right' data-tip={p.createdAt ? formatInTimeZone(new Date(p.createdAt), AR_TIME_ZONE, 'dd/MM/yyyy HH:mm') : ''}>
                         <span className="underline decoration-dotted cursor-help">
-                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString('es-AR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                          }) : '-'}
+                          {p.createdAt ? formatInTimeZone(new Date(p.createdAt), AR_TIME_ZONE, 'dd/MM') : '-'}
                         </span>
                       </div>
                     </span>

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AppointmentStatus, AppointmentOutcome } from '@prisma/client';
 import { useRouter } from 'next/navigation';
+import { formatInTimeZone } from 'date-fns-tz'
+import { AR_TIME_ZONE } from '@/lib/timezone'
 
 type SerializedAppointment = {
     id: string;
@@ -45,13 +47,11 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
         });
     }, [appointments, searchQuery, statusFilter, outcomeFilter]);
 
-    const formatDate = (iso: string) => new Date(iso).toLocaleString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    const formatDate = (iso: string) => {
+        const date = new Date(iso);
+        if (isNaN(date.getTime())) return 'Fecha inválida'; // Handle invalid dates
+        return formatInTimeZone(date, AR_TIME_ZONE, 'dd/MM/yyyy HH:mm');
+    };
 
     const handleDelete = async (id: string) => {
         if (window.confirm('¿Estás seguro de que quieres eliminar esta cita?')) {

@@ -2,6 +2,7 @@
 'use client';
 
 import { SaleMeta } from '@/app/sales/new/page';
+import { toArgDateTimeInputValue, fromArgDateTimeInputValue } from '@/lib/timezone';
 
 interface SaleMetaSectionProps {
     meta: SaleMeta;
@@ -26,7 +27,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
     };
 
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setMeta({ ...meta, date: new Date(e.target.value) });
+        setMeta({ ...meta, date: fromArgDateTimeInputValue(e.target.value) });
     }
 
     return (
@@ -38,7 +39,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
                     <input 
                         type="datetime-local"
                         name="date"
-                        value={meta.date.toISOString().substring(0, 16)}
+                        value={toArgDateTimeInputValue(meta.date)}
                         onChange={handleDateChange}
                         className="input input-bordered"
                     />

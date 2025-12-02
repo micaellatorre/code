@@ -8,6 +8,7 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import { Buyer, Product, AppointmentStatus, AppointmentOutcome, AppointmentNoSaleReason } from '@prisma/client';
 import BuyerSection from '@/components/sales/BuyerSection';
 import AppointmentInterestSection, { AppointmentInterestDraft } from '@/components/appointments/AppointmentInterestSection';
+import { fromArgDateTimeInputValue, toArgDateTimeInputValue } from '@/lib/timezone';
 
 type AppointmentFull = {
     id: string;
@@ -139,7 +140,7 @@ export default function EditAppointmentPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div className="form-control">
                         <label className="label"><span className="label-text">Fecha y Hora</span></label>
-                        <input type="datetime-local" value={scheduledAt.toISOString().substring(0, 16)} onChange={e => setScheduledAt(new Date(e.target.value))} className="input input-bordered"/>
+                        <input type="datetime-local" value={toArgDateTimeInputValue(scheduledAt)} onChange={e => setScheduledAt(fromArgDateTimeInputValue(e.target.value))} className="input input-bordered"/>
                     </div>
                     <div className="form-control">
                         <label className="label"><span className="label-text">Duración (minutos)</span></label>

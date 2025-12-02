@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Buyer } from '@prisma/client'
+import { fromArgDateInputValue, toArgDateInputValue } from '@/lib/timezone'
 
 export default function EditClientPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -38,7 +39,7 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
           name: buyerData.name || '',
           surname: buyerData.surname || '',
           dni: buyerData.dni || '',
-          dob: buyerData.dob ? new Date(buyerData.dob).toISOString().split('T')[0] : '',
+          dob: buyerData.dob ? toArgDateInputValue(new Date(buyerData.dob)) : '',
           phone: buyerData.phone || '',
           instagram: buyerData.instagram || '',
           email: buyerData.email || '',
@@ -63,7 +64,7 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
     setIsSubmitting(true)
     const payload = {
       ...form,
-      dob: form.dob ? new Date(form.dob).toISOString() : null,
+      dob: form.dob ? fromArgDateInputValue(form.dob).toISOString() : null,
     }
 
     try {

@@ -3,6 +3,8 @@ import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import SearchBar from '@/components/SearchBar'
 import { prisma } from '@/lib/prisma'
+import { formatInTimeZone } from 'date-fns-tz'
+import { AR_TIME_ZONE } from '@/lib/timezone'
 
 /**
  * Listado de pedidos mayoristas (WholesaleOrder).
@@ -42,7 +44,7 @@ export default async function WholesaleOrdersPage() {
                   <td>{o.customerName}</td>
                   <td>{o.modelName}</td>
                   <td>{o.units}</td>
-                  <td>{new Date(o.requestedAt).toLocaleDateString()}</td>
+                  <td>{formatInTimeZone(o.requestedAt, AR_TIME_ZONE, 'dd/MM/yyyy')}</td>
                   <td>{o.unitPriceRef ? Number(o.unitPriceRef).toFixed(2) : '-'}</td>
                   <td>{o.unitCostRef ? Number(o.unitCostRef).toFixed(2) : '-'}</td>
                   <td>{o.status}</td>

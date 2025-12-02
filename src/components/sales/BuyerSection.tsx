@@ -3,6 +3,7 @@
 
 import { Buyer } from "@prisma/client";
 import { useState, useEffect, useCallback } from "react";
+import { toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone';
 
 interface BuyerSectionProps {
     selectedBuyer: Buyer | null;
@@ -131,7 +132,7 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                         <input type="text" placeholder="Instagram" value={newBuyer.instagram || ''} onChange={e => setNewBuyer({ ...newBuyer, instagram: e.target.value })} className="input input-bordered" />
                         <input type="text" placeholder="Teléfono" value={newBuyer.phone || ''} onChange={e => setNewBuyer({ ...newBuyer, phone: e.target.value })} className="input input-bordered" />
                         <input type="email" placeholder="Email" value={newBuyer.email || ''} onChange={e => setNewBuyer({ ...newBuyer, email: e.target.value })} className="input input-bordered" />
-                        <input type="date" placeholder="Fecha de Nacimiento" value={newBuyer.dob ? new Date(newBuyer.dob).toISOString().split('T')[0] : ''} onChange={e => setNewBuyer({ ...newBuyer, dob: new Date(e.target.value) })} className="input input-bordered" />
+                        <input type="date" placeholder="Fecha de Nacimiento" value={newBuyer.dob ? toArgDateInputValue(newBuyer.dob) : ''} onChange={e => setNewBuyer({ ...newBuyer, dob: e.target.value ? fromArgDateInputValue(e.target.value) : undefined })} className="input input-bordered" />
                         <input type="text" placeholder="CUIT" value={newBuyer.cuit || ''} onChange={e => setNewBuyer({ ...newBuyer, cuit: e.target.value })} className="input input-bordered" />
                     </div>
                     <div className="mt-4 flex justify-end gap-2">

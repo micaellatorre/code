@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import SearchBar from "@/components/SearchBar";
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
+import { formatInTimeZone } from 'date-fns-tz'
+import { startOfDay, endOfDay } from 'date-fns'
+import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
 
 // ====== Tipos ======
 type SerializedSale = {
@@ -219,14 +222,15 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
       // Rango fechas
       if (startDate || endDate) {
         if (!s.date) return false;
-        const t = new Date(s.date).getTime();
+        const sDateUTC = new Date(s.date);
+
         if (startDate) {
-          const sd = new Date(`${startDate}T00:00:00Z`).getTime();
-          if (t < sd) return false;
+          const startOfArgDayUTC = startOfDay(fromArgDateInputValue(startDate));
+          if (sDateUTC < startOfArgDayUTC) return false;
         }
         if (endDate) {
-          const ed = new Date(`${endDate}T23:59:59.999Z`).getTime();
-          if (t > ed) return false;
+          const endOfArgDayUTC = endOfDay(fromArgDateInputValue(endDate));
+          if (sDateUTC > endOfArgDayUTC) return false;
         }
       }
 
@@ -260,11 +264,17 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
     editingFields[saleId]?.[fieldName] ?? "";
 
   const startEditField = (saleId: string, fieldName: string, currentValue: any) => {
+    let formattedValue = currentValue;
+    if (fieldName === "date" && currentValue) {
+      formattedValue = toArgDateInputValue(new Date(currentValue)); // currentValue is ISO string
+    } else {
+      formattedValue = currentValue == null ? "" : String(currentValue);
+    }
     setEditingFields((prev) => ({
       ...prev,
       [saleId]: {
         ...prev[saleId],
-        [fieldName]: currentValue == null ? "" : String(currentValue),
+        [fieldName]: formattedValue,
       },
     }));
   };
@@ -376,9 +386,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
         processed = n;
       }
     } else if (fieldName === "date" && processed) {
-      const d = new Date(processed);
-      if (isNaN(d.getTime())) return;
-      processed = d.toISOString();
+      processed = fromArgDateInputValue(processed).toISOString();
     } else if (["customerName", "origin", "payment", "notes"].includes(fieldName)) {
       // strings: null si vacío
       processed = processed ?? null;
@@ -675,12 +683,9 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         onClick={() => startEditField(s.id, "date", s.date ? new Date(s.date).toISOString().split('T')[0] : '')}
                         title="Click para editar"
                       >
-                        <div className='tooltip tooltip-right' data-tip={s.date ? new Date(s.date).toLocaleString('es-AR') : ''}>
+                        <div className='tooltip tooltip-right' data-tip={s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy HH:mm') : ''}>
                           <span className="underline decoration-dotted cursor-help">
-                            {s.date ? new Date(s.date).toLocaleDateString('es-AR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                            }) : '-'}
+                            {s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy') : '-'}
                           </span>
                         </div>
                       </span>

@@ -3,6 +3,8 @@ import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import SearchBar from '@/components/SearchBar'
 import { prisma } from '@/lib/prisma'
+import { formatInTimeZone } from 'date-fns-tz'
+import { AR_TIME_ZONE } from '@/lib/timezone'
 
 /**
  * Listado de compras.
@@ -38,7 +40,7 @@ export default async function PurchasesPage() {
             <tbody>
               {purchases.map((p) => (
                 <tr key={p.id}>
-                  <td>{new Date(p.date).toLocaleDateString()}</td>
+                  <td>{formatInTimeZone(p.date, AR_TIME_ZONE, 'dd/MM/yyyy')}</td>
                   <td>{p.supplier?.name ?? '-'}</td>
                   <td>{Number(p.totalCost).toFixed(2)}</td>
                 </tr>

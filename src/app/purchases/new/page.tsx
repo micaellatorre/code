@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { fromArgDateInputValue, toArgDateInputValue } from '@/lib/timezone'
 
 interface Supplier {
   id: string
@@ -21,7 +22,7 @@ export default function NewPurchasePage() {
   const [products, setProducts] = useState<Product[]>([])
   const [form, setForm] = useState({
     supplierId: '',
-    date: '',
+    date: toArgDateInputValue(new Date()),
     currency: 'USD',
     downPayment: '',
     notes: '',
@@ -75,7 +76,7 @@ export default function NewPurchasePage() {
     const totalCost = items.reduce((acc, i) => acc + i.units * i.unitCost, 0)
     const payload = {
       supplierId: form.supplierId,
-      date: form.date || new Date().toISOString(),
+      date: form.date ? fromArgDateInputValue(form.date).toISOString() : new Date().toISOString(),
       currency: form.currency,
       downPayment: form.downPayment ? Number(form.downPayment) : null,
       totalCost,

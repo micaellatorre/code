@@ -2,6 +2,9 @@ import DashboardLayout from '@/components/DashboardLayout'
 import DashboardKpiCard from '@/components/DashboardKpiCard'
 import { prisma } from '@/lib/prisma'
 import type { Metadata } from 'next'
+import { startOfDay, endOfDay } from 'date-fns'
+import { toDate } from 'date-fns-tz'
+import { AR_TIME_ZONE } from '@/lib/timezone'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -59,12 +62,12 @@ export default async function HomePage() {
   )
 
   // Facturación y ganancia del día
-  const now = new Date()
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const endOfDay = new Date(startOfDay)
-  endOfDay.setDate(startOfDay.getDate() + 1)
+  const nowInArgentina = toDate(new Date(), { timeZone: AR_TIME_ZONE })
+  const todayStart = startOfDay(nowInArgentina)
+  const todayEnd = endOfDay(nowInArgentina)
+
   const salesToday = await prisma.sale.findMany({
-    where: { date: { gte: startOfDay, lt: endOfDay } },
+    where: { date: { gte: todayStart, lt: todayEnd } },
     select: { total: true, profit: true },
   })
   const facturacionDia = salesToday.reduce((acc, s) => acc + Number(s.total), 0)
@@ -89,8 +92,8 @@ export default async function HomePage() {
         {/* <DashboardKpiCard title="Ventas" value={totalSales} /> */}
         {/* <DashboardKpiCard title="Perfiles de Costo" value={totalCostProfiles} /> */}
         {/* <DashboardKpiCard title="Pedidos Mayoristas" value={totalWholesaleOrders} /> */}
-        {/* <DashboardKpiCard title="Facturación del día" value={`$${facturacionDia.toFixed(2)}`} /> */}
-        {/* <DashboardKpiCard title="Ganancia del día" value={`$${gananciaDia.toFixed(2)}`} /> */}
+        {/* <DashboardKpiCard title="Facturación del día" value={`${facturacionDia.toFixed(2)}`} /> */}
+        {/* <DashboardKpiCard title="Ganancia del día" value={`${gananciaDia.toFixed(2)}`} /> */}
       </div>
     </DashboardLayout>
   )

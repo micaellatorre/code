@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { fromArgDateInputValue } from '@/lib/timezone'
 
 // async function getDefaultTenantId() {
 //     const tenant = await prisma.tenant.findFirst({
@@ -46,7 +47,7 @@ export default function NewClientPage() {
     setIsSubmitting(true)
     const payload = {
       ...form,
-      dob: form.dob ? new Date(form.dob).toISOString() : null,
+      dob: form.dob ? fromArgDateInputValue(form.dob).toISOString() : null,
     }
 
     try {
