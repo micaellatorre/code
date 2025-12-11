@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, ChevronDownIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, ChevronDownIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/react/24/solid'
 import { formatInTimeZone } from 'date-fns-tz'
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
 
@@ -76,6 +76,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [savingField, setSavingField] = useState<{ productId: string; fieldName: string } | null>(null)
   const [savingStateId, setSavingStateId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [isTableExpanded, setIsTableExpanded] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -471,6 +472,32 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       alert('No se pudo eliminar el producto. Intente de nuevo.')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  async function duplicateProduct(id: string) {
+    setDuplicatingId(id)
+    try {
+      const res = await fetch(`/api/products/${id}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const { product: newProduct } = await res.json()
+
+      // Add the new product to the local state
+      setProductsLocal((prev) => {
+        const index = prev.findIndex((p) => p.id === id)
+        const newProducts = [...prev]
+        newProducts.splice(index + 1, 0, newProduct)
+        return newProducts
+      })
+
+    } catch (err) {
+      console.error('Failed to duplicate product', err)
+      alert('No se pudo duplicar el producto. Intente de nuevo.')
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -1342,6 +1369,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   <Link href={`/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
                     <PencilIcon className="size-[1.2em]" />
                   </Link>
+                  <button
+                    className="btn btn-xs btn-square btn-soft"
+                    onClick={() => duplicateProduct(p.id)}
+                    disabled={duplicatingId === p.id}
+                    title="Duplicar producto"
+                  >
+                    {duplicatingId === p.id ? (
+                      <span className="loading loading-bars loading-xs"></span>
+                    ) : (
+                      <DocumentDuplicateIcon className="size-[1.2em]" />
+                    )}
+                  </button>
                   <button
                     className="btn btn-xs btn-square btn-soft btn-error"
                     onClick={() => deleteProduct(p.id)}
