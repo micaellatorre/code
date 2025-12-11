@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import SearchBar from "@/components/SearchBar";
-import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
+import SearchBar from "@/components/SearchBar";import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, PencilIcon, TrashIcon, ArrowTrendingDownIcon, CurrencyDollarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/solid'
 import { formatInTimeZone } from 'date-fns-tz'
 import { startOfDay, endOfDay } from 'date-fns'
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
@@ -115,6 +114,16 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   const [maxTotal, setMaxTotal] = useState<string>("");
   const [minProfit, setMinProfit] = useState<string>("");
   const [maxProfit, setMaxProfit] = useState<string>("");
+
+  function clearFilters() {
+    setSearchQuery("");
+    setStartDate("");
+    setEndDate("");
+    setMinTotal("");
+    setMaxTotal("");
+    setMinProfit("");
+    setMaxProfit("");
+  }
 
   // Inline edit por campo (mismo patrón que Products)
   const [editingFields, setEditingFields] = useState<
@@ -460,6 +469,37 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
               <ArrowsPointingOutIcon className="size-6" />
             )}
           </button>
+          <div className="stats bg-base-100/50">
+            <div className="stat px-4 py-2 text-error">
+              <div className="stat-figure text-error">
+                <ArrowTrendingDownIcon className="w-6 h-6" />
+              </div>
+              <div className="stat-title text-xs">Total Costos</div>
+              <div className="stat-value text-base">
+                ${displayed.reduce((acc, s) => acc + (s.costTotal ? parseFloat(s.costTotal) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <div className="stat px-4 py-2">
+              <div className="stat-figure text-warning">
+                <CurrencyDollarIcon className="w-6 h-6" />
+              </div>
+              <div className="stat-title text-xs">Total Ventas</div>
+              <div className="stat-value text-base text-warning">
+                ${displayed.reduce((acc, s) => acc + (s.total ? parseFloat(s.total) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <div className="stat px-4 py-2">
+              <div className="stat-figure text-success">
+                <ArrowTrendingUpIcon className="w-6 h-6" />
+              </div>
+              <div className="stat-title text-xs">Total Ganancias</div>
+              <div className="stat-value text-base text-success">
+                ${displayed.reduce((acc, s) => acc + (s.profit ? parseFloat(s.profit) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/sales/new" className="btn btn-primary">
@@ -483,6 +523,63 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
           >
             <FunnelIcon className="w-5 h-5 mr-1" />
             Filtros
+          </button>
+          
+          {(startDate || endDate || minTotal || maxTotal || minProfit || maxProfit) && (
+            <div className="flex items-center gap-2">
+              {(startDate || endDate) && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Fecha: {startDate ? `desde ${startDate}` : ''}{startDate && endDate ? ' ' : ''}{endDate ? `hasta ${endDate}` : ''}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {(minTotal || maxTotal) && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Total: {minTotal ? `Min $${minTotal}` : ''}{minTotal && maxTotal ? ' - ' : ''}{maxTotal ? `Max $${maxTotal}` : ''}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => {
+                      setMinTotal('');
+                      setMaxTotal('');
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+              {(minProfit || maxProfit) && (
+                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                  Ganancia: {minProfit ? `Min $${minProfit}` : ''}{minProfit && maxProfit ? ' - ' : ''}{maxProfit ? `Max $${maxProfit}` : ''}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle ml-1"
+                    onClick={() => {
+                      setMinProfit('');
+                      setMaxProfit('');
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={clearFilters}
+          >
+            Limpiar
           </button>
         </div>
       </div>
@@ -585,16 +682,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => {
-                    setStartDate("");
-                    setEndDate("");
-                    setMinTotal("");
-                    setMaxTotal("");
-                    setMinProfit("");
-                    setMaxProfit("");
-                    setSearchQuery("");
-                    setDrawerOpen(false);
-                  }}
+                  onClick={clearFilters}
                 >
                   Limpiar filtros
                 </button>
