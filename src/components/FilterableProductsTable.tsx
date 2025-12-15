@@ -2,9 +2,20 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, ChevronDownIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/react/24/solid'
+import {
+  ArrowsPointingInIcon,
+  ArrowsPointingOutIcon,
+  FunnelIcon,
+  CheckIcon,
+  XMarkIcon,
+  ChevronDownIcon,
+  PencilIcon,
+  TrashIcon,
+  DocumentDuplicateIcon,
+} from '@heroicons/react/24/solid'
 import { formatInTimeZone } from 'date-fns-tz'
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
+import SearchBar from '@/components/SearchBar'
 
 // SerializedProduct mirrors the shape we send from the server page:
 // Decimal and Date fields are converted to strings (or null) so they can
@@ -33,7 +44,6 @@ type SerializedProduct = {
   createdAt: string | null
   updatedAt: string | null
 }
-import SearchBar from '@/components/SearchBar'
 
 type FilterableProductsTableProps = {
   products: SerializedProduct[]
@@ -47,7 +57,6 @@ function formatDecimal(value: unknown) {
   }
   if (typeof value === 'number') return value.toFixed(2)
   try {
-    // Decimal-like objects may have toString
     const s = String(value)
     const n = parseFloat(s)
     return Number.isFinite(n) ? n.toFixed(2) : s
@@ -56,11 +65,46 @@ function formatDecimal(value: unknown) {
   }
 }
 
+function normalizeModelKey(modelName: string | null | undefined) {
+  return (modelName ?? '').trim().toLowerCase()
+}
+
+function parseNumberOrNull(v: string | null) {
+  if (v == null) return null
+  const n = parseFloat(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function rangeLabelFromItems(items: SerializedProduct[], field: 'costPrice' | 'salePrice') {
+  const nums = items
+    .map((p) => parseNumberOrNull(p[field]))
+    .filter((n): n is number => n != null)
+  if (nums.length === 0) return '-'
+  let min = nums[0]
+  let max = nums[0]
+  for (const n of nums) {
+    if (n < min) min = n
+    if (n > max) max = n
+  }
+  if (min === max) return min.toFixed(2)
+  return `${min.toFixed(2)} – ${max.toFixed(2)}`
+}
+
+function newestCreatedAt(items: SerializedProduct[]) {
+  let best = 0
+  for (const p of items) {
+    const t = p.createdAt ? new Date(p.createdAt).getTime() : 0
+    if (t > best) best = t
+  }
+  return best
+}
+
 export default function FilterableProductsTable({ products }: FilterableProductsTableProps) {
-  // Keep a local copy of products so we can do optimistic updates when
-  // changing stock from the UI.
+  // Keep a local copy of products so we can do optimistic updates when changing stock from the UI.
   const [productsLocal, setProductsLocal] = useState<SerializedProduct[]>(products)
   useEffect(() => setProductsLocal(products), [products])
+
+  const [viewMode, setViewMode] = useState<'DETAIL' | 'GENERAL'>('DETAIL')
 
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState<string>('')
@@ -71,23 +115,21 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   const [colorFilter, setColorFilter] = useState<string>('')
   const [capacityFilter, setCapacityFilter] = useState<string>('')
   const [stateFilter, setStateFilter] = useState<string>('')
+
   // Generic editing state: { productId: { fieldName: value } }
   const [editingFields, setEditingFields] = useState<Record<string, Record<string, string>>>({})
   const [savingField, setSavingField] = useState<{ productId: string; fieldName: string } | null>(null)
   const [savingStateId, setSavingStateId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+
   const [isTableExpanded, setIsTableExpanded] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
   // Product states from prisma schema enum ProductState
-  const stateOptions = [
-    'EN_STOCK',
-    'EN_CAMINO',
-    'EN_REPARACION',
-    'CON_CLIENTE',
-    'VENDIDO',
-  ] as const
+  const stateOptions = ['EN_STOCK', 'EN_CAMINO', 'EN_REPARACION', 'CON_CLIENTE', 'VENDIDO'] as const
 
   const stateColorMap: Record<string, string> = {
     EN_STOCK: 'badge-success',
@@ -97,8 +139,14 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     VENDIDO: 'badge-outline',
   }
 
-  const brands = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.brand).filter(Boolean) as string[])), [productsLocal])
-  const conditions = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.condition).filter(Boolean) as string[])), [productsLocal])
+  const brands = useMemo(
+    () => Array.from(new Set(productsLocal.map((p) => p.brand).filter(Boolean) as string[])),
+    [productsLocal],
+  )
+  const conditions = useMemo(
+    () => Array.from(new Set(productsLocal.map((p) => p.condition).filter(Boolean) as string[])),
+    [productsLocal],
+  )
 
   const conditionOptions = ['A_PLUS', 'OEM', 'ASIS', 'ASIS_PLUS', 'SEALED'] as const
   const conditionLabelMap: Record<string, string> = {
@@ -110,8 +158,17 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   }
 
   // Derived filter values
-  const colors = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.color).filter(Boolean) as string[])), [productsLocal])
-  const capacities = useMemo(() => Array.from(new Set(productsLocal.map((p) => p.capacityGB).filter((n): n is number => n != null) as number[])).sort((a, b) => a - b), [productsLocal])
+  const colors = useMemo(
+    () => Array.from(new Set(productsLocal.map((p) => p.color).filter(Boolean) as string[])),
+    [productsLocal],
+  )
+  const capacities = useMemo(
+    () =>
+      Array.from(
+        new Set(productsLocal.map((p) => p.capacityGB).filter((n): n is number => n != null) as number[]),
+      ).sort((a, b) => a - b),
+    [productsLocal],
+  )
 
   const stateLabelMap: Record<string, string> = {
     EN_STOCK: 'En stock',
@@ -146,9 +203,72 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         }
       }
 
-      return matchesSearch && matchesBrand && matchesCondition && matchesType && matchesColor && matchesCapacity && matchesState && matchesBattery
+      return (
+        matchesSearch &&
+        matchesBrand &&
+        matchesCondition &&
+        matchesType &&
+        matchesColor &&
+        matchesCapacity &&
+        matchesState &&
+        matchesBattery
+      )
     })
-  }, [search, brandFilter, conditionFilter, typeFilter, colorFilter, capacityFilter, stateFilter, batteryMin, batteryMax, productsLocal])
+  }, [
+    search,
+    brandFilter,
+    conditionFilter,
+    typeFilter,
+    colorFilter,
+    capacityFilter,
+    stateFilter,
+    batteryMin,
+    batteryMax,
+    productsLocal,
+  ])
+
+  const grouped = useMemo(() => {
+    const map = new Map<
+      string,
+      { key: string; label: string; items: SerializedProduct[]; newest: number; stockSum: number; availSum: number }
+    >()
+
+    for (const p of filteredProducts) {
+      const key = normalizeModelKey(p.modelName)
+      if (!key) continue
+      const existing = map.get(key)
+      if (!existing) {
+        map.set(key, {
+          key,
+          label: p.modelName,
+          items: [p],
+          newest: p.createdAt ? new Date(p.createdAt).getTime() : 0,
+          stockSum: p.stock ?? 0,
+          availSum: p.stockAvailable ?? 0,
+        })
+      } else {
+        existing.items.push(p)
+        const t = p.createdAt ? new Date(p.createdAt).getTime() : 0
+        if (t > existing.newest) existing.newest = t
+        existing.stockSum += p.stock ?? 0
+        existing.availSum += p.stockAvailable ?? 0
+      }
+    }
+
+    const groups = Array.from(map.values())
+    groups.sort((a, b) => b.newest - a.newest)
+    return groups
+  }, [filteredProducts])
+
+  const groupedCounts = useMemo(() => {
+    let totalStock = 0
+    let totalAvail = 0
+    for (const g of grouped) {
+      totalStock += g.stockSum
+      totalAvail += g.availSum
+    }
+    return { groups: grouped.length, instances: filteredProducts.length, totalStock, totalAvail }
+  }, [grouped, filteredProducts.length])
 
   // Clear all filters
   function clearFilters() {
@@ -225,17 +345,16 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         prev.map((p) =>
           p.id === productId
             ? {
-              ...p,
-              [fieldName]: updated[fieldName] ?? p[fieldName as keyof SerializedProduct],
-              ...(fieldName === 'stock' && updated.stockAvailable !== undefined
-                ? { stockAvailable: updated.stockAvailable }
-                : {}),
-            }
+                ...p,
+                [fieldName]: updated[fieldName] ?? p[fieldName as keyof SerializedProduct],
+                ...(fieldName === 'stock' && updated.stockAvailable !== undefined
+                  ? { stockAvailable: updated.stockAvailable }
+                  : {}),
+              }
             : p,
         ),
       )
 
-      // Clear editing state
       cancelEditField(productId, fieldName)
     } catch (err) {
       const original = products.find((p) => p.id === productId)
@@ -257,7 +376,6 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
     let processedValue: any = editingValue.trim() === '' ? null : editingValue.trim()
 
-    // Type-specific processing
     if (['capacityGB', 'batteryPct'].includes(fieldName)) {
       if (processedValue === null || processedValue === '') {
         processedValue = null
@@ -284,33 +402,27 @@ export default function FilterableProductsTable({ products }: FilterableProducts
         processedValue = num
       }
     } else if (fieldName === 'createdAt') {
-        if (processedValue === null || processedValue === '') {
-            processedValue = null;
-        } else {
-            // processedValue is "yyyy-MM-dd" from the input
-            processedValue = fromArgDateInputValue(processedValue).toISOString();
-        }
+      if (processedValue === null || processedValue === '') {
+        processedValue = null
+      } else {
+        processedValue = fromArgDateInputValue(processedValue).toISOString()
+      }
     } else if (['imei', 'color', 'brand', 'notes'].includes(fieldName)) {
-      // For nullable string fields, empty string becomes null
       processedValue = processedValue === '' ? null : processedValue
     }
 
-    // Optimistic update
     setProductsLocal((prev) =>
       prev.map((p) =>
         p.id === productId
           ? {
-            ...p,
-            [fieldName]: processedValue,
-            ...(fieldName === 'stock'
-              ? {
-                stockAvailable: Math.max(
-                  0,
-                  (p.stockAvailable ?? 0) + (processedValue - (p.stock ?? 0)),
-                ),
-              }
-              : {}),
-          }
+              ...p,
+              [fieldName]: processedValue,
+              ...(fieldName === 'stock'
+                ? {
+                    stockAvailable: Math.max(0, (p.stockAvailable ?? 0) + (processedValue - (p.stock ?? 0))),
+                  }
+                : {}),
+            }
           : p,
       ),
     )
@@ -328,76 +440,64 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
   // Legacy functions for stock arrows (keep for backwards compatibility)
   async function persistStockUpdate(id: string, newStock: number, newStockAvailable?: number) {
-    setSavingField({ productId: id, fieldName: "stock" });
-    // Snapshot para rollback si falla
-    const original = products.find((p) => p.id === id);
+    setSavingField({ productId: id, fieldName: 'stock' })
+    const original = products.find((p) => p.id === id)
 
-    // 🎯 (Opcional) Optimistic UI: estimamos el nextState para evitar parpadeos
-    // Si no te interesa optimista, puedes quitar este bloque y dejar que sólo el response mande el estado
     const optimisticNext = (() => {
-      if (!original) return null;
-      const prevState = original.state;
-      if (newStock < 1 && prevState !== "FUERA_DE_STOCK") return "FUERA_DE_STOCK";
-      if (newStock >= 1 && prevState === "FUERA_DE_STOCK") return "EN_STOCK";
-      return prevState;
-    })();
+      if (!original) return null
+      const prevState = original.state
+      if (newStock < 1 && prevState !== 'FUERA_DE_STOCK') return 'FUERA_DE_STOCK'
+      if (newStock >= 1 && prevState === 'FUERA_DE_STOCK') return 'EN_STOCK'
+      return prevState
+    })()
 
-    // Aplicamos optimista de stock + state
     if (original) {
       setProductsLocal((prev) =>
         prev.map((p) =>
           p.id === id
             ? {
-              ...p,
-              stock: newStock,
-              stockAvailable:
-                newStockAvailable !== undefined ? newStockAvailable : p.stockAvailable,
-              state: optimisticNext ?? p.state,
-            }
-            : p
-        )
-      );
+                ...p,
+                stock: newStock,
+                stockAvailable: newStockAvailable !== undefined ? newStockAvailable : p.stockAvailable,
+                state: optimisticNext ?? p.state,
+              }
+            : p,
+        ),
+      )
     }
 
     try {
-      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock };
-      if (newStockAvailable !== undefined) {
-        updateBody.stockAvailable = newStockAvailable;
-      }
-      const res = await fetch(`/api/products/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateBody),
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(await res.text());
+      const updateBody: { stock: number; stockAvailable?: number } = { stock: newStock }
+      if (newStockAvailable !== undefined) updateBody.stockAvailable = newStockAvailable
 
-      // 🔁 Aseguramos sincronizar lo que diga el servidor (incluye `state`)
-      const updated = await res.json();
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateBody),
+        cache: 'no-store',
+      })
+      if (!res.ok) throw new Error(await res.text())
+
+      const updated = await res.json()
       setProductsLocal((prev) =>
         prev.map((p) =>
           p.id === id
             ? {
-              ...p,
-              stock: updated.stock,
-              stockAvailable:
-                updated.stockAvailable ?? p.stockAvailable,
-              state: updated.state, // 👈 aquí está la clave
-            }
-            : p
-        )
-      );
+                ...p,
+                stock: updated.stock,
+                stockAvailable: updated.stockAvailable ?? p.stockAvailable,
+                state: updated.state,
+              }
+            : p,
+        ),
+      )
     } catch (err) {
-      // Rollback a original
-      if (original) {
-        setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)));
-      }
-      console.error("Failed to persist stock update", err);
+      if (original) setProductsLocal((prev) => prev.map((p) => (p.id === id ? original : p)))
+      console.error('Failed to persist stock update', err)
     } finally {
-      setSavingField(null);
+      setSavingField(null)
     }
   }
-
 
   function startEditStock(id: string, value: number) {
     startEditField(id, 'stock', value)
@@ -408,14 +508,8 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     if (!p) return
     const newStock = Math.max(0, (p.stock ?? 0) + delta)
     const newStockAvailable = Math.max(0, (p.stockAvailable ?? 0) + delta)
-    // optimistic
-    setProductsLocal((prev) =>
-      prev.map((prod) =>
-        prod.id === id
-          ? { ...prod, stock: newStock, stockAvailable: newStockAvailable }
-          : prod,
-      ),
-    )
+
+    setProductsLocal((prev) => prev.map((prod) => (prod.id === id ? { ...prod, stock: newStock, stockAvailable: newStockAvailable } : prod)))
     persistStockUpdate(id, newStock, newStockAvailable)
   }
 
@@ -440,7 +534,6 @@ export default function FilterableProductsTable({ products }: FilterableProducts
   }
 
   function changeState(id: string, newState: string) {
-    // optimistic update
     setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: newState } : p)))
     persistStateUpdate(id, newState)
   }
@@ -450,19 +543,15 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     if (!ok) return
     setDeletingId(id)
 
-    // keep original and index so we can revert if delete fails
     const originalIndex = productsLocal.findIndex((p) => p.id === id)
     const original = productsLocal[originalIndex]
 
-    // optimistic remove
     setProductsLocal((prev) => prev.filter((p) => p.id !== id))
 
     try {
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`)
-      // success - nothing else to do (row already removed)
     } catch (err) {
-      // revert by reinserting at original index
       setProductsLocal((prev) => {
         const copy = prev.slice()
         copy.splice(originalIndex, 0, original)
@@ -485,14 +574,12 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       if (!res.ok) throw new Error(await res.text())
       const { product: newProduct } = await res.json()
 
-      // Add the new product to the local state
       setProductsLocal((prev) => {
         const index = prev.findIndex((p) => p.id === id)
         const newProducts = [...prev]
         newProducts.splice(index + 1, 0, newProduct)
         return newProducts
       })
-
     } catch (err) {
       console.error('Failed to duplicate product', err)
       alert('No se pudo duplicar el producto. Intente de nuevo.')
@@ -501,22 +588,542 @@ export default function FilterableProductsTable({ products }: FilterableProducts
     }
   }
 
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  // --- Row renderer (keeps your exact per-product UI in ONE place) ---
+  function ProductRow({ p }: { p: SerializedProduct }) {
+    return (
+      <tr key={p.id}>
+        <td className="text-xs text-base-content/60">
+          {isEditing(p.id, 'createdAt') ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="date"
+                value={getEditingValue(p.id, 'createdAt')}
+                onChange={(e) => updateEditingValue(p.id, 'createdAt', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'createdAt')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'createdAt')
+                }}
+                onBlur={() => commitEditField(p.id, 'createdAt')}
+                className="input input-xs w-full min-w-[120px]"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'createdAt'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'createdAt')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'createdAt')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span
+              className="cursor-pointer hover:bg-base-200 rounded px-1"
+              onClick={() => startEditField(p.id, 'createdAt', p.createdAt ? toArgDateInputValue(new Date(p.createdAt)) : '')}
+              title="Click para editar"
+            >
+              <div
+                className="tooltip tooltip-right"
+                data-tip={p.createdAt ? formatInTimeZone(new Date(p.createdAt), AR_TIME_ZONE, 'dd/MM/yyyy HH:mm') : ''}
+              >
+                <span className="underline decoration-dotted cursor-help">
+                  {p.createdAt ? formatInTimeZone(new Date(p.createdAt), AR_TIME_ZONE, 'dd/MM') : '-'}
+                </span>
+              </div>
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'modelName') ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={getEditingValue(p.id, 'modelName')}
+                onChange={(e) => updateEditingValue(p.id, 'modelName', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'modelName')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'modelName')
+                }}
+                onBlur={() => commitEditField(p.id, 'modelName')}
+                className="input input-xs w-full min-w-[120px]"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'modelName'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'modelName')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'modelName')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'modelName', p.modelName)} title="Click para editar">
+              {p.notes ? (
+                <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
+                  <span className="underline decoration-dotted">{p.modelName}</span>
+                </div>
+              ) : (
+                p.modelName
+              )}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'imei') ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={getEditingValue(p.id, 'imei')}
+                onChange={(e) => updateEditingValue(p.id, 'imei', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'imei')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'imei')
+                }}
+                onBlur={() => commitEditField(p.id, 'imei')}
+                className="input input-xs w-full min-w-[100px]"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'imei'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'imei')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'imei')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'imei', p.imei)} title="Click para editar">
+              {p.imei || '-'}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'batteryPct') ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="number"
+                min={0}
+                max={100}
+                value={getEditingValue(p.id, 'batteryPct')}
+                onChange={(e) => updateEditingValue(p.id, 'batteryPct', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'batteryPct')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'batteryPct')
+                }}
+                onBlur={() => commitEditField(p.id, 'batteryPct')}
+                className="input input-xs w-20"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'batteryPct'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'batteryPct')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'batteryPct')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'batteryPct', p.batteryPct)} title="Click para editar">
+              {p.batteryPct != null ? (
+                <>
+                  {p.batteryPct}
+                  <span className="text-xs text-base-content/50"> %</span>
+                </>
+              ) : (
+                '-'
+              )}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'color') ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={getEditingValue(p.id, 'color')}
+                onChange={(e) => updateEditingValue(p.id, 'color', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'color')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'color')
+                }}
+                onBlur={() => commitEditField(p.id, 'color')}
+                className="input input-xs w-full min-w-[80px]"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'color'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'color')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'color')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'color', p.color)} title="Click para editar">
+              {p.color ?? '-'}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'capacityGB') ? (
+            <div className="flex items-center gap-2">
+              <select
+                autoFocus
+                name="capacityGB"
+                value={getEditingValue(p.id, 'capacityGB')}
+                onChange={(e) => updateEditingValue(p.id, 'capacityGB', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'capacityGB')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'capacityGB')
+                }}
+                onBlur={() => commitEditField(p.id, 'capacityGB')}
+                className="select select-xs w-24"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'capacityGB'}
+              >
+                <option value="">Seleccionar</option>
+                <option value="64">64 GB</option>
+                <option value="128">128 GB</option>
+                <option value="256">256 GB</option>
+                <option value="512">512 GB</option>
+                <option value="1024">1024 GB (1 TB)</option>
+                <option value="2048">2048 GB (2 TB)</option>
+              </select>
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'capacityGB')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'capacityGB')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'capacityGB', p.capacityGB)} title="Click para editar">
+              {p.capacityGB != null ? (
+                <>
+                  {p.capacityGB}
+                  <span className="text-xs text-base-content/50"> GB</span>
+                </>
+              ) : (
+                '-'
+              )}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'condition') ? (
+            <div className="flex items-center gap-2">
+              <select
+                autoFocus
+                value={getEditingValue(p.id, 'condition')}
+                onChange={(e) => updateEditingValue(p.id, 'condition', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'condition')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'condition')
+                }}
+                onBlur={() => commitEditField(p.id, 'condition')}
+                className="select select-xs w-full min-w-[100px]"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'condition'}
+              >
+                <option value="">-</option>
+                {conditionOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {conditionLabelMap[opt] ?? opt}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'condition')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'condition')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'condition', p.condition)} title="Click para editar">
+              {p.condition == null ? '-' : conditionLabelMap[p.condition] ?? p.condition}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'costPrice') ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-base-content/50">$ </span>
+              <input
+                autoFocus
+                type="number"
+                step="0.01"
+                min={0}
+                value={getEditingValue(p.id, 'costPrice')}
+                onChange={(e) => updateEditingValue(p.id, 'costPrice', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'costPrice')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'costPrice')
+                }}
+                onBlur={() => commitEditField(p.id, 'costPrice')}
+                className="input input-xs w-24"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'costPrice'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'costPrice')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'costPrice')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'costPrice', p.costPrice)} title="Click para editar">
+              <span className="text-xs text-base-content/50">$ </span>
+              {formatDecimal((p as any).costPrice)}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'salePrice') ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-base-content/50">$ </span>
+              <input
+                autoFocus
+                type="number"
+                step="0.01"
+                min={0}
+                value={getEditingValue(p.id, 'salePrice')}
+                onChange={(e) => updateEditingValue(p.id, 'salePrice', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'salePrice')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'salePrice')
+                }}
+                onBlur={() => commitEditField(p.id, 'salePrice')}
+                className="input input-xs w-24"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'salePrice'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'salePrice')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'salePrice')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'salePrice', p.salePrice)} title="Click para editar">
+              <span className="text-xs text-base-content/50">$ </span>
+              {formatDecimal((p as any).salePrice)}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'stockInitial') ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="number"
+                min={0}
+                step={1}
+                value={getEditingValue(p.id, 'stockInitial')}
+                onChange={(e) => updateEditingValue(p.id, 'stockInitial', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'stockInitial')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'stockInitial')
+                }}
+                onBlur={() => commitEditField(p.id, 'stockInitial')}
+                className="input input-xs w-20"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'stockInitial'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stockInitial')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stockInitial')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditField(p.id, 'stockInitial', p.stockInitial)} title="Click para editar">
+              {p.stockInitial}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, 'stock') ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="number"
+                min={0}
+                step={1}
+                value={getEditingValue(p.id, 'stock')}
+                onChange={(e) => updateEditingValue(p.id, 'stock', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitEditField(p.id, 'stock')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'stock')
+                }}
+                onBlur={() => commitEditField(p.id, 'stock')}
+                className="input input-xs w-20"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stock')}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stock')}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="flex flex-row btn-group gap-1 items-center">
+                <button
+                  className="btn btn-ghost btn-xs"
+                  aria-label="decrement stock"
+                  disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
+                  onClick={() => changeStockBy(p.id, -1)}
+                >
+                  ▼
+                </button>
+                <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditStock(p.id, p.stock)} title="Click para editar">
+                  {p.stock}
+                </span>
+                <button
+                  className="btn btn-ghost btn-xs"
+                  aria-label="increment stock"
+                  disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
+                  onClick={() => changeStockBy(p.id, 1)}
+                >
+                  ▲
+                </button>
+              </div>
+            </div>
+          )}
+        </td>
+
+        <td>
+          <div className="dropdown dropdown-start relative">
+            <div tabIndex={0} role="button" className="flex flex-row flex-nowrap gap-2 items-center cursor-pointer btn btn-xs btn-ghost py-2">
+              <span className={`badge badge-sm ${stateColorMap[p.state] ?? 'badge-ghost'}`}>{p.state}</span>
+              <ChevronDownIcon className="h-4 w-4" />
+            </div>
+            <ul tabIndex={-1} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
+              {stateOptions.map((s) => (
+                <li key={s} className="py-2 flex flex-row items-center gap-2">
+                  <button
+                    className={`w-full text-left btn btn-ghost btn-xs justify-start ${stateColorMap[s] ?? ''}`}
+                    disabled={savingStateId === p.id}
+                    onClick={() => changeState(p.id, s)}
+                  >
+                    {s}
+                    <div className={`w-2 h-2 rounded-full border ${stateColorMap[s] ?? ''}`}></div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </td>
+
+        <td className="flex items-center gap-2">
+          <Link href={`/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
+            <PencilIcon className="size-[1.2em]" />
+          </Link>
+
+          <button
+            className="btn btn-xs btn-square btn-soft"
+            onClick={() => duplicateProduct(p.id)}
+            disabled={duplicatingId === p.id}
+            title="Duplicar producto"
+          >
+            {duplicatingId === p.id ? <span className="loading loading-bars loading-xs"></span> : <DocumentDuplicateIcon className="size-[1.2em]" />}
+          </button>
+
+          <button
+            className="btn btn-xs btn-square btn-soft btn-error"
+            onClick={() => deleteProduct(p.id)}
+            disabled={deletingId === p.id}
+            aria-disabled={deletingId === p.id}
+            title="Eliminar producto"
+          >
+            {deletingId === p.id ? <span className="loading loading-bars loading-xs"></span> : <TrashIcon className="size-[1.2em]" />}
+          </button>
+        </td>
+      </tr>
+    )
+  }
+
+  // --- UI ---
   return (
     <div className="flex flex-col gap-4 !h-full flex-1 relative">
       <div className="flex justify-between items-center">
         <div className="flex flex-row items-center justify-between gap-2">
           <h2 className="text-2xl font-bold">
             Productos
-            <span className="ml-4 text-sm text-base-content/60">
-              - Resultados {filteredProducts.length}
-            </span>
-            <span className="ml-1 text-sm text-base-content/30">
-              de
-            </span>
-            <span className="ml-1 text-sm text-base-content/30">
-              {products.length}
-            </span>
+            {viewMode === 'DETAIL' ? (
+              <>
+                <span className="ml-4 text-sm text-base-content/60">- Resultados {filteredProducts.length}</span>
+                <span className="ml-1 text-sm text-base-content/30">de</span>
+                <span className="ml-1 text-sm text-base-content/30">{products.length}</span>
+              </>
+            ) : (
+              <>
+                <span className="ml-4 text-sm text-base-content/60">- Grupos {groupedCounts.groups}</span>
+                <span className="ml-1 text-sm text-base-content/30">| Items {groupedCounts.instances}</span>
+                <span className="ml-1 text-sm text-base-content/30">| Stock {groupedCounts.totalStock}</span>
+                <span className="ml-1 text-sm text-base-content/30">| Disp. {groupedCounts.totalAvail}</span>
+              </>
+            )}
           </h2>
+
+          {/* View toggle */}
+          <div className="ml-2 flex items-center gap-2">
+            <div className="join border-[0.1em] border-base-content/10">
+              <button
+                type="button"
+                className={`join-item btn btn-sm ${viewMode === 'DETAIL' ? 'btn-active' : ''}`}
+                onClick={() => setViewMode('DETAIL')}
+                title="Detalle de Stock"
+              >
+                Detalle
+              </button>
+              <div className="divider divider-horizontal mx-[-4px]"></div>
+              <button
+                type="button"
+                className={`join-item btn btn-sm ${viewMode === 'GENERAL' ? 'btn-active' : ''}`}
+                onClick={() => setViewMode('GENERAL')}
+                title="Stock General"
+              >
+                General
+              </button>
+            </div>
+          </div>
+
           <div className="ml-2 flex items-center gap-2">
             <div className="join border-[0.1em] border-base-content/10 ">
               <button
@@ -526,7 +1133,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               >
                 Teléfonos
               </button>
-              <div className='divider divider-horizontal mx-[-4px]'></div>
+              <div className="divider divider-horizontal mx-[-4px]"></div>
               <button
                 type="button"
                 className={`join-item btn btn-sm ${typeFilter === 'ACCESSORY' ? 'btn-active' : ''}`}
@@ -536,9 +1143,12 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               </button>
             </div>
             {typeFilter ? (
-              <button className="btn btn-ghost btn-xs" onClick={() => setTypeFilter('')}>✕</button>
+              <button className="btn btn-ghost btn-xs" onClick={() => setTypeFilter('')}>
+                ✕
+              </button>
             ) : null}
           </div>
+
           <button
             type="button"
             className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
@@ -546,13 +1156,10 @@ export default function FilterableProductsTable({ products }: FilterableProducts
             title={isTableExpanded ? 'Contraer tabla' : 'Expandir tabla'}
           >
             {isTableExpanded ? 'Comprimir' : 'Expandir '} Tabla
-            {isTableExpanded ? (
-              <ArrowsPointingInIcon className="size-6" />
-            ) : (
-              <ArrowsPointingOutIcon className="size-6" />
-            )}
+            {isTableExpanded ? <ArrowsPointingInIcon className="size-6" /> : <ArrowsPointingOutIcon className="size-6" />}
           </button>
         </div>
+
         <div className="flex items-center gap-2">
           <Link href="/products/new" className="btn btn-primary">
             Nuevo Producto
@@ -562,30 +1169,18 @@ export default function FilterableProductsTable({ products }: FilterableProducts
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
         <div className="flex items-center gap-2 flex-1">
-          <SearchBar
-            placeholder="Buscar por modelo..."
-            onSearch={setSearch}
-            search={search}
-          />
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => setDrawerOpen(true)}
-          >
+          <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} search={search} />
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setDrawerOpen(true)}>
             <FunnelIcon className="w-5 h-5" />
             Filtros
           </button>
-          {/* Add a chip for each activeFilters */}
-          {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) &&
+
+          {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) && (
             <div className="flex items-center gap-2">
               {brandFilter && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                   Marca: {brandFilter}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setBrandFilter('')}
-                  >
+                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setBrandFilter('')}>
                     ✕
                   </button>
                 </span>
@@ -593,11 +1188,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               {conditionFilter && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                   Condición: {conditionLabelMap[conditionFilter]}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setConditionFilter('')}
-                  >
+                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setConditionFilter('')}>
                     ✕
                   </button>
                 </span>
@@ -605,12 +1196,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               {colorFilter && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                   Color: {colorFilter}
-                  <button
-
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setColorFilter('')}
-                  >
+                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setColorFilter('')}>
                     ✕
                   </button>
                 </span>
@@ -618,11 +1204,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               {capacityFilter && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                   Capacidad: {capacityFilter} GB
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setCapacityFilter('')}
-                  >
+                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setCapacityFilter('')}>
                     ✕
                   </button>
                 </span>
@@ -630,18 +1212,16 @@ export default function FilterableProductsTable({ products }: FilterableProducts
               {stateFilter && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                   Estado: {stateLabelMap[stateFilter]}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => setStateFilter('')}
-                  >
+                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setStateFilter('')}>
                     ✕
                   </button>
                 </span>
               )}
               {(batteryMin || batteryMax) && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Batería: {batteryMin ? `Min ${batteryMin}%` : ''}{batteryMin && batteryMax ? ' - ' : ''}{batteryMax ? `Max ${batteryMax}%` : ''}
+                  Batería: {batteryMin ? `Min ${batteryMin}%` : ''}
+                  {batteryMin && batteryMax ? ' - ' : ''}
+                  {batteryMax ? `Max ${batteryMax}%` : ''}
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs btn-circle ml-1"
@@ -655,12 +1235,9 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                 </span>
               )}
             </div>
-          }
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => clearFilters()}
-          >
+          )}
+
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => clearFilters()}>
             Limpiar
           </button>
         </div>
@@ -678,11 +1255,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
             <div className="menu p-4 min-h-full">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold">Filtros</h3>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-circle btn-ghost"
-                  onClick={() => setDrawerOpen(false)}
-                >
+                <button type="button" className="btn btn-sm btn-circle btn-ghost" onClick={() => setDrawerOpen(false)}>
                   ✕
                 </button>
               </div>
@@ -693,11 +1266,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   <label className="label">
                     <span className="label-text font-semibold">Condición</span>
                   </label>
-                  <select
-                    value={conditionFilter}
-                    onChange={(e) => setConditionFilter(e.target.value)}
-                    className="select select-bordered select-sm"
-                  >
+                  <select value={conditionFilter} onChange={(e) => setConditionFilter(e.target.value)} className="select select-bordered select-sm">
                     <option value="">Todas las condiciones</option>
                     {conditionOptions
                       .filter((opt) => conditions.includes(opt))
@@ -708,10 +1277,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                       ))}
                   </select>
                   {conditionFilter && (
-                    <button
-                      className="btn btn-ghost btn-xs mt-1"
-                      onClick={() => setConditionFilter('')}
-                    >
+                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setConditionFilter('')}>
                       Limpiar
                     </button>
                   )}
@@ -770,11 +1336,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   <label className="label">
                     <span className="label-text font-semibold">Color</span>
                   </label>
-                  <select
-                    value={colorFilter}
-                    onChange={(e) => setColorFilter(e.target.value)}
-                    className="select select-bordered select-sm"
-                  >
+                  <select value={colorFilter} onChange={(e) => setColorFilter(e.target.value)} className="select select-bordered select-sm">
                     <option value="">Todos los colores</option>
                     {colors.map((c) => (
                       <option key={c} value={c}>
@@ -783,10 +1345,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                     ))}
                   </select>
                   {colorFilter && (
-                    <button
-                      className="btn btn-ghost btn-xs mt-1"
-                      onClick={() => setColorFilter('')}
-                    >
+                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setColorFilter('')}>
                       Limpiar
                     </button>
                   )}
@@ -797,11 +1356,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   <label className="label">
                     <span className="label-text font-semibold">Capacidad (GB)</span>
                   </label>
-                  <select
-                    value={capacityFilter}
-                    onChange={(e) => setCapacityFilter(e.target.value)}
-                    className="select select-bordered select-sm"
-                  >
+                  <select value={capacityFilter} onChange={(e) => setCapacityFilter(e.target.value)} className="select select-bordered select-sm">
                     <option value="">Todas las capacidades</option>
                     {capacities.map((cap) => (
                       <option key={cap} value={String(cap)}>
@@ -810,10 +1365,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                     ))}
                   </select>
                   {capacityFilter && (
-                    <button
-                      className="btn btn-ghost btn-xs mt-1"
-                      onClick={() => setCapacityFilter('')}
-                    >
+                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setCapacityFilter('')}>
                       Limpiar
                     </button>
                   )}
@@ -824,11 +1376,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                   <label className="label">
                     <span className="label-text font-semibold">Estado</span>
                   </label>
-                  <select
-                    value={stateFilter}
-                    onChange={(e) => setStateFilter(e.target.value)}
-                    className="select select-bordered select-sm"
-                  >
+                  <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="select select-bordered select-sm">
                     <option value="">Todos los estados</option>
                     {stateOptions.map((s) => (
                       <option key={s} value={s}>
@@ -837,10 +1385,7 @@ export default function FilterableProductsTable({ products }: FilterableProducts
                     ))}
                   </select>
                   {stateFilter && (
-                    <button
-                      className="btn btn-ghost btn-xs mt-1"
-                      onClick={() => setStateFilter('')}
-                    >
+                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setStateFilter('')}>
                       Limpiar
                     </button>
                   )}
@@ -872,537 +1417,142 @@ export default function FilterableProductsTable({ products }: FilterableProducts
       />
 
       <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
-        <table className={`table table-zebra w-full table-pin-rows table-pin-cols ${isTableExpanded ? '' : 'table-xs'}`}>
-          <thead>
-            <tr>
-              <th>Agregado</th>
-              <th>Modelo</th>
-              <th>IMEI</th>
-              <th>Bateria %</th>
-              <th>Color</th>
-              <th>Capacidad (GB)</th>
-              <th>Condición</th>
-              <th>Costo (USD)</th>
-              <th>Precio Venta (USD)</th>
-              <th>Stock Inicial</th>
-              <th>Stock</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody className='h-full'>
-            {filteredProducts.map((p) => (
-              <tr key={p.id}>
-                <td className='text-xs text-base-content/60'>
-                  {isEditing(p.id, 'createdAt') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="date"
-                        value={getEditingValue(p.id, 'createdAt')}
-                        onChange={(e) => updateEditingValue(p.id, 'createdAt', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'createdAt')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'createdAt')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'createdAt')}
-                        className="input input-xs w-full min-w-[120px]"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'createdAt'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'createdAt')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'createdAt')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'createdAt', p.createdAt ? toArgDateInputValue(new Date(p.createdAt)) : '')}
-                      title="Click para editar">
-                      <div className='tooltip tooltip-right' data-tip={p.createdAt ? formatInTimeZone(new Date(p.createdAt), AR_TIME_ZONE, 'dd/MM/yyyy HH:mm') : ''}>
-                        <span className="underline decoration-dotted cursor-help">
-                          {p.createdAt ? formatInTimeZone(new Date(p.createdAt), AR_TIME_ZONE, 'dd/MM') : '-'}
-                        </span>
-                      </div>
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'modelName') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={getEditingValue(p.id, 'modelName')}
-                        onChange={(e) => updateEditingValue(p.id, 'modelName', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'modelName')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'modelName')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'modelName')}
-                        className="input input-xs w-full min-w-[120px]"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'modelName'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'modelName')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'modelName')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'modelName', p.modelName)}
-                      title="Click para editar"
-                    >
-                      {p.notes ? (
-                        <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ''}>
-                          <span className="underline decoration-dotted">
-                            {p.modelName}
-                          </span>
-                        </div>
-                      ) : (
-                        p.modelName
-                      )}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'imei') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={getEditingValue(p.id, 'imei')}
-                        onChange={(e) => updateEditingValue(p.id, 'imei', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'imei')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'imei')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'imei')}
-                        className="input input-xs w-full min-w-[100px]"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'imei'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'imei')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'imei')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'imei', p.imei)}
-                      title="Click para editar"
-                    >
-                      {p.imei || '-'}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'batteryPct') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={getEditingValue(p.id, 'batteryPct')}
-                        onChange={(e) => updateEditingValue(p.id, 'batteryPct', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'batteryPct')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'batteryPct')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'batteryPct')}
-                        className="input input-xs w-20"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'batteryPct'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'batteryPct')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'batteryPct')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'batteryPct', p.batteryPct)}
-                      title="Click para editar"
-                    >
-                      {p.batteryPct != null ? (
-                        <>
-                          {p.batteryPct}<span className="text-xs text-base-content/50"> %</span>
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'color') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={getEditingValue(p.id, 'color')}
-                        onChange={(e) => updateEditingValue(p.id, 'color', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'color')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'color')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'color')}
-                        className="input input-xs w-full min-w-[80px]"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'color'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'color')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'color')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'color', p.color)}
-                      title="Click para editar"
-                    >
-                      {p.color ?? '-'}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'capacityGB') ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        autoFocus
-                        name="capacityGB"
-                        value={getEditingValue(p.id, 'capacityGB')}
-                        onChange={(e) => updateEditingValue(p.id, 'capacityGB', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'capacityGB')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'capacityGB')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'capacityGB')}
-                        className="select select-xs w-24"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'capacityGB'}
-                      >
-                        <option value="">Seleccionar</option>
-                        <option value="64">64 GB</option>
-                        <option value="128">128 GB</option>
-                        <option value="256">256 GB</option>
-                        <option value="512">512 GB</option>
-                        <option value="1024">1024 GB (1 TB)</option>
-                        <option value="2048">2048 GB (2 TB)</option>
-                      </select>
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'capacityGB')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'capacityGB')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'capacityGB', p.capacityGB)}
-                      title="Click para editar"
-                    >
-                      {p.capacityGB != null ? (
-                        <>
-                          {p.capacityGB}<span className="text-xs text-base-content/50"> GB</span>
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'condition') ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        autoFocus
-                        value={getEditingValue(p.id, 'condition')}
-                        onChange={(e) => updateEditingValue(p.id, 'condition', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'condition')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'condition')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'condition')}
-                        className="select select-xs w-full min-w-[100px]"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'condition'}
-                      >
-                        <option value="">-</option>
-                        {conditionOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {conditionLabelMap[opt] ?? opt}
-                          </option>
-                        ))}
-                      </select>
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'condition')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'condition')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'condition', p.condition)}
-                      title="Click para editar"
-                    >
-                      {p.condition == null ? '-' : conditionLabelMap[p.condition] ?? p.condition}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'costPrice') ? (
-                    <div className="flex items-center gap-2">
-                      <span className='text-xs text-base-content/50'>$ </span>
-                      <input
-                        autoFocus
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        value={getEditingValue(p.id, 'costPrice')}
-                        onChange={(e) => updateEditingValue(p.id, 'costPrice', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'costPrice')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'costPrice')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'costPrice')}
-                        className="input input-xs w-24"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'costPrice'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'costPrice')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'costPrice')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'costPrice', p.costPrice)}
-                      title="Click para editar"
-                    >
-                      <span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).costPrice)}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'salePrice') ? (
-                    <div className="flex items-center gap-2">
-                      <span className='text-xs text-base-content/50'>$ </span>
-                      <input
-                        autoFocus
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        value={getEditingValue(p.id, 'salePrice')}
-                        onChange={(e) => updateEditingValue(p.id, 'salePrice', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'salePrice')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'salePrice')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'salePrice')}
-                        className="input input-xs w-24"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'salePrice'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'salePrice')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'salePrice')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'salePrice', p.salePrice)}
-                      title="Click para editar"
-                    >
-                      <span className='text-xs text-base-content/50'>$ </span>{formatDecimal((p as any).salePrice)}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'stockInitial') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={getEditingValue(p.id, 'stockInitial')}
-                        onChange={(e) => updateEditingValue(p.id, 'stockInitial', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'stockInitial')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'stockInitial')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'stockInitial')}
-                        className="input input-xs w-20"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'stockInitial'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stockInitial')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stockInitial')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="cursor-pointer hover:bg-base-200 rounded px-1"
-                      onClick={() => startEditField(p.id, 'stockInitial', p.stockInitial)}
-                      title="Click para editar"
-                    >
-                      {p.stockInitial}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {isEditing(p.id, 'stock') ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={getEditingValue(p.id, 'stock')}
-                        onChange={(e) => updateEditingValue(p.id, 'stock', e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitEditField(p.id, 'stock')
-                          if (e.key === 'Escape') cancelEditField(p.id, 'stock')
-                        }}
-                        onBlur={() => commitEditField(p.id, 'stock')}
-                        className="input input-xs w-20"
-                        disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
-                      />
-                      <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'stock')}>
-                          <CheckIcon className="h-[1em]" />
-                        </button>
-                        <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'stock')}>
-                          <XMarkIcon className="h-[1em]" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-row btn-group gap-1 items-center">
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          aria-label="decrement stock"
-                          disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
-                          onClick={() => changeStockBy(p.id, -1)}
-                        >
-                          ▼
-                        </button>
-                        <span className="cursor-pointer hover:bg-base-200 rounded px-1" onClick={() => startEditStock(p.id, p.stock)} title="Click para editar">
-                          {p.stock}
-                        </span>
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          aria-label="increment stock"
-                          disabled={savingField?.productId === p.id && savingField?.fieldName === 'stock'}
-                          onClick={() => changeStockBy(p.id, 1)}
-                        >
-                          ▲
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </td>
-                <td>
-                  <div className="dropdown dropdown-start relative">
-                    <div tabIndex={0} role="button" className="flex flex-row flex-nowrap gap-2 items-center cursor-pointer btn btn-xs btn-ghost py-2">
-                      <span className={`badge badge-sm ${stateColorMap[p.state] ?? 'badge-ghost'}`}>{p.state}</span>
-                      <ChevronDownIcon className="h-4 w-4" />
-                    </div>
-                    <ul tabIndex={-1} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
-                      {stateOptions.map((s) => (
-                        <li key={s} className='py-2 flex flex-row items-center gap-2'>
-                          <button
-                            className={`w-full text-left btn btn-ghost btn-xs justify-start ${stateColorMap[s] ?? ''}`}
-                            disabled={savingStateId === p.id}
-                            onClick={() => changeState(p.id, s)}
-                          >
-                            {s}
-                            <div className={`w-2 h-2 rounded-full border ${stateColorMap[s] ?? ''}`}></div>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </td>
-                <td className="flex items-center gap-2">
-                  <Link href={`/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
-                    <PencilIcon className="size-[1.2em]" />
-                  </Link>
-                  <button
-                    className="btn btn-xs btn-square btn-soft"
-                    onClick={() => duplicateProduct(p.id)}
-                    disabled={duplicatingId === p.id}
-                    title="Duplicar producto"
-                  >
-                    {duplicatingId === p.id ? (
-                      <span className="loading loading-bars loading-xs"></span>
-                    ) : (
-                      <DocumentDuplicateIcon className="size-[1.2em]" />
-                    )}
-                  </button>
-                  <button
-                    className="btn btn-xs btn-square btn-soft btn-error"
-                    onClick={() => deleteProduct(p.id)}
-                    disabled={deletingId === p.id}
-                    aria-disabled={deletingId === p.id}
-                    title="Eliminar producto"
-                  >
-                    {deletingId === p.id ?
-                      <>
-                        <span className="loading loading-bars loading-xs"></span>
-                      </>
-                      :
-                      <>
-                        <TrashIcon className="size-[1.2em]" />
-                      </>
-                    }
-                  </button>
-                </td>
+        {viewMode === 'DETAIL' ? (
+          <table className={`table table-zebra w-full table-pin-rows table-pin-cols ${isTableExpanded ? '' : 'table-xs'}`}>
+            <thead>
+              <tr>
+                <th>Agregado</th>
+                <th>Modelo</th>
+                <th>IMEI</th>
+                <th>Bateria %</th>
+                <th>Color</th>
+                <th>Capacidad (GB)</th>
+                <th>Condición</th>
+                <th>Costo (USD)</th>
+                <th>Precio Venta (USD)</th>
+                <th>Stock Inicial</th>
+                <th>Stock</th>
+                <th>Estado</th>
+                <th>Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="h-full">
+              {filteredProducts.map((p) => (
+                <ProductRow key={p.id} p={p} />
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className={`table table-zebra w-full table-pin-rows ${isTableExpanded ? '' : 'table-xs'}`}>
+            <thead>
+              <tr>
+                <th className="w-[40px]"></th>
+                <th>Modelo</th>
+                <th>Items</th>
+                <th>Stock</th>
+                <th>Disponible</th>
+                <th>Costo (USD)</th>
+                <th>Precio Venta (USD)</th>
+                <th className="text-right">Último agregado</th>
+              </tr>
+            </thead>
+            <tbody className="h-full">
+              {grouped.map((g) => {
+                const isOpen = !!expandedGroups[g.key]
+                const last = g.newest ? formatInTimeZone(new Date(g.newest), AR_TIME_ZONE, 'dd/MM HH:mm') : '-'
+                const costLabel = rangeLabelFromItems(g.items, 'costPrice')
+                const saleLabel = rangeLabelFromItems(g.items, 'salePrice')
+
+                return (
+                  <>
+                    <tr
+                      key={`group-${g.key}`}
+                      className="cursor-pointer hover:bg-base-200/50"
+                      onClick={() => toggleGroup(g.key)}
+                      title="Click para expandir/contraer"
+                    >
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs btn-square"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleGroup(g.key)
+                          }}
+                          aria-label={isOpen ? 'collapse group' : 'expand group'}
+                        >
+                          <ChevronDownIcon className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                      </td>
+                      <td className="font-semibold">{g.label}</td>
+                      <td>
+                        <span className="badge badge-sm badge-ghost">{g.items.length}</span>
+                      </td>
+                      <td>{g.stockSum}</td>
+                      <td>{g.availSum}</td>
+                      <td>
+                        <span className="text-xs text-base-content/50">$ </span>
+                        {costLabel}
+                      </td>
+                      <td>
+                        <span className="text-xs text-base-content/50">$ </span>
+                        {saleLabel}
+                      </td>
+                      <td className="text-right text-xs text-base-content/60">{last}</td>
+                    </tr>
+
+                    {isOpen ? (
+                      <tr key={`group-body-${g.key}`}>
+                        <td colSpan={8} className="p-0">
+                          <div className="bg-base-100 border-t border-base-content/5">
+                            <div className="px-3 py-2 text-xs text-base-content/60 flex items-center justify-between">
+                              <span>
+                                Detalle de <span className="font-semibold">{g.label}</span> — {g.items.length} items (filtrados)
+                              </span>
+                              <button className="btn btn-ghost btn-xs" onClick={() => toggleGroup(g.key)}>
+                                Cerrar
+                              </button>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                              <table className={`table table-zebra w-full ${isTableExpanded ? '' : 'table-xs'}`}>
+                                <thead>
+                                  <tr>
+                                    <th>Agregado</th>
+                                    <th>Modelo</th>
+                                    <th>IMEI</th>
+                                    <th>Bateria %</th>
+                                    <th>Color</th>
+                                    <th>Capacidad (GB)</th>
+                                    <th>Condición</th>
+                                    <th>Costo (USD)</th>
+                                    <th>Precio Venta (USD)</th>
+                                    <th>Stock Inicial</th>
+                                    <th>Stock</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {g.items
+                                    .slice()
+                                    .sort((a, b) => newestCreatedAt([b]) - newestCreatedAt([a])) // keep consistent “newest first” within group
+                                    .map((p) => (
+                                      <ProductRow key={p.id} p={p} />
+                                    ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )
