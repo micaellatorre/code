@@ -1,4 +1,3 @@
-// app/api/products/route.ts
 import { prisma } from "@/lib/prisma"
 import { ProductState, ProductType } from "@prisma/client"
 import { NextResponse } from "next/server"
@@ -17,7 +16,7 @@ function isEnumValue<T extends Record<string, string>>(enm: T, v: string | null)
 }
 
 /**
- * GET /api/products?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
+ * GET ?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
  *
  * Returns:
  * { products: SerializedProduct[], nextCursor: string | null }
