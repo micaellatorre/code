@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     // Here we keep cursor by `id` and a stable orderBy including `id`.
     const rows = await prisma.product.findMany({
       where,
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       ...(cursor
         ? {
