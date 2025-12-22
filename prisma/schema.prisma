@@ -54,7 +54,7 @@ model Product {
   salePrice      Decimal       @db.Decimal(12, 2) // precio_venta_x_unidad (precio sugerido/base)
   shippingCost   Decimal?      @db.Decimal(12, 2) // costo_envio (si es fijo/por unidad)
   status         ProductStatus @default(AVAILABLE)
-  state          ProductSate   @default(EN_CAMINO) // estado actual del producto
+  state          ProductState   @default(EN_CAMINO) // estado actual del producto
   stockInitial   Int           @default(1) // stock inicial
   stock          Int           @default(1) // stock actual
   stockAvailable Int           @default(1) // stock disponible para venta
@@ -375,7 +375,7 @@ enum ProductStatus {
   DISCONTINUED
 }
 
-enum ProductSate {
+enum ProductState {
   EN_STOCK
   EN_CAMINO
   EN_REPARACION
