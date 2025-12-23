@@ -25,7 +25,7 @@ type SerializedProduct = {
   brand: string | null
   imei: string | null
   modelName: string
-  capacityGB: number | null
+  capacityGB: number | string | null | any
   condition: string | null
   color: string | null
   batteryPct: number | null
@@ -154,17 +154,17 @@ export default function FilterableProductsTable() {
     sp.set("limit", String(limit))
     if (cursor) sp.set("cursor", cursor)
     return `/api/products?${sp.toString()}`
-  }, [search, typeFilter, stateFilter, limit, cursor ])
+  }, [search, typeFilter, stateFilter, limit, cursor])
 
   const { data, error, isLoading, mutate } = useSWR(apiUrl, fetcher, {
     revalidateOnFocus: false,
     keepPreviousData: true,
   })
-  
+
   // local list so you can keep all your optimistic UI logic
   const [productsLocal, setProductsLocal] = useState<SerializedProduct[]>([])
   const totalProducts = data?.totalProducts ?? null
-  
+
   useEffect(() => {
     if (!data) return
     // cursor pagination: append; first page: replace
@@ -173,10 +173,10 @@ export default function FilterableProductsTable() {
       const seen = new Set(prev.map((p) => p.id))
       const merged = prev.slice()
       for (const p of data.products) if (!seen.has(p.id)) merged.push(p)
-        return merged
+      return merged
     })
   }, [data?.products])
-  
+
   // enums + labels
   const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "VENDIDO"] as const
   const stateColorMap: Record<string, string> = {
@@ -366,12 +366,12 @@ export default function FilterableProductsTable() {
         prev.map((p) =>
           p.id === productId
             ? {
-                ...p,
-                [fieldName]: updated[fieldName] ?? (p as any)[fieldName],
-                ...(fieldName === "stock" && updated.stockAvailable !== undefined
-                  ? { stockAvailable: updated.stockAvailable }
-                  : {}),
-              }
+              ...p,
+              [fieldName]: updated[fieldName] ?? (p as any)[fieldName],
+              ...(fieldName === "stock" && updated.stockAvailable !== undefined
+                ? { stockAvailable: updated.stockAvailable }
+                : {}),
+            }
             : p,
         ),
       )
@@ -431,14 +431,14 @@ export default function FilterableProductsTable() {
       prev.map((p) =>
         p.id === productId
           ? {
-              ...p,
-              [fieldName]: processedValue,
-              ...(fieldName === "stock"
-                ? {
-                    stockAvailable: Math.max(0, (p.stockAvailable ?? 0) + (processedValue - (p.stock ?? 0))),
-                  }
-                : {}),
-            }
+            ...p,
+            [fieldName]: processedValue,
+            ...(fieldName === "stock"
+              ? {
+                stockAvailable: Math.max(0, (p.stockAvailable ?? 0) + (processedValue - (p.stock ?? 0))),
+              }
+              : {}),
+          }
           : p,
       ),
     )
@@ -471,11 +471,11 @@ export default function FilterableProductsTable() {
         prev.map((p) =>
           p.id === id
             ? {
-                ...p,
-                stock: newStock,
-                stockAvailable: newStockAvailable !== undefined ? newStockAvailable : p.stockAvailable,
-                state: optimisticNext ?? p.state,
-              }
+              ...p,
+              stock: newStock,
+              stockAvailable: newStockAvailable !== undefined ? newStockAvailable : p.stockAvailable,
+              state: optimisticNext ?? p.state,
+            }
             : p,
         ),
       )
@@ -498,11 +498,11 @@ export default function FilterableProductsTable() {
         prev.map((p) =>
           p.id === id
             ? {
-                ...p,
-                stock: updated.stock,
-                stockAvailable: updated.stockAvailable ?? p.stockAvailable,
-                state: updated.state,
-              }
+              ...p,
+              stock: updated.stock,
+              stockAvailable: updated.stockAvailable ?? p.stockAvailable,
+              state: updated.state,
+            }
             : p,
         ),
       )
@@ -822,20 +822,20 @@ export default function FilterableProductsTable() {
         </td>
 
         <td>
-          {isEditing(p.id, "capacityGB") ? (
+          {isEditing(p.id, 'capacityGB') ? (
             <div className="flex items-center gap-2">
               <select
                 autoFocus
                 name="capacityGB"
-                value={getEditingValue(p.id, "capacityGB")}
-                onChange={(e) => updateEditingValue(p.id, "capacityGB", e.target.value)}
+                value={getEditingValue(p.id, 'capacityGB')}
+                onChange={(e) => updateEditingValue(p.id, 'capacityGB', e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") commitEditField(p.id, "capacityGB")
-                  if (e.key === "Escape") cancelEditField(p.id, "capacityGB")
+                  if (e.key === 'Enter') commitEditField(p.id, 'capacityGB')
+                  if (e.key === 'Escape') cancelEditField(p.id, 'capacityGB')
                 }}
-                onBlur={() => commitEditField(p.id, "capacityGB")}
+                onBlur={() => commitEditField(p.id, 'capacityGB')}
                 className="select select-xs w-24"
-                disabled={savingField?.productId === p.id && savingField?.fieldName === "capacityGB"}
+                disabled={savingField?.productId === p.id && savingField?.fieldName === 'capacityGB'}
               >
                 <option value="">Seleccionar</option>
                 <option value="64">64 GB</option>
@@ -845,11 +845,11 @@ export default function FilterableProductsTable() {
                 <option value="1024">1024 GB (1 TB)</option>
                 <option value="2048">2048 GB (2 TB)</option>
               </select>
-              <div className="flex flex-col join join-horizontal border border-base-content/10">
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "capacityGB")}>
+              <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, 'capacityGB')}>
                   <CheckIcon className="h-[1em]" />
                 </button>
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "capacityGB")}>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, 'capacityGB')}>
                   <XMarkIcon className="h-[1em]" />
                 </button>
               </div>
@@ -857,16 +857,15 @@ export default function FilterableProductsTable() {
           ) : (
             <span
               className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "capacityGB", p.capacityGB)}
+              onClick={() => startEditField(p.id, 'capacityGB', p.capacityGB)}
               title="Click para editar"
             >
-              {p.capacityGB != null ? (
+              {(p.capacityGB != null) ? (
                 <>
-                  {p.capacityGB}
-                  <span className="text-xs text-base-content/50"> GB</span>
+                  {p.capacityGB}<span className="text-xs text-base-content/50"> GB</span>
                 </>
               ) : (
-                "-"
+                '-'
               )}
             </span>
           )}

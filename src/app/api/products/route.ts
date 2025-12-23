@@ -1,3 +1,4 @@
+// app/api/products/route.ts
 import { prisma } from "@/lib/prisma"
 import { ProductState, ProductType } from "@prisma/client"
 import { NextResponse } from "next/server"
@@ -16,10 +17,8 @@ function isEnumValue<T extends Record<string, string>>(enm: T, v: string | null)
 }
 
 /**
- * GET ?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
- *
- * Returns:
- * { products: SerializedProduct[], nextCursor: string | null }
+ * GET /api/products?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
+ * Returns: { products: SerializedProduct[], nextCursor: string | null, totalProducts: number }
  */
 export async function GET(request: Request) {
   try {
@@ -52,11 +51,9 @@ export async function GET(request: Request) {
       ]
     }
 
-    const totalProducts = await prisma.product.count()
+    // IMPORTANT: count must match same filters (where)
+    const totalProducts = await prisma.product.count({ where })
 
-    // Cursor pagination note:
-    // Prisma requires that `cursor` matches the `orderBy` uniqueness for strict stability.
-    // Here we keep cursor by `id` and a stable orderBy including `id`.
     const rows = await prisma.product.findMany({
       where,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -70,22 +67,37 @@ export async function GET(request: Request) {
       select: {
         id: true,
         tenantId: true,
+
+        // filters / enums
         state: true,
+        status: true,
         type: true,
+
+        // identity
         brand: true,
         modelName: true,
         imei: true,
+
+        // IMPORTANT: include it (this was missing)
+        capacityGB: true,
+
+        // attributes
         condition: true,
         color: true,
         batteryPct: true,
         purchaseDate: true,
+
+        // money
         costPrice: true,
         salePrice: true,
         shippingCost: true,
-        status: true, // include if your SerializedProduct expects it
+
+        // stock
         stockInitial: true,
         stock: true,
         stockAvailable: true,
+
+        // misc
         notes: true,
         createdAt: true,
         updatedAt: true,
@@ -96,31 +108,36 @@ export async function GET(request: Request) {
     const page = hasNextPage ? rows.slice(0, limit) : rows
     const nextCursor = hasNextPage ? page[page.length - 1]?.id ?? null : null
 
-    // Serialize to match your Client type:
-    // - Decimal -> string
-    // - Date -> ISO string
-    // - keep nulls as null (don't replace with "" unless you really want that)
     const products = page.map((p) => ({
       id: p.id,
       tenantId: p.tenantId,
+
       type: p.type,
+      state: p.state,
+      status: p.status, // don't coerce to string/defaults; keep enum value
+
       brand: p.brand ?? null,
-      imei: p.imei ?? null,
       modelName: p.modelName,
-      capacityGB: null as number | null, // remove this line if capacityGB exists in your schema
+      imei: p.imei ?? null,
+
+      capacityGB: p.capacityGB ?? null,
+
       condition: p.condition ?? null,
       color: p.color ?? null,
       batteryPct: p.batteryPct ?? null,
+
       purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
+
       costPrice: p.costPrice != null ? String(p.costPrice) : null,
       salePrice: p.salePrice != null ? String(p.salePrice) : null,
       shippingCost: p.shippingCost != null ? String(p.shippingCost) : null,
-      state: p.state,
-      status: p.status ?? "ACTIVE", // adapt to your schema (or just `p.status`)
+
       stockInitial: p.stockInitial ?? 0,
       stock: p.stock ?? 0,
       stockAvailable: p.stockAvailable ?? 0,
+
       notes: p.notes ?? null,
+
       createdAt: p.createdAt ? p.createdAt.toISOString() : null,
       updatedAt: p.updatedAt ? p.updatedAt.toISOString() : null,
     }))
