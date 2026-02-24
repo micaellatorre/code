@@ -12,6 +12,25 @@ function parseLimit(v: string | null) {
   return Math.min(n, MAX_LIMIT)
 }
 
+function parseOrderBy(v: string | null) {
+  switch (v) {
+    case "alpha_asc":
+      return [{ modelName: "asc" as const }]
+    case "alpha_desc":
+      return [{ modelName: "desc" as const }]
+    case "created_desc":
+      return [{ createdAt: "desc" as const }, { id: "desc" as const }]
+    case "created_asc":
+      return [{ createdAt: "asc" as const }, { id: "asc" as const }]
+    case "updated_desc":
+      return [{ updatedAt: "desc" as const }, { id: "desc" as const }]
+    case "updated_asc":
+      return [{ updatedAt: "asc" as const }, { id: "asc" as const }]
+    default:
+      return [{ createdAt: "desc" as const }, { id: "desc" as const }]
+  }
+}
+
 function isEnumValue<T extends Record<string, string>>(enm: T, v: string | null): v is T[keyof T] {
   return !!v && Object.values(enm).includes(v as any)
 }
@@ -31,6 +50,8 @@ export async function GET(request: Request) {
 
     const limit = parseLimit(searchParams.get("limit"))
     const cursor = searchParams.get("cursor")
+    const orderParam = searchParams.get("orderBy")
+    const orderBy = parseOrderBy(orderParam)
 
     const qRaw = searchParams.get("q")
     const q = qRaw?.trim() ? qRaw.trim() : null
@@ -56,7 +77,7 @@ export async function GET(request: Request) {
 
     const rows = await prisma.product.findMany({
       where,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      orderBy,
       take: limit + 1,
       ...(cursor
         ? {
@@ -86,6 +107,7 @@ export async function GET(request: Request) {
         color: true,
         batteryPct: true,
         purchaseDate: true,
+        location: true,
 
         // money
         costPrice: true,
@@ -125,6 +147,7 @@ export async function GET(request: Request) {
       condition: p.condition ?? null,
       color: p.color ?? null,
       batteryPct: p.batteryPct ?? null,
+      location: p.location ?? null,
 
       purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
 

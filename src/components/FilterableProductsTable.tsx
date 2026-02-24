@@ -39,6 +39,7 @@ type SerializedProduct = {
   stock: number
   stockAvailable: number
   notes: string | null
+  location: string | null
   createdAt: string | null
   updatedAt: string | null
 }
@@ -140,7 +141,8 @@ export default function FilterableProductsTable() {
   // pagination (cursor-based)
   const [cursor, setCursor] = useState<string | null>(null)
   const [limit] = useState<number>(100)
-
+  const [orderBy, setOrderBy] = useState("created_desc")
+  
   // Reset pagination when server-backed filters change
   useEffect(() => {
     setCursor(null)
@@ -151,10 +153,11 @@ export default function FilterableProductsTable() {
     if (typeFilter) sp.set("type", typeFilter)
     if (stateFilter) sp.set("state", stateFilter)
     if (search.trim()) sp.set("q", search.trim())
+    sp.set("orderBy", orderBy)
     sp.set("limit", String(limit))
     if (cursor) sp.set("cursor", cursor)
     return `/api/products?${sp.toString()}`
-  }, [search, typeFilter, stateFilter, limit, cursor])
+  }, [search, typeFilter, stateFilter, orderBy, limit, cursor])
 
   const { data, error, isLoading, mutate } = useSWR(apiUrl, fetcher, {
     revalidateOnFocus: false,
@@ -168,6 +171,7 @@ export default function FilterableProductsTable() {
   useEffect(() => {
     if (!data) return
     // cursor pagination: append; first page: replace
+    console.log(data)
     setProductsLocal((prev) => {
       if (!cursor) return data.products
       const seen = new Set(prev.map((p) => p.id))
@@ -175,7 +179,7 @@ export default function FilterableProductsTable() {
       for (const p of data.products) if (!seen.has(p.id)) merged.push(p)
       return merged
     })
-  }, [data?.products])
+  }, [data, cursor])
 
   // enums + labels
   const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "VENDIDO"] as const
@@ -303,9 +307,6 @@ export default function FilterableProductsTable() {
     setColorFilter("")
     setCapacityFilter("")
     setStateFilter("")
-    // keep typeFilter as-is? your old clearFilters cleared it, but you didn't include it there.
-    // uncomment if you want full reset:
-    // setTypeFilter("")
   }
 
   function startEditField(productId: string, fieldName: string, currentValue: any) {
@@ -353,6 +354,8 @@ export default function FilterableProductsTable() {
           updateBody.stockAvailable = Math.max(0, (product.stockAvailable ?? 0) + delta)
         }
       }
+
+      console.log("Persisting update", { productId, fieldName, value, updateBody })
 
       const res = await fetch(`/api/products/${productId}`, {
         method: "PATCH",
@@ -423,7 +426,7 @@ export default function FilterableProductsTable() {
     } else if (fieldName === "createdAt") {
       if (processedValue === null || processedValue === "") processedValue = null
       else processedValue = fromArgDateInputValue(processedValue).toISOString()
-    } else if (["imei", "color", "brand", "notes"].includes(fieldName)) {
+    } else if (["imei", "color", "brand", "notes", "location"].includes(fieldName)) {
       processedValue = processedValue === "" ? null : processedValue
     }
 
@@ -700,6 +703,42 @@ export default function FilterableProductsTable() {
               ) : (
                 p.modelName
               )}
+            </span>
+          )}
+        </td>
+
+        <td>
+          {isEditing(p.id, "location") ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={getEditingValue(p.id, "location")}
+                onChange={(e) => updateEditingValue(p.id, "location", e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitEditField(p.id, "location")
+                  if (e.key === "Escape") cancelEditField(p.id, "location")
+                }}
+                onBlur={() => commitEditField(p.id, "location")}
+                className="input input-xs w-full min-w-[100px]"
+                disabled={savingField?.productId === p.id && savingField?.fieldName === "location"}
+              />
+              <div className="flex flex-col join join-horizontal border border-base-content/10">
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "location")}>
+                  <CheckIcon className="h-[1em]" />
+                </button>
+                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "location")}>
+                  <XMarkIcon className="h-[1em]" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span
+              className="cursor-pointer hover:bg-base-200 rounded px-1"
+              onClick={() => startEditField(p.id, "location", p.location)}
+              title="Click para editar"
+            >
+              {p.location || "-"}
             </span>
           )}
         </td>
@@ -1266,7 +1305,22 @@ export default function FilterableProductsTable() {
             <FunnelIcon className="w-5 h-5" />
             Filtros
           </button>
+          <div className="flex items-center gap-2 mx-4"> 
+            <span className="text-sm font-medium whitespace-nowrap">Ordenar por:</span>
 
+            <select
+              className="select select-bordered select-sm"
+              value={orderBy}
+              onChange={(e) => setOrderBy(e.target.value)}
+            >
+              <option value="alpha_asc">Alfabético A-Z</option>
+              <option value="alpha_desc">Alfabético Z-A</option>
+              <option value="created_desc">Más Nuevos Creados</option>
+              <option value="created_asc">Más Viejos Creados</option>
+              <option value="updated_desc">Más Nuevos Modificados</option>
+              <option value="updated_asc">Más Viejos Modificados</option>
+            </select>
+          </div>
           {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) && (
             <div className="flex items-center gap-2">
               {brandFilter && (
@@ -1526,6 +1580,7 @@ export default function FilterableProductsTable() {
               <tr>
                 <th>Agregado</th>
                 <th>Modelo</th>
+                <th>Ubicación</th>
                 <th>IMEI</th>
                 <th>Bateria %</th>
                 <th>Color</th>

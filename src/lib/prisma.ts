@@ -1,19 +1,20 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
-/**
- * Instancia única de Prisma Client.
- *
- * En Next.js (App Router) es importante reutilizar la conexión
- * para evitar agotar el pool de conexiones en entornos serverless.
- */
-const globalForPrisma = global as unknown as { prisma: PrismaClient | undefined }
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ['query'],
-  })
+    adapter: new PrismaPg(
+      new Pool({
+        connectionString: process.env.DATABASE_URL,
+      })
+    ),
+    log: ["query"],
+  });
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
-export default prisma
+export default prisma;

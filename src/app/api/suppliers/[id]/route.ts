@@ -1,38 +1,45 @@
-import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+// src/app/api/suppliers/[id]/route.ts
+import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from "next/server"
 
-interface Params {
-  params: { id: string }
+type Ctx = {
+  params: Promise<{ id: string }>
 }
 
 // GET: proveedor por ID
-export async function GET(_req: Request, { params }: Params) {
-  const supplier = await prisma.supplier.findUnique({ where: { id: params.id } })
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params
+
+  const supplier = await prisma.supplier.findUnique({ where: { id } })
   if (!supplier) {
-    return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 })
+    return NextResponse.json({ error: "Proveedor no encontrado" }, { status: 404 })
   }
   return NextResponse.json(supplier)
 }
 
 // PUT: actualiza proveedor
-export async function PUT(request: Request, { params }: Params) {
+export async function PUT(request: NextRequest, { params }: Ctx) {
+  const { id } = await params
   const body = await request.json()
+
   try {
-    const supplier = await prisma.supplier.update({ where: { id: params.id }, data: body })
+    const supplier = await prisma.supplier.update({ where: { id }, data: body })
     return NextResponse.json(supplier)
   } catch (err) {
     console.error(err)
-    return NextResponse.json({ error: 'Error actualizando proveedor' }, { status: 500 })
+    return NextResponse.json({ error: "Error actualizando proveedor" }, { status: 500 })
   }
 }
 
 // DELETE: elimina proveedor
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const { id } = await params
+
   try {
-    await prisma.supplier.delete({ where: { id: params.id } })
+    await prisma.supplier.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error(err)
-    return NextResponse.json({ error: 'Error eliminando proveedor' }, { status: 500 })
+    return NextResponse.json({ error: "Error eliminando proveedor" }, { status: 500 })
   }
 }

@@ -7,7 +7,11 @@
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // url removed in Prisma 7
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 /// Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
@@ -30,9 +34,6 @@ model Tenant {
   appointments Appointment[]
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
 
 /// Catálogo unificado: iPhones y accesorios.
 // Para MVP trabajamos con stock agregado (no por IMEI). IMEI se puede agregar en el futuro.
@@ -58,6 +59,7 @@ model Product {
   stockInitial   Int           @default(1) // stock inicial
   stock          Int           @default(1) // stock actual
   stockAvailable Int           @default(1) // stock disponible para venta
+  location      String? // opcional, para saber dónde está el producto, después se puede usar para filtrar por ubicación y agregar un modelo Sede con datos de ubiacion, contacto, direccion, etc.
   notes          String?
 
   saleItems    SaleItem[]
