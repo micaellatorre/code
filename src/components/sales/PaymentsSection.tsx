@@ -11,6 +11,18 @@ interface PaymentsSectionProps {
     total: string; // The total from the TotalsBar to compare against
 }
 
+/* 
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./node_modules/@prisma/client/index-browser.js:1:16
+Module not found: Can't resolve '.prisma/client/index-browser'
+> 1 | const prisma = require('.prisma/client/index-browser')
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  2 |
+  3 | module.exports = prisma
+  4 |
+*/
 const PAYMENT_METHODS = Object.values(PaymentMethod);
 const CURRENCIES = Object.values(Currency);
 
