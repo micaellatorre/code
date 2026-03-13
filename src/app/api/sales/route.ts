@@ -1,7 +1,7 @@
 // app/api/sales/route.ts
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { Prisma, SaleItemKind, ProductState } from "@prisma/client";
+import { Prisma, SaleItemKind, ProductState } from "../../../../prisma/generated/client";
 
 // GET: lista de ventas con items, payments y buyer
 export async function GET() {
