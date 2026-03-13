@@ -1,7 +1,6 @@
 
 // app/api/appointments/route.ts
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 // GET: lista de todas las citas
@@ -42,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const txResult = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const txResult = await prisma.$transaction(async (tx: any) => {
       const tenantId = process.env.DEFAULT_TENANT_ID;
       if (!tenantId) {
         throw new Error("DEFAULT_TENANT_ID no configurado");
