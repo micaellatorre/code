@@ -1,7 +1,7 @@
 'use client'
 
 import { SaleItemDraft } from '@/app/sales/new/page'
-import { Product, ProductType, ProductStatus, Prisma } from '@prisma/client'
+import type { Product, ProductType, ProductStatus, Prisma } from '@prisma/client'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 
 interface ProductSelectionModalProps {
@@ -67,9 +67,9 @@ function apiToPrismaProduct(p: ApiProduct): Product {
     purchaseDate: p.purchaseDate ? new Date(p.purchaseDate) : null,
 
     // Prisma Decimal
-    costPrice: p.costPrice != null ? new Prisma.Decimal(p.costPrice) : null,
-    salePrice: p.salePrice != null ? new Prisma.Decimal(p.salePrice) : null,
-    shippingCost: p.shippingCost != null ? new Prisma.Decimal(p.shippingCost) : null,
+    costPrice: p.costPrice != null ? (p.costPrice as any) : null,
+    salePrice: p.salePrice != null ? (p.salePrice as any) : null,
+    shippingCost: p.shippingCost != null ? (p.shippingCost as any) : null,
 
     state: p.state as any,
     status: p.status as ProductStatus,

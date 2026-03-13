@@ -1,6 +1,6 @@
 'use client';
 
-import { Product } from '@prisma/client';
+import type { Product } from '@prisma/client';
 import { useState } from 'react';
 import ProductSelectionModal from '../sales/ProductSelectionModal';
 

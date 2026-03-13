@@ -1,8 +1,8 @@
 
 'use client';
 
-import { PaymentDraft } from '@/app/sales/new/page';
-import { PaymentMethod, Currency } from '@prisma/client';
+import type { PaymentDraft } from '@/app/sales/new/page';
+import type { PaymentMethod, Currency } from '@prisma/client';
 import { useMemo } from 'react';
 
 interface PaymentsSectionProps {
@@ -11,20 +11,15 @@ interface PaymentsSectionProps {
     total: string; // The total from the TotalsBar to compare against
 }
 
-/* 
-
-> Build error occurred
-Error: Turbopack build failed with 1 errors:
-./node_modules/@prisma/client/index-browser.js:1:16
-Module not found: Can't resolve '.prisma/client/index-browser'
-> 1 | const prisma = require('.prisma/client/index-browser')
-    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  2 |
-  3 | module.exports = prisma
-  4 |
-*/
-const PAYMENT_METHODS = Object.values(PaymentMethod);
-const CURRENCIES = Object.values(Currency);
+const PAYMENT_METHODS: PaymentMethod[] = [
+  'EFECTIVO_PESOS',
+  'EFECTIVO_USD',
+  'TRANSFERENCIA_ARS',
+  'TRANSFERENCIA_USD',
+  'TARJETA',
+  'USDT'
+];
+const CURRENCIES: Currency[] = ['ARS', 'USD', 'USDT'];
 
 export default function PaymentsSection({ payments, setPayments, total }: PaymentsSectionProps) {
 

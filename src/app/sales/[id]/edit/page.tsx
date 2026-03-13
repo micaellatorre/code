@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from "@prisma/client";
+import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from "@prisma/client";
 
 // ===== Tipos compartidos con /sales/new =====
 export type SaleItemDraft = {

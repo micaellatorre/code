@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import Breadcrumbs from '@/components/Breadcrumbs';
-import { Buyer, Product, AppointmentStatus, AppointmentOutcome, AppointmentNoSaleReason } from '@prisma/client';
+import type { Buyer, Product, AppointmentStatus, AppointmentOutcome, AppointmentNoSaleReason } from '@prisma/client';
 import BuyerSection from '@/components/sales/BuyerSection';
 import AppointmentInterestSection, { AppointmentInterestDraft } from '@/components/appointments/AppointmentInterestSection';
 import { fromArgDateTimeInputValue, toArgDateTimeInputValue } from '@/lib/timezone';
@@ -149,13 +149,13 @@ export default function EditAppointmentPage() {
                     <div className="form-control">
                         <label className="label"><span className="label-text">Estado</span></label>
                         <select value={status} onChange={e => setStatus(e.target.value as AppointmentStatus)} className="select select-bordered">
-                            {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                            {['PROGRAMADA', 'CONCRETADA', 'CANCELADA', 'NO_SE_PRESENTO'].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
                     <div className="form-control">
                         <label className="label"><span className="label-text">Resultado</span></label>
                         <select value={outcome} onChange={e => setOutcome(e.target.value as AppointmentOutcome)} className="select select-bordered">
-                            {Object.values(AppointmentOutcome).map(o => <option key={o} value={o}>{o}</option>)}
+                            {['PENDIENTE', 'VENTA_CONCRETADA', 'NO_SE_CONCRETO'].map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
                     </div>
                 </div>
@@ -165,7 +165,7 @@ export default function EditAppointmentPage() {
                             <label className="label"><span className="label-text">Razón de no-venta</span></label>
                             <select value={noSaleReason || ''} onChange={e => setNoSaleReason(e.target.value as AppointmentNoSaleReason)} className="select select-bordered">
                                 <option disabled value="">Seleccione un motivo</option>
-                                {Object.values(AppointmentNoSaleReason).map(r => <option key={r} value={r}>{r}</option>)}
+                                {['MUY_CARO', 'MODELO_NO_DISPONIBLE', 'ENCONTRO_MEJOR_OFERTA', 'LO_ESTA_PENSANDO', 'NO_SE_PRESENTO', 'OTRO'].map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
                         </div>
                         {noSaleReason === 'OTRO' && (

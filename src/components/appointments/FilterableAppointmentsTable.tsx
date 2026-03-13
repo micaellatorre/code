@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AppointmentStatus, AppointmentOutcome } from '@prisma/client';
+import type { AppointmentStatus, AppointmentOutcome } from '@prisma/client';
 import { useRouter } from 'next/navigation';
 import { formatInTimeZone } from 'date-fns-tz'
 import { AR_TIME_ZONE } from '@/lib/timezone'
@@ -94,7 +94,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                         onChange={e => setStatusFilter(e.target.value as any)}
                     >
                         <option value="ALL">Todos los Estados</option>
-                        {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                        {['PROGRAMADA', 'CONCRETADA', 'CANCELADA', 'NO_SE_PRESENTO'].map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <select 
                         className="select select-bordered select-sm"
@@ -102,7 +102,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                         onChange={e => setOutcomeFilter(e.target.value as any)}
                     >
                         <option value="ALL">Todos los Resultados</option>
-                        {Object.values(AppointmentOutcome).map(o => <option key={o} value={o}>{o}</option>)}
+                        {['PENDIENTE', 'VENTA_CONCRETADA', 'NO_SE_CONCRETO'].map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                 </div>
 

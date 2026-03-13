@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import Breadcrumbs from '@/components/Breadcrumbs';
-import { Buyer, Product, AppointmentStatus, AppointmentOutcome, AppointmentNoSaleReason } from '@prisma/client';
+import type { Buyer, Product, AppointmentStatus, AppointmentOutcome, AppointmentNoSaleReason } from '@prisma/client';
 import BuyerSection from '@/components/sales/BuyerSection';
 import AppointmentInterestSection, { AppointmentInterestDraft } from '@/components/appointments/AppointmentInterestSection';
 import { fromArgDateTimeInputValue, toArgDateTimeInputValue } from '@/lib/timezone';
