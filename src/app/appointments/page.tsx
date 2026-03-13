@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import Breadcrumbs from '@/components/Breadcrumbs';
-import { prisma } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 import type { Metadata } from 'next';
 import FilterableAppointmentsTable from '@/components/appointments/FilterableAppointmentsTable';
 

@@ -2,7 +2,7 @@
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableBuyersTable from '@/components/FilterableBuyersTable'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import type { Metadata } from 'next'
 
 // SEO

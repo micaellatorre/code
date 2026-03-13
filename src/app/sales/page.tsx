@@ -3,7 +3,7 @@ import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableSalesTable from '@/components/FilterableSalesTable'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import type { Metadata } from 'next'
 
 // SEO

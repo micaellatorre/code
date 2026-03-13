@@ -2,7 +2,7 @@ import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import SearchBar from '@/components/SearchBar'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { formatInTimeZone } from 'date-fns-tz'
 import { AR_TIME_ZONE } from '@/lib/timezone'
 

@@ -1,6 +1,6 @@
 import DashboardLayout from '@/components/DashboardLayout'
 import DashboardKpiCard from '@/components/DashboardKpiCard'
-import { prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import type { Metadata } from 'next'
 import { startOfDay, endOfDay } from 'date-fns'
 import { toDate } from 'date-fns-tz'
