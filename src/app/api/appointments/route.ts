@@ -1,6 +1,7 @@
 
 // app/api/appointments/route.ts
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 // GET: lista de todas las citas
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const txResult = await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const tenantId = process.env.DEFAULT_TENANT_ID;
       if (!tenantId) {
         throw new Error("DEFAULT_TENANT_ID no configurado");
@@ -71,15 +72,15 @@ export async function POST(request: Request) {
 
     // Lectura FUERA de la transacción para devolver el objeto completo
     const createdAppointment = await prisma.appointment.findUnique({
-        where: { id: txResult.id },
-        include: {
-            buyer: true,
-            interests: {
-                include: {
-                    product: true,
-                }
-            }
+      where: { id: txResult.id },
+      include: {
+        buyer: true,
+        interests: {
+          include: {
+            product: true,
+          }
         }
+      }
     });
 
     return NextResponse.json(createdAppointment, { status: 201 });
