@@ -27,7 +27,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       select: { modelName: true },
     })
 
-    const copyNumbers = productsWithSameName.map((p) => {
+    const copyNumbers = productsWithSameName.map((p: { modelName: string }) => {
       const match = p.modelName.match(/Copia #(\d+)$/)
       return match ? parseInt(match[1], 10) : 0
     })
