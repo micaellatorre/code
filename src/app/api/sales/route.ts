@@ -130,6 +130,14 @@ export async function POST(request: Request) {
         }
 
         // Crear Sale + Payments
+        const paymentsData = payments.map((p: any) => ({
+          method: p.method,
+          currency: p.currency,
+          amount: new Prisma.Decimal(p.amount),
+          note: p.note,
+          paidAt: p.paidAt ? new Date(p.paidAt) : new Date(),
+        }));
+
         const sale = await tx.sale.create({
           data: {
             tenantId: tenant.id,
@@ -144,13 +152,7 @@ export async function POST(request: Request) {
             total,
             profit,
             payments: {
-              create: payments.map((p: any) => ({
-                method: p.method,
-                currency: p.currency,
-                amount: new Prisma.Decimal(p.amount),
-                note: p.note,
-                paidAt: p.paidAt ? new Date(p.paidAt) : new Date(),
-              })),
+              create: paymentsData,
             },
           },
           select: { id: true },
