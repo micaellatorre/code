@@ -1,6 +1,6 @@
 // src/app/api/buyers/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import prisma from "@/lib/prisma"
 
 type Ctx = { params: Promise<{ id: string }> }
 

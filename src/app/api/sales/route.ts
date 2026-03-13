@@ -1,5 +1,5 @@
 // app/api/sales/route.ts
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { Prisma, SaleItemKind, ProductState } from "@prisma/client";
 
