@@ -1,6 +1,6 @@
 // app/api/appointments/route.ts
 import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../../../prisma/generated/client";
 import { NextResponse } from "next/server";
 
 // GET: lista de todas las citas
