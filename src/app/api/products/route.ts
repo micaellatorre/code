@@ -1,6 +1,6 @@
 // app/api/products/route.ts
 import { prisma } from "@/lib/prisma"
-import { ProductState, ProductType } from "@prisma/client"
+
 import { NextResponse } from "next/server"
 
 const DEFAULT_LIMIT = 50
@@ -31,9 +31,7 @@ function parseOrderBy(v: string | null) {
   }
 }
 
-function isEnumValue<T extends Record<string, string>>(enm: T, v: string | null): v is T[keyof T] {
-  return !!v && Object.values(enm).includes(v as any)
-}
+
 
 /**
  * GET /api/products?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
@@ -61,8 +59,8 @@ export async function GET(request: Request) {
 
     const where: NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"] = { tenantId }
 
-    if (isEnumValue(ProductState, stateParam)) where.state = stateParam as ProductState
-    if (isEnumValue(ProductType, typeParam)) where.type = typeParam as ProductType
+    if (stateParam) where.state = stateParam as any
+    if (typeParam) where.type = typeParam as any
 
     if (q) {
       where.OR = [

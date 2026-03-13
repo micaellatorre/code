@@ -1,7 +1,7 @@
 // app/api/sales/route.ts
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { Prisma, SaleItemKind, ProductState } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 // GET: lista de ventas con items, payments y buyer
 export async function GET() {
@@ -177,7 +177,7 @@ export async function POST(request: Request) {
             data: {
               saleId: sale.id,
               productId: prod.id,
-              kind: raw.kind as SaleItemKind,
+              kind: raw.kind as any,
               units: unitsNum,
               unitPrice,
               unitCost,
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
           });
 
           // Cambiar estado según stock resultante
-          let nextState: ProductState | null = null;
+          let nextState: any = null;
           if (updated.stock < 1 && updated.state !== "FUERA_DE_STOCK") {
             nextState = "FUERA_DE_STOCK";
           } else if (updated.stock >= 1 && updated.state === "FUERA_DE_STOCK") {
@@ -215,7 +215,7 @@ export async function POST(request: Request) {
 
           // Sync snapshot local para consistencia si hubiera más iteraciones
           prod.stock = updated.stock;
-          prod.state = (nextState ?? updated.state) as ProductState;
+          prod.state = (nextState ?? updated.state) as any;
         }
 
         return { saleId: sale.id };
