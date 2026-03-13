@@ -32,40 +32,37 @@ function parseOrderBy(v: string | null) {
   }
 }
 
-type ProductRow = Prisma.ProductGetPayload<{
-  select: {
-    id: true
-    tenantId: true
+// Declare select shape as a const so `typeof PRODUCT_SELECT` is always
+// structurally identical to what findMany receives. This prevents the
+// implicit-any that arises when Prisma 7 fails to unify an inline literal
+// type with the explicit GetPayload annotation.
+const PRODUCT_SELECT = {
+  id: true,
+  tenantId: true,
+  state: true,
+  status: true,
+  type: true,
+  brand: true,
+  modelName: true,
+  imei: true,
+  capacityGB: true,
+  condition: true,
+  color: true,
+  batteryPct: true,
+  purchaseDate: true,
+  location: true,
+  costPrice: true,
+  salePrice: true,
+  shippingCost: true,
+  stockInitial: true,
+  stock: true,
+  stockAvailable: true,
+  notes: true,
+  createdAt: true,
+  updatedAt: true,
+} as const
 
-    state: true
-    status: true
-    type: true
-
-    brand: true
-    modelName: true
-    imei: true
-
-    capacityGB: true
-
-    condition: true
-    color: true
-    batteryPct: true
-    purchaseDate: true
-    location: true
-
-    costPrice: true
-    salePrice: true
-    shippingCost: true
-
-    stockInitial: true
-    stock: true
-    stockAvailable: true
-
-    notes: true
-    createdAt: true
-    updatedAt: true
-  }
-}>
+type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>
 
 /**
  * GET /api/products?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
@@ -93,8 +90,9 @@ export async function GET(request: Request) {
 
     const where: NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"] = { tenantId }
 
-    if (stateParam) where.state = stateParam as any
-    if (typeParam) where.type = typeParam as any
+    // Cast string params to the correct Prisma enum types rather than `any`
+    if (stateParam) where.state = stateParam as Prisma.EnumProductStateFilter["equals"]
+    if (typeParam) where.type = typeParam as Prisma.EnumProductTypeFilter["equals"]
 
     if (q) {
       where.OR = [
@@ -117,52 +115,14 @@ export async function GET(request: Request) {
             skip: 1,
           }
         : {}),
-      select: {
-        id: true,
-        tenantId: true,
-
-        // filters / enums
-        state: true,
-        status: true,
-        type: true,
-
-        // identity
-        brand: true,
-        modelName: true,
-        imei: true,
-
-        // IMPORTANT: include it (this was missing)
-        capacityGB: true,
-
-        // attributes
-        condition: true,
-        color: true,
-        batteryPct: true,
-        purchaseDate: true,
-        location: true,
-
-        // money
-        costPrice: true,
-        salePrice: true,
-        shippingCost: true,
-
-        // stock
-        stockInitial: true,
-        stock: true,
-        stockAvailable: true,
-
-        // misc
-        notes: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: PRODUCT_SELECT,
     })
 
     const hasNextPage = rows.length > limit
-    const page = hasNextPage ? rows.slice(0, limit) : rows
+    const page: ProductRow[] = hasNextPage ? rows.slice(0, limit) : rows
     const nextCursor = hasNextPage ? page[page.length - 1]?.id ?? null : null
 
-    const products = page.map((p) => ({
+    const products = page.map((p: ProductRow) => ({
       id: p.id,
       tenantId: p.tenantId,
 

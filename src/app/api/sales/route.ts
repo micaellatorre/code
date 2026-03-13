@@ -1,7 +1,7 @@
 // app/api/sales/route.ts
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, SaleItemKind, ProductState } from "@prisma/client";
 
 // GET: lista de ventas con items, payments y buyer
 export async function GET() {
@@ -16,9 +16,39 @@ export async function GET() {
   return NextResponse.json(sales);
 }
 
+interface SaleItemInput {
+  productId: string;
+  kind: SaleItemKind;
+  units: number;
+  unitPrice: number | string;
+  extraCost?: number | string;
+}
+
+interface PaymentInput {
+  method: string;
+  currency: string;
+  amount: number | string;
+  note?: string;
+  paidAt?: string;
+}
+
+interface SaleInputBody {
+  date?: string;
+  buyerId?: string;
+  customerName?: string;
+  origin?: string;
+  notes?: string;
+  items: SaleItemInput[];
+  payments: PaymentInput[];
+}
+
+interface ApiError extends Error {
+  statusCode?: number;
+}
+
 // POST: crea una venta y sus items/pagos; descuenta stock y controla estado
 export async function POST(request: Request) {
-  let body: any;
+  let body: SaleInputBody;
   try {
     body = await request.json();
   } catch {
@@ -44,22 +74,22 @@ export async function POST(request: Request) {
 
   try {
     const txResult = await prisma.$transaction(
-      async (tx) => {
+      async (tx: Prisma.TransactionClient) => {
         const tenantId = process.env.DEFAULT_TENANT_ID as string | undefined;
         if (!tenantId) {
-          const err: any = new Error("DEFAULT_TENANT_ID no configurado");
+          const err = new Error("DEFAULT_TENANT_ID no configurado") as ApiError;
           err.statusCode = 500;
           throw err;
         }
         const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });
         if (!tenant) {
-          const err: any = new Error("Tenant no encontrado");
+          const err = new Error("Tenant no encontrado") as ApiError;
           err.statusCode = 500;
           throw err;
         }
 
         // Productos necesarios para validar y calcular
-        const productIds = items.map((it: any) => String(it.productId));
+        const productIds = items.map((it) => String(it.productId));
         const products = await tx.product.findMany({
           where: { id: { in: productIds } },
           select: {
@@ -81,18 +111,18 @@ export async function POST(request: Request) {
         for (const raw of items) {
           const prod = productMap.get(String(raw.productId));
           if (!prod) {
-            const err: any = new Error(
+            const err = new Error(
               `No se encontró el producto ${raw.productId}`
-            );
+            ) as ApiError;
             err.statusCode = 400;
             throw err;
           }
 
           // Stock
           if (prod.stock < raw.units) {
-            const err: any = new Error(
+            const err = new Error(
               `Stock insuficiente para ${prod.modelName}. Disponible: ${prod.stock}, solicitado: ${raw.units}`
-            );
+            ) as ApiError;
             err.statusCode = 409;
             throw err;
           }
@@ -117,22 +147,21 @@ export async function POST(request: Request) {
 
         // Validación de pagos
         const totalPaid = payments.reduce(
-          (acc: Prisma.Decimal, p: any) =>
-            acc.add(new Prisma.Decimal(p.amount)),
+          (acc, p) => acc.add(new Prisma.Decimal(p.amount)),
           new Prisma.Decimal(0)
         );
         if (!totalPaid.equals(total)) {
-          const err: any = new Error(
+          const err = new Error(
             `El total de pagos (${totalPaid}) no coincide con el total de la venta (${total})`
-          );
+          ) as ApiError;
           err.statusCode = 400;
           throw err;
         }
 
         // Crear Sale + Payments
-        const paymentsData = payments.map((p: any) => ({
-          method: p.method,
-          currency: p.currency,
+        const paymentsData = payments.map((p) => ({
+          method: p.method as any, // Cast necessary if method is string but Enum type required
+          currency: p.currency as any,
           amount: new Prisma.Decimal(p.amount),
           note: p.note,
           paidAt: p.paidAt ? new Date(p.paidAt) : new Date(),
@@ -179,7 +208,7 @@ export async function POST(request: Request) {
             data: {
               saleId: sale.id,
               productId: prod.id,
-              kind: raw.kind as any,
+              kind: raw.kind,
               units: unitsNum,
               unitPrice,
               unitCost,
@@ -201,7 +230,7 @@ export async function POST(request: Request) {
           });
 
           // Cambiar estado según stock resultante
-          let nextState: any = null;
+          let nextState: ProductState | null = null;
           if (updated.stock < 1 && updated.state !== "FUERA_DE_STOCK") {
             nextState = "FUERA_DE_STOCK";
           } else if (updated.stock >= 1 && updated.state === "FUERA_DE_STOCK") {
@@ -217,7 +246,7 @@ export async function POST(request: Request) {
 
           // Sync snapshot local para consistencia si hubiera más iteraciones
           prod.stock = updated.stock;
-          prod.state = (nextState ?? updated.state) as any;
+          prod.state = nextState ?? updated.state;
         }
 
         return { saleId: sale.id };
@@ -238,9 +267,10 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(created, { status: 201 });
-  } catch (err: any) {
-    if (err?.statusCode) {
-      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+  } catch (err: unknown) {
+    const error = err as ApiError;
+    if (error.statusCode) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
     return NextResponse.json({ error: "Error creating sale" }, { status: 500 });
   }

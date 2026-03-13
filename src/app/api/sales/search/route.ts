@@ -1,27 +1,27 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 // GET /api/sales/search?q=term
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q')?.trim()
 
-  // Build a flexible where clause that searches customerName and id,
-  // and also attempts to match by date if the query looks like a date.
-  const where: any = {}
+  const orClauses: Prisma.SaleWhereInput['OR'] = []
+
   if (q) {
-    const or: any[] = [
+    orClauses.push(
       { customerName: { contains: q, mode: 'insensitive' } },
-      { id: { contains: q } },
-    ]
+      { id: { contains: q } }
+    )
     // Try parse date-like queries (ISO or simple YYYY-MM-DD)
     const parsed = Date.parse(q)
     if (!Number.isNaN(parsed)) {
-      const iso = new Date(parsed).toISOString()
-      or.push({ date: { equals: new Date(parsed) } })
+      orClauses.push({ date: { equals: new Date(parsed) } })
     }
-    where.OR = or
   }
+
+  const where: Prisma.SaleWhereInput = q && orClauses.length > 0 ? { OR: orClauses } : {}
 
   const results = await prisma.sale.findMany({ where, orderBy: { date: 'desc' }, take: 200 })
 

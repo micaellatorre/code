@@ -9,7 +9,6 @@ const ALLOWED_FIELDS = new Set<string>([
   "date",
   "customerName",
   "origin",
-  "payment",
   "notes",
   "subtotal",
   "extraCosts",
@@ -21,7 +20,7 @@ const ALLOWED_FIELDS = new Set<string>([
 
 type Ctx = { params: Promise<{ id: string }> }
 
-function toDecimal(v: any): Prisma.Decimal | null {
+function toDecimal(v: unknown): Prisma.Decimal | null {
   if (v == null) return null
   const n = typeof v === "number" ? v : parseFloat(String(v))
   if (!Number.isFinite(n)) return null
@@ -46,14 +45,15 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
       await tx.sale.delete({ where: { id } })
     })
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "DELETE failed" }, { status: 500 })
+  } catch (e: unknown) {
+    const error = e as Error
+    return NextResponse.json({ error: error?.message ?? "DELETE failed" }, { status: 500 })
   }
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { id } = await params
-  const body = await req.json().catch(() => ({} as any))
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
 
   const keys = Object.keys(body || {})
   if (keys.length === 0) return NextResponse.json({ error: "Empty body" }, { status: 400 })
@@ -61,9 +61,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Some fields are not allowed" }, { status: 400 })
   }
 
-  if (body.buyer && typeof body.buyer === "object") {
-    const name = (body.buyer.name ?? "").trim()
-    const surname = (body.buyer.surname ?? "").trim()
+  const buyerObj = body.buyer as Record<string, string> | undefined
+  if (buyerObj && typeof buyerObj === "object") {
+    const name = (buyerObj.name ?? "").trim()
+    const surname = (buyerObj.surname ?? "").trim()
 
     try {
       const updated = await prisma.sale.update({
@@ -84,12 +85,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         include: { buyer: true, items: { include: { product: true } } },
       })
       return NextResponse.json({ sale: updated })
-    } catch (e: any) {
-      return NextResponse.json({ error: e?.message ?? "PATCH failed" }, { status: 500 })
+    } catch (e: unknown) {
+      const error = e as Error
+      return NextResponse.json({ error: error?.message ?? "PATCH failed" }, { status: 500 })
     }
   }
 
-  const data: any = {}
+  const data: Record<string, unknown> = {}
   for (const k of keys) {
     const v = body[k]
     if (DECIMAL_FIELDS.has(k)) {
@@ -97,7 +99,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       continue
     }
     if (k === "date") {
-      data[k] = v == null ? null : new Date(v)
+      data[k] = v == null ? null : new Date(v as string | number)
       continue
     }
     data[k] = v ?? null
@@ -110,7 +112,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       include: { buyer: true, items: { include: { product: true } } },
     })
     return NextResponse.json({ sale: updated })
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "PATCH failed" }, { status: 500 })
+  } catch (e: unknown) {
+    const error = e as Error
+    return NextResponse.json({ error: error?.message ?? "PATCH failed" }, { status: 500 })
   }
 }

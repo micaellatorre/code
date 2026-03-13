@@ -1,6 +1,6 @@
-
 // app/api/appointments/route.ts
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 // GET: lista de todas las citas
@@ -17,7 +17,13 @@ export async function GET() {
 
 // POST: crea una nueva cita
 export async function POST(request: Request) {
-  let body: any;
+  let body: {
+    buyerId?: string;
+    scheduledAt?: string;
+    durationMinutes?: number | string;
+    notes?: string;
+    interests?: { productId: string; notes?: string; priority?: number }[];
+  };
   try {
     body = await request.json();
   } catch {
@@ -41,33 +47,38 @@ export async function POST(request: Request) {
   }
 
   try {
-    const txResult = await prisma.$transaction(async (tx: any) => {
-      const tenantId = process.env.DEFAULT_TENANT_ID;
-      if (!tenantId) {
-        throw new Error("DEFAULT_TENANT_ID no configurado");
-      }
+    const txResult = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const tenantId = process.env.DEFAULT_TENANT_ID;
+        if (!tenantId) {
+          throw new Error("DEFAULT_TENANT_ID no configurado");
+        }
 
-      const appointment = await tx.appointment.create({
-        data: {
-          tenantId,
-          buyerId,
-          scheduledAt: new Date(scheduledAt),
-          durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : null,
-          resultNotes: notes || null,
-          status: 'PROGRAMADA',
-          outcome: 'PENDIENTE',
-          interests: {
-            create: interests?.map((interest: any) => ({
-              productId: interest.productId,
-              notes: interest.notes,
-              priority: interest.priority,
-            })) || [],
+        const appointment = await tx.appointment.create({
+          data: {
+            tenantId,
+            buyerId,
+            scheduledAt: new Date(scheduledAt),
+            durationMinutes: durationMinutes
+              ? parseInt(String(durationMinutes), 10)
+              : null,
+            resultNotes: notes || null,
+            status: "PROGRAMADA",
+            outcome: "PENDIENTE",
+            interests: {
+              create:
+                interests?.map((interest) => ({
+                  productId: interest.productId,
+                  notes: interest.notes,
+                  priority: interest.priority,
+                })) || [],
+            },
           },
-        },
-      });
+        });
 
-      return appointment;
-    });
+        return appointment;
+      }
+    );
 
     // Lectura FUERA de la transacción para devolver el objeto completo
     const createdAppointment = await prisma.appointment.findUnique({
@@ -77,15 +88,15 @@ export async function POST(request: Request) {
         interests: {
           include: {
             product: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     return NextResponse.json(createdAppointment, { status: 201 });
-
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al crear la cita";
     console.error("Error creating appointment:", err);
-    return NextResponse.json({ error: err.message || "Error al crear la cita" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

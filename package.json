@@ -11,8 +11,11 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:seed": "prisma db seed",
-    "seed:manual": "ts-node prisma/seed.ts",
+    "seed:manual": "node dist/seed.js",
     "db:fix:numerics": "node prisma/fixNumerics.js"
+  },
+  "prisma": {
+    "seed": "node dist/seed.js"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

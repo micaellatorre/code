@@ -5,10 +5,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const client_1 = require("@prisma/client");
+const adapter_pg_1 = require("@prisma/adapter-pg");
+const pg_1 = require("pg");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const sync_1 = require("csv-parse/sync");
-const prisma = new client_1.PrismaClient();
+const _pool = new pg_1.Pool({ connectionString: process.env.DATABASE_URL });
+const _adapter = new adapter_pg_1.PrismaPg(_pool);
+const prisma = new client_1.PrismaClient({ adapter: _adapter });
 // === Ajustá esta ruta si movés los CSV ===
 // Asumiendo: code/prisma/seed.ts → CSVs en ../../excel_to_csv
 const CSV_DIR = path_1.default.join(__dirname, '..', '..', 'excel_to_csv');
@@ -172,7 +176,7 @@ async function importIphones(tenantId) {
                 data: {
                     purchaseDate, costPrice, salePrice, shippingCost, stock,
                     batteryPct,
-                    status: 'ACTIVE',
+                    status: 'AVAILABLE',
                 },
             });
             updated++;
@@ -192,7 +196,7 @@ async function importIphones(tenantId) {
                     costPrice,
                     salePrice,
                     shippingCost,
-                    status: 'ACTIVE',
+                    status: 'AVAILABLE',
                     stock,
                 },
             });
@@ -220,7 +224,7 @@ async function importAccesorios(tenantId) {
         if (exists) {
             await prisma.product.update({
                 where: { id: exists.id },
-                data: { purchaseDate, costPrice, salePrice, stock, status: 'ACTIVE' },
+                data: { purchaseDate, costPrice, salePrice, stock, status: 'AVAILABLE' },
             });
             updated++;
         }
@@ -238,7 +242,7 @@ async function importAccesorios(tenantId) {
                     costPrice,
                     salePrice,
                     shippingCost: null,
-                    status: 'ACTIVE',
+                    status: 'AVAILABLE',
                     stock,
                 },
             });
@@ -409,8 +413,8 @@ async function importSales(tenantId) {
                 date,
                 customerName,
                 origin,
-                payment,
                 subtotal: lineTotal,
+                costTotal: lineCost,
                 extraCosts: (num(extraCost) * units).toFixed(2),
                 total: lineTotal,
                 profit: lineProfit,
@@ -430,7 +434,7 @@ async function importSales(tenantId) {
                     color,
                     costPrice: unitCost,
                     salePrice: unitPrice,
-                    status: 'ACTIVE',
+                    status: 'AVAILABLE',
                     stock: 0,
                 },
             })).id;
