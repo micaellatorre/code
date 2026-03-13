@@ -1,5 +1,6 @@
 // app/api/products/route.ts
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 
 import { NextResponse } from "next/server"
 
@@ -31,7 +32,40 @@ function parseOrderBy(v: string | null) {
   }
 }
 
+type ProductRow = Prisma.ProductGetPayload<{
+  select: {
+    id: true
+    tenantId: true
 
+    state: true
+    status: true
+    type: true
+
+    brand: true
+    modelName: true
+    imei: true
+
+    capacityGB: true
+
+    condition: true
+    color: true
+    batteryPct: true
+    purchaseDate: true
+    location: true
+
+    costPrice: true
+    salePrice: true
+    shippingCost: true
+
+    stockInitial: true
+    stock: true
+    stockAvailable: true
+
+    notes: true
+    createdAt: true
+    updatedAt: true
+  }
+}>
 
 /**
  * GET /api/products?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
@@ -73,7 +107,7 @@ export async function GET(request: Request) {
     // IMPORTANT: count must match same filters (where)
     const totalProducts = await prisma.product.count({ where })
 
-    const rows = await prisma.product.findMany({
+    const rows: ProductRow[] = await prisma.product.findMany({
       where,
       orderBy,
       take: limit + 1,
@@ -185,12 +219,12 @@ export async function POST(request: Request) {
     // Keep POST response consistent with your client shape if you want
     const serialized = {
       ...product,
-      costPrice: (product as any).costPrice != null ? String((product as any).costPrice) : null,
-      salePrice: (product as any).salePrice != null ? String((product as any).salePrice) : null,
-      shippingCost: (product as any).shippingCost != null ? String((product as any).shippingCost) : null,
-      purchaseDate: (product as any).purchaseDate ? new Date((product as any).purchaseDate).toISOString() : null,
-      createdAt: (product as any).createdAt ? new Date((product as any).createdAt).toISOString() : null,
-      updatedAt: (product as any).updatedAt ? new Date((product as any).updatedAt).toISOString() : null,
+      costPrice: product.costPrice != null ? String(product.costPrice) : null,
+      salePrice: product.salePrice != null ? String(product.salePrice) : null,
+      shippingCost: product.shippingCost != null ? String(product.shippingCost) : null,
+      purchaseDate: product.purchaseDate ? product.purchaseDate.toISOString() : null,
+      createdAt: product.createdAt ? product.createdAt.toISOString() : null,
+      updatedAt: product.updatedAt ? product.updatedAt.toISOString() : null,
     }
 
     return NextResponse.json(serialized, { status: 201 })
