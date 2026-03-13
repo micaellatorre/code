@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { AppointmentStatus, AppointmentOutcome } from '@prisma/client';
+import type { AppointmentStatus, AppointmentOutcome } from '../../../prisma/generated/client';
 import { useRouter } from 'next/navigation';
 import { formatInTimeZone } from 'date-fns-tz'
 import { AR_TIME_ZONE } from '@/lib/timezone'

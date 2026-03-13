@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import Breadcrumbs from '@/components/Breadcrumbs';
-import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from '@prisma/client';
+import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from '../../../../prisma/generated/client';
 
 // --- TYPE DEFINITIONS ---
 // These types will be used by the child components.
