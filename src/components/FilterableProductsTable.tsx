@@ -13,6 +13,8 @@ import {
   PencilIcon,
   TrashIcon,
   DocumentDuplicateIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/solid"
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from "@/lib/timezone"
@@ -130,6 +132,7 @@ export default function FilterableProductsTable() {
   const [isTableExpanded, setIsTableExpanded] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const [showCostColumn, setShowCostColumn] = useState(true)
 
   // editing state
   const [editingFields, setEditingFields] = useState<Record<string, Record<string, string>>>({})
@@ -952,45 +955,47 @@ export default function FilterableProductsTable() {
           )}
         </td>
 
-        <td>
-          {isEditing(p.id, "costPrice") ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-base-content/50">$ </span>
-              <input
-                autoFocus
-                type="number"
-                step="0.01"
-                min={0}
-                value={getEditingValue(p.id, "costPrice")}
-                onChange={(e) => updateEditingValue(p.id, "costPrice", e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitEditField(p.id, "costPrice")
-                  if (e.key === "Escape") cancelEditField(p.id, "costPrice")
-                }}
-                onBlur={() => commitEditField(p.id, "costPrice")}
-                className="input input-xs w-24"
-                disabled={savingField?.productId === p.id && savingField?.fieldName === "costPrice"}
-              />
-              <div className="flex flex-col join join-horizontal border border-base-content/10">
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "costPrice")}>
-                  <CheckIcon className="h-[1em]" />
-                </button>
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "costPrice")}>
-                  <XMarkIcon className="h-[1em]" />
-                </button>
+        {showCostColumn ? (
+          <td>
+            {isEditing(p.id, "costPrice") ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-base-content/50">$ </span>
+                <input
+                  autoFocus
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={getEditingValue(p.id, "costPrice")}
+                  onChange={(e) => updateEditingValue(p.id, "costPrice", e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEditField(p.id, "costPrice")
+                    if (e.key === "Escape") cancelEditField(p.id, "costPrice")
+                  }}
+                  onBlur={() => commitEditField(p.id, "costPrice")}
+                  className="input input-xs w-24"
+                  disabled={savingField?.productId === p.id && savingField?.fieldName === "costPrice"}
+                />
+                <div className="flex flex-col join join-horizontal border border-base-content/10">
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "costPrice")}>
+                    <CheckIcon className="h-[1em]" />
+                  </button>
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "costPrice")}>
+                    <XMarkIcon className="h-[1em]" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "costPrice", p.costPrice)}
-              title="Click para editar"
-            >
-              <span className="text-xs text-base-content/50">$ </span>
-              {formatDecimal((p as any).costPrice)}
-            </span>
-          )}
-        </td>
+            ) : (
+              <span
+                className="cursor-pointer hover:bg-base-200 rounded px-1"
+                onClick={() => startEditField(p.id, "costPrice", p.costPrice)}
+                title="Click para editar"
+              >
+                <span className="text-xs text-base-content/50">$ </span>
+                {formatDecimal((p as any).costPrice)}
+              </span>
+            )}
+          </td>
+        ) : null}
 
         <td>
           {isEditing(p.id, "salePrice") ? (
@@ -1189,6 +1194,7 @@ export default function FilterableProductsTable() {
             {deletingId === p.id ? <span className="loading loading-bars loading-xs"></span> : <TrashIcon className="size-[1.2em]" />}
           </button>
         </td>
+        <td></td>
       </tr>
     )
   }
@@ -1603,12 +1609,23 @@ export default function FilterableProductsTable() {
                 <th>Color</th>
                 <th>Capacidad (GB)</th>
                 <th>Condición</th>
-                <th>Costo (USD)</th>
+                {showCostColumn ? <th>Costo (USD)</th> : null}
                 <th>Precio Venta (USD)</th>
                 <th>Stock Inicial</th>
                 <th>Stock</th>
                 <th>Estado</th>
                 <th>Acciones</th>
+                <th className="text-right">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs"
+                    onClick={() => setShowCostColumn((prev) => !prev)}
+                    title={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
+                    aria-label={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
+                  >
+                    {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody key="filtered-products" className="h-full">
@@ -1626,9 +1643,20 @@ export default function FilterableProductsTable() {
                 <th>Items</th>
                 <th>Stock</th>
                 <th>Disponible</th>
-                <th>Costo (USD)</th>
+                {showCostColumn ? <th>Costo (USD)</th> : null}
                 <th>Precio Venta (USD)</th>
                 <th className="text-right">Último agregado</th>
+                <th className="text-right">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs"
+                    onClick={() => setShowCostColumn((prev) => !prev)}
+                    title={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
+                    aria-label={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
+                  >
+                    {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody className="h-full">
@@ -1665,20 +1693,23 @@ export default function FilterableProductsTable() {
                       </td>
                       <td>{g.stockSum}</td>
                       <td>{g.availSum}</td>
-                      <td>
-                        <span className="text-xs text-base-content/50">$ </span>
-                        {costLabel}
-                      </td>
+                      {showCostColumn ? (
+                        <td>
+                          <span className="text-xs text-base-content/50">$ </span>
+                          {costLabel}
+                        </td>
+                      ) : null}
                       <td>
                         <span className="text-xs text-base-content/50">$ </span>
                         {saleLabel}
                       </td>
                       <td className="text-right text-xs text-base-content/60">{last}</td>
+                      <td></td>
                     </tr>
 
                     {isOpen ? (
                       <tr key={`group-body-${g.key}`}>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={showCostColumn ? 9 : 8} className="p-0">
                           <div className="bg-base-100 border-t border-base-content/5">
                             <div className="px-3 py-2 text-xs text-base-content/60 flex items-center justify-between">
                               <span>
@@ -1700,12 +1731,23 @@ export default function FilterableProductsTable() {
                                     <th>Color</th>
                                     <th>Capacidad (GB)</th>
                                     <th>Condición</th>
-                                    <th>Costo (USD)</th>
+                                    {showCostColumn ? <th>Costo (USD)</th> : null}
                                     <th>Precio Venta (USD)</th>
                                     <th>Stock Inicial</th>
                                     <th>Stock</th>
                                     <th>Estado</th>
                                     <th>Acciones</th>
+                                    <th className="text-right">
+                                      <button
+                                        type="button"
+                                        className="btn btn-ghost btn-xs"
+                                        onClick={() => setShowCostColumn((prev) => !prev)}
+                                        title={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
+                                        aria-label={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
+                                      >
+                                        {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                                      </button>
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
