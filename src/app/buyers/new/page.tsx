@@ -70,7 +70,7 @@ export default function NewClientPage() {
   }
 
   return (
-    <DashboardLayout activeTab="buyers">
+    <DashboardLayout >
       <Breadcrumbs
         items={[
           { label: 'Inicio', href: '/' },

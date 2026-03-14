@@ -13,7 +13,7 @@ import { AR_TIME_ZONE } from '@/lib/timezone'
 export default async function WholesaleOrdersPage() {
   const orders = await prisma.wholesaleOrder.findMany({ orderBy: { requestedAt: 'desc' } })
   return (
-    <DashboardLayout activeTab="wholesale-orders">
+    <DashboardLayout>
       {/* Breadcrumbs de navegación */}
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Pedidos Mayoristas' }]} />
       <div className="flex flex-col gap-4">

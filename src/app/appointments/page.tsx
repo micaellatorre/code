@@ -49,7 +49,7 @@ export default async function AppointmentsPage() {
   }));
 
   return (
-    <DashboardLayout activeTab="appointments">
+    <DashboardLayout >
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Citas' }]} />
       <div className="flex justify-end mb-4">
         <Link href="/appointments/new" className="btn btn-primary">

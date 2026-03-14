@@ -88,7 +88,7 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
 
   if (isLoading) {
     return (
-      <DashboardLayout activeTab="buyers">
+      <DashboardLayout >
         <div className="flex justify-center items-center h-full">
           <span className="loading loading-spinner loading-lg"></span>
         </div>
@@ -101,7 +101,7 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <DashboardLayout activeTab="buyers">
+    <DashboardLayout >
       <Breadcrumbs
         items={[
           { label: 'Inicio', href: '/' },

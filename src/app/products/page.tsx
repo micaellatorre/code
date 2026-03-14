@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function ProductsPage() {
   return (
-    <DashboardLayout activeTab="products">
+    <DashboardLayout >
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Productos' }]} />
       <div className="flex flex-col gap-4 h-full">
         <FilterableProductsTable />

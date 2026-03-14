@@ -90,7 +90,7 @@ export default async function SalesPage() {
   }))
 
   return (
-    <DashboardLayout activeTab="sales">
+    <DashboardLayout >
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Ventas' }]} />
       <div className="flex flex-col gap-4">
         <FilterableSalesTable initial={serialized} />

@@ -104,7 +104,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
 
   if (loading) {
     return (
-      <DashboardLayout activeTab="products">
+      <DashboardLayout >
         <div className="flex justify-center items-center py-10">
           <span className="loading loading-spinner loading-lg"></span>
         </div>
@@ -113,7 +113,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
   }
 
   return (
-    <DashboardLayout activeTab="products">
+    <DashboardLayout >
       {/* Breadcrumbs de navegación */}
       <Breadcrumbs
         items={[

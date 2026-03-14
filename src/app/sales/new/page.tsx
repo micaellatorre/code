@@ -150,7 +150,7 @@ export default function NewSalePage() {
   };
 
   return (
-    <DashboardLayout activeTab="sales">
+    <DashboardLayout >
       <Breadcrumbs
         items={[
           { label: 'Inicio', href: '/' },

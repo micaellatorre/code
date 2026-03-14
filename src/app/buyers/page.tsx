@@ -41,7 +41,7 @@ export default async function ClientsPage() {
   }))
 
   return (
-    <DashboardLayout activeTab="buyers">
+    <DashboardLayout >
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Clientes' }]} />
       <div className="flex flex-col gap-4">
         <FilterableBuyersTable initial={serialized} />

@@ -96,7 +96,7 @@ export default function NewPurchasePage() {
   }
 
   return (
-    <DashboardLayout activeTab="purchases">
+    <DashboardLayout >
       {/* Breadcrumbs de navegación */}
       <Breadcrumbs
         items={[

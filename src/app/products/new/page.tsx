@@ -68,7 +68,7 @@ export default function NewProductPage() {
     }
   }
   return (
-    <DashboardLayout activeTab="products">
+    <DashboardLayout >
       {/* Breadcrumbs de navegación */}
       <Breadcrumbs
         items={[

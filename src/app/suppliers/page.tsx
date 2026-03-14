@@ -11,7 +11,7 @@ import prisma from '@/lib/prisma'
 export default async function SuppliersPage() {
   const suppliers = await prisma.supplier.findMany({ orderBy: { name: 'asc' } })
   return (
-    <DashboardLayout activeTab="suppliers">
+    <DashboardLayout >
       {/* Breadcrumbs de navegación */}
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Proveedores' }]} />
       <div className="flex flex-col gap-4">

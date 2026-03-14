@@ -114,15 +114,15 @@ export default function EditAppointmentPage() {
   };
 
   if (isLoading) {
-    return <DashboardLayout activeTab="appointments"><div className="flex justify-center items-center h-full"><span className="loading loading-lg"></span></div></DashboardLayout>;
+    return <DashboardLayout ><div className="flex justify-center items-center h-full"><span className="loading loading-lg"></span></div></DashboardLayout>;
   }
 
   if (error && !appointment) {
-    return <DashboardLayout activeTab="appointments"><div className="alert alert-error">{error}</div></DashboardLayout>;
+    return <DashboardLayout ><div className="alert alert-error">{error}</div></DashboardLayout>;
   }
 
   return (
-    <DashboardLayout activeTab="appointments">
+    <DashboardLayout >
       <Breadcrumbs
         items={[
           { label: 'Inicio', href: '/' },

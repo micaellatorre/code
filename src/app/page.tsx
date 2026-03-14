@@ -74,7 +74,7 @@ export default async function HomePage() {
   const gananciaDia = salesToday.reduce((acc, s) => acc + Number(s.profit), 0)
 
   return (
-    <DashboardLayout activeTab="dashboard">
+    <DashboardLayout >
       <h1 className="text-2xl font-bold mb-4">Panel de Control</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <DashboardKpiCard title="Productos" value={totalProducts} />

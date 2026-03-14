@@ -16,7 +16,7 @@ export default async function PurchasesPage() {
     orderBy: { date: 'desc' },
   })
   return (
-    <DashboardLayout activeTab="purchases">
+    <DashboardLayout >
       {/* Breadcrumbs de navegación */}
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Compras' }]} />
       <div className="flex flex-col gap-4">

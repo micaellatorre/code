@@ -202,14 +202,14 @@ export default function EditSalePage() {
 
   if (loading) {
     return (
-      <DashboardLayout activeTab="sales">
+      <DashboardLayout >
         <div className="p-6">Cargando venta…</div>
       </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout activeTab="sales">
+    <DashboardLayout >
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },

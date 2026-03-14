@@ -67,7 +67,7 @@ export default function NewAppointmentPage() {
   };
 
   return (
-    <DashboardLayout activeTab="appointments">
+    <DashboardLayout >
       <Breadcrumbs
         items={[
           { label: 'Inicio', href: '/' },

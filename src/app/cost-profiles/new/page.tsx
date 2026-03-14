@@ -64,7 +64,7 @@ export default function NewCostProfilePage() {
   }
 
   return (
-    <DashboardLayout activeTab="cost-profiles">
+    <DashboardLayout >
       {/* Breadcrumbs de navegación */}
       <Breadcrumbs
         items={[

@@ -11,7 +11,7 @@ import prisma from '@/lib/prisma'
 export default async function CostProfilesPage() {
   const profiles = await prisma.costProfile.findMany({ orderBy: { name: 'asc' } })
   return (
-    <DashboardLayout activeTab="cost-profiles">
+    <DashboardLayout >
       {/* Breadcrumbs para indicar la ruta actual */}
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Perfiles de Costo' }]} />
       <div className="flex flex-col gap-4">
