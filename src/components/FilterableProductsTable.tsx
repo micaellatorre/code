@@ -142,7 +142,7 @@ export default function FilterableProductsTable() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [limit] = useState<number>(100)
   const [orderBy, setOrderBy] = useState("created_desc")
-  
+
   // Reset pagination when server-backed filters change
   useEffect(() => {
     setCursor(null)
@@ -1264,7 +1264,6 @@ export default function FilterableProductsTable() {
               </button>
             ) : null}
           </div>
-
           <button
             type="button"
             className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
@@ -1305,14 +1304,12 @@ export default function FilterableProductsTable() {
             <FunnelIcon className="w-5 h-5" />
             Filtros
           </button>
-          <div className="flex items-center gap-2 mx-4"> 
-            <span className="text-sm font-medium whitespace-nowrap">Ordenar por:</span>
-
+          <div className="flex flex-col items-start gap-1 mx-4 relative mt-2">
+            <span className="text-xs font-medium text-base-content/30 whitespace-nowrap absolute -top-5">Ordenar por:</span>
             <select
               className="select select-bordered select-sm"
               value={orderBy}
-              onChange={(e) => setOrderBy(e.target.value)}
-            >
+              onChange={(e) => setOrderBy(e.target.value)}>
               <option value="alpha_asc">Alfabético A-Z</option>
               <option value="alpha_desc">Alfabético Z-A</option>
               <option value="created_desc">Más Nuevos Creados</option>
@@ -1321,6 +1318,22 @@ export default function FilterableProductsTable() {
               <option value="updated_asc">Más Viejos Modificados</option>
             </select>
           </div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => clearFilters()}>
+            Limpiar
+          </button>
+          {hasNext ? (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              disabled={isLoading}
+              onClick={() => setCursor(data?.nextCursor ?? null)}
+              title="Cargar más"
+            >
+              {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Cargar más"}
+            </button>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-4">
           {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) && (
             <div className="flex items-center gap-2">
               {brandFilter && (
@@ -1382,22 +1395,6 @@ export default function FilterableProductsTable() {
               )}
             </div>
           )}
-
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => clearFilters()}>
-            Limpiar
-          </button>
-
-          {hasNext ? (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              disabled={isLoading}
-              onClick={() => setCursor(data?.nextCursor ?? null)}
-              title="Cargar más"
-            >
-              {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Cargar más"}
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -1419,7 +1416,7 @@ export default function FilterableProductsTable() {
               </div>
 
               <div className="flex flex-col gap-4">
-                <div className="form-control">
+                <div className="form-control relative">
                   <label className="label">
                     <span className="label-text font-semibold">Condición</span>
                   </label>
@@ -1434,13 +1431,14 @@ export default function FilterableProductsTable() {
                       ))}
                   </select>
                   {conditionFilter && (
-                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setConditionFilter("")}>
-                      Limpiar
+                      <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setConditionFilter("")}>
+                        <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                        ✕
                     </button>
                   )}
                 </div>
 
-                <div className="form-control">
+                <div className="form-control relative">
                   <label className="label">
                     <span className="label-text font-semibold">Batería (%)</span>
                   </label>
@@ -1475,19 +1473,19 @@ export default function FilterableProductsTable() {
                     </div>
                   </div>
                   {(batteryMin || batteryMax) && (
-                    <button
-                      className="btn btn-ghost btn-xs mt-1"
+                    <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1"
                       onClick={() => {
                         setBatteryMin("")
                         setBatteryMax("")
                       }}
                     >
-                      Limpiar
+                      <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                      ✕
                     </button>
                   )}
                 </div>
 
-                <div className="form-control">
+                <div className="form-control relative">
                   <label className="label">
                     <span className="label-text font-semibold">Color</span>
                   </label>
@@ -1500,13 +1498,14 @@ export default function FilterableProductsTable() {
                     ))}
                   </select>
                   {colorFilter && (
-                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setColorFilter("")}>
-                      Limpiar
-                    </button>
+                      <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setColorFilter("")}>
+                        <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                        ✕
+                      </button>
                   )}
                 </div>
 
-                <div className="form-control">
+                <div className="form-control relative">
                   <label className="label">
                     <span className="label-text font-semibold">Capacidad (GB)</span>
                   </label>
@@ -1519,29 +1518,33 @@ export default function FilterableProductsTable() {
                     ))}
                   </select>
                   {capacityFilter && (
-                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setCapacityFilter("")}>
-                      Limpiar
+                      <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setCapacityFilter("")}>
+                        <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                        ✕
                     </button>
                   )}
                 </div>
 
-                <div className="form-control">
+                <div className="form-control relative">
                   <label className="label">
                     <span className="label-text font-semibold">Estado</span>
                   </label>
-                  <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="select select-bordered select-sm">
-                    <option value="">Todos los estados</option>
-                    {stateOptions.map((s) => (
-                      <option key={s} value={s}>
-                        {stateLabelMap[s] ?? s}
-                      </option>
-                    ))}
-                  </select>
-                  {stateFilter && (
-                    <button className="btn btn-ghost btn-xs mt-1" onClick={() => setStateFilter("")}>
-                      Limpiar
-                    </button>
-                  )}
+                  <div className="form-control">
+                    <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="select select-sm bg-base-100 border-[0.1em] border-base-content/10">
+                      <option value="">Todos los estados</option>
+                      {stateOptions.map((s) => (
+                        <option key={s} value={s}>
+                          {stateLabelMap[s] ?? s}
+                        </option>
+                      ))}
+                    </select>
+                    {stateFilter && (
+                      <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setStateFilter("")}>
+                        <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="divider"></div>
@@ -1594,7 +1597,7 @@ export default function FilterableProductsTable() {
                 <th>Acciones</th>
               </tr>
             </thead>
-            <tbody className="h-full">
+            <tbody key="filtered-products" className="h-full">
               {filteredProducts.map((p) => (
                 <ProductRow key={p.id} p={p} />
               ))}
