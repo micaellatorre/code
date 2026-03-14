@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import React, { useMemo, useState, useEffect } from "react"
 import useSWR from "swr"
 import Link from "next/link"
 import {
@@ -111,7 +111,7 @@ function newestCreatedAt(items: SerializedProduct[]) {
 }
 
 export default function FilterableProductsTable() {
-  const [viewMode, setViewMode] = useState<"DETAIL" | "GENERAL">("DETAIL")
+  const [viewMode, setViewMode] = useState<"DETAIL" | "GENERAL">("GENERAL")
 
   // server-backed filters (hit the API)
   const [search, setSearch] = useState("")
@@ -1318,6 +1318,20 @@ export default function FilterableProductsTable() {
               <option value="updated_asc">Más Viejos Modificados</option>
             </select>
           </div>
+          <div className="flex flex-col items-start gap-1 mx-4 relative mt-2">
+            <span className="text-xs font-medium text-base-content/30 whitespace-nowrap absolute -top-5">Estado:</span>
+            <select
+              className="select select-bordered select-sm"
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value)}>
+              <option value="">Todos los estados</option>
+              {stateOptions.map((s) => (
+                <option key={s} value={s}>
+                  {stateLabelMap[s] ?? s}
+                </option>
+              ))}
+            </select>
+          </div>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => clearFilters()}>
             Limpiar
           </button>
@@ -1625,7 +1639,7 @@ export default function FilterableProductsTable() {
                 const saleLabel = rangeLabelFromItems(g.items, "salePrice")
 
                 return (
-                  <>
+                  <React.Fragment key={g.key}>
                     <tr
                       key={`group-${g.key}`}
                       className="cursor-pointer hover:bg-base-200/50"
@@ -1708,7 +1722,7 @@ export default function FilterableProductsTable() {
                         </td>
                       </tr>
                     ) : null}
-                  </>
+                  </React.Fragment>
                 )
               })}
             </tbody>
