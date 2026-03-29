@@ -11,6 +11,7 @@ import {
   MoonIcon,
 } from "@heroicons/react/24/solid"
 import { signIn, signOut, useSession } from "next-auth/react"
+import UserSessionMenu from "./UserSessionMenu"
 
 export default function Navbar({
   onToggleSidebar,
@@ -167,25 +168,20 @@ export default function Navbar({
               ))}
             </ul>
           </div>
-
-          <div>
-            {status === "loading" ? (
-              <span className="text-sm opacity-70">Cargando...</span>
-            ) : session?.user ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden md:inline text-sm font-medium">
-                  {session.user.email}
-                </span>
-                <button className="btn btn-sm border-0 shadow-none bg-base-200" onClick={() => signOut()}>
-                  Cerrar sesión
-                </button>
-              </div>
-            ) : (
-              <button className="btn btn-sm border-0 shadow-none bg-base-200" onClick={() => signIn("google")}>
-                Ingresar con Google
-              </button>
-            )}
-          </div>
+          {session?.user?.isSimulatingRole ? (
+            <div className="hidden md:flex items-center px-3 py-1 rounded-full bg-warning/20 text-warning-content text-xs font-medium border border-warning/30">
+              Navegando como: {session.user.activeRole}
+            </div>
+          ) : null}
+          {status === "loading" ? (
+            <span className="text-sm opacity-70">Cargando...</span>
+          ) : session?.user ? (
+            <UserSessionMenu />
+          ) : (
+            <button className="btn btn-sm border-0 shadow-none bg-base-200" onClick={() => signIn("google")}>
+              Ingresar con Google
+            </button>
+          )}
         </div>
       </div>
 

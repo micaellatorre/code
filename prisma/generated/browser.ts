@@ -18,6 +18,11 @@ export { Prisma }
 export * as $Enums from './enums'
 export * from './enums';
 /**
+ * Model User
+ * 
+ */
+export type User = Prisma.UserModel
+/**
  * Model Tenant
  * Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
  */

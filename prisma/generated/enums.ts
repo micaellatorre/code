@@ -118,3 +118,13 @@ export const AppointmentNoSaleReason = {
 } as const
 
 export type AppointmentNoSaleReason = (typeof AppointmentNoSaleReason)[keyof typeof AppointmentNoSaleReason]
+
+
+export const UserRole = {
+  ADMIN: 'ADMIN',
+  VENDEDOR: 'VENDEDOR',
+  STOCK: 'STOCK',
+  SOCIO: 'SOCIO'
+} as const
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]

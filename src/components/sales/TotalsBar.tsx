@@ -1,7 +1,7 @@
 
 'use client';
 
-import { SaleItemDraft, PaymentDraft } from '@/app/sales/new/page';
+import type { SaleItemDraft, PaymentDraft } from '@/app/dashboard/sales/new/form';
 import { useMemo } from 'react';
 
 interface TotalsBarProps {

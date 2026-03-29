@@ -14,6 +14,20 @@ generator client {
   output   = "./generated"
 }
 
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String?
+  image       String?
+  isActive    Boolean   @default(true)
+  role        UserRole
+  tenantId    String?
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+}
+
 /// Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
 // El Tenant administra sus productos, ventas, órdenes, compras y proveedores. Como un encargado por sucursal.
 model Tenant {
@@ -29,11 +43,11 @@ model Tenant {
   purchases    Purchase[]
   suppliers    Supplier[]
   buyers       Buyer[]
+  users        User[]
 
   // NUEVO
   appointments Appointment[]
 }
-
 
 /// Catálogo unificado: iPhones y accesorios.
 // Para MVP trabajamos con stock agregado (no por IMEI). IMEI se puede agregar en el futuro.
@@ -55,11 +69,11 @@ model Product {
   salePrice      Decimal       @db.Decimal(12, 2) // precio_venta_x_unidad (precio sugerido/base)
   shippingCost   Decimal?      @db.Decimal(12, 2) // costo_envio (si es fijo/por unidad)
   status         ProductStatus @default(AVAILABLE)
-  state          ProductState   @default(EN_CAMINO) // estado actual del producto
+  state          ProductState  @default(EN_CAMINO) // estado actual del producto
   stockInitial   Int           @default(1) // stock inicial
   stock          Int           @default(1) // stock actual
   stockAvailable Int           @default(1) // stock disponible para venta
-  location      String? // opcional, para saber dónde está el producto, después se puede usar para filtrar por ubicación y agregar un modelo Sede con datos de ubiacion, contacto, direccion, etc.
+  location       String? // opcional, para saber dónde está el producto, después se puede usar para filtrar por ubicación y agregar un modelo Sede con datos de ubiacion, contacto, direccion, etc.
   notes          String?
 
   saleItems    SaleItem[]
@@ -125,7 +139,7 @@ model Sale {
 
   // Totales (recomendado recalcular en servidor)
   subtotal   Decimal  @db.Decimal(12, 2) // Σ (NORMAL line: units*unitPrice)
-  costTotal  Decimal  @db.Decimal(12, 2) @default(0)// Σ (items.unitCost)
+  costTotal  Decimal  @default(0) @db.Decimal(12, 2) // Σ (items.unitCost)
   extraCosts Decimal  @db.Decimal(12, 2) // Σ (IN_TOTAL items + extraCost de CostProfile en PHONE)
   total      Decimal  @db.Decimal(12, 2) // subtotal + extraCosts
   profit     Decimal  @db.Decimal(12, 2) // total - costo_total
@@ -313,11 +327,11 @@ model Appointment {
 
   /// Buyer asociado a la cita (opcional, se puede cargar sólo nombre suelto si querés en el futuro)
   buyerId String?
-  buyer   Buyer? @relation(fields: [buyerId], references: [id])
+  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
 
   /// Venta que se concretó a partir de esta cita (opcional)
   saleId String?
-  sale   Sale? @relation(fields: [saleId], references: [id])
+  sale   Sale?   @relation(fields: [saleId], references: [id])
 
   /// Fecha y hora agendada (inicio de la cita)
   scheduledAt DateTime
@@ -332,9 +346,9 @@ model Appointment {
   outcome AppointmentOutcome @default(PENDIENTE)
 
   /// Motivo de no venta cuando outcome = NO_SALE
-  noSaleReason       AppointmentNoSaleReason?
-  noSaleReasonOther  String?  // texto libre cuando se elige OTHER
-  resultNotes        String?  // notas internas sobre cómo fue la cita
+  noSaleReason      AppointmentNoSaleReason?
+  noSaleReasonOther String? // texto libre cuando se elige OTHER
+  resultNotes       String? // notas internas sobre cómo fue la cita
 
   /// Productos de interés del Buyer para esta cita
   interests AppointmentInterest[]
@@ -349,9 +363,9 @@ model Appointment {
 
 /// Productos que el Buyer quiere ver en una cita concreta.
 model AppointmentInterest {
-  id            String       @id @default(cuid())
+  id            String      @id @default(cuid())
   appointmentId String
-  appointment   Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
@@ -425,25 +439,32 @@ enum Currency {
 
 /// Estado operativo de la cita.
 enum AppointmentStatus {
-  PROGRAMADA   // Agendada, futura
-  CONCRETADA   // Se concretó (haya o no venta)
-  CANCELADA   // Cancelada antes de que ocurra
-  NO_SE_PRESENTO     // El cliente no se presentó
+  PROGRAMADA // Agendada, futura
+  CONCRETADA // Se concretó (haya o no venta)
+  CANCELADA // Cancelada antes de que ocurra
+  NO_SE_PRESENTO // El cliente no se presentó
 }
 
 /// Resultado comercial de la cita.
 enum AppointmentOutcome {
-  PENDIENTE     // Aún no se sabe (cita futura / sin registrar)
+  PENDIENTE // Aún no se sabe (cita futura / sin registrar)
   VENTA_CONCRETADA // Se concretó una venta (podés linkear Sale)
-  NO_SE_CONCRETO        // No se concretó venta
+  NO_SE_CONCRETO // No se concretó venta
 }
 
 /// Motivo principal de que no haya venta (cuando outcome = NO_SALE).
 enum AppointmentNoSaleReason {
-  MUY_CARO        // Precio muy alto
-  MODELO_NO_DISPONIBLE   // No se consiguió el modelo deseado
-  ENCONTRO_MEJOR_OFERTA    // Encontró mejor oferta
-  LO_ESTA_PENSANDO     // Lo está pensando / "me lo llevo a pensar"
-  NO_SE_PRESENTO               // Directamente no vino / no se pudo hacer la demo
-  OTRO                 // Otro motivo (se detalla en noSaleReasonOther)
+  MUY_CARO // Precio muy alto
+  MODELO_NO_DISPONIBLE // No se consiguió el modelo deseado
+  ENCONTRO_MEJOR_OFERTA // Encontró mejor oferta
+  LO_ESTA_PENSANDO // Lo está pensando / "me lo llevo a pensar"
+  NO_SE_PRESENTO // Directamente no vino / no se pudo hacer la demo
+  OTRO // Otro motivo (se detalla en noSaleReasonOther)
+}
+
+enum UserRole {
+  ADMIN
+  VENDEDOR
+  STOCK
+  SOCIO
 }

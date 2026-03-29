@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import type { ReactNode } from "react"
 import { useMemo, useState } from "react"
 import Navbar from "./Navbar"
+import UserSessionMenu from "./UserSessionMenu"
 import {
   CalendarIcon,
   DevicePhoneMobileIcon,
@@ -25,31 +26,31 @@ export default function DashboardLayout({
       {
         key: "dashboard",
         label: "Dashboard",
-        href: "/",
+        href: "/dashboard",
         icon: <Squares2X2Icon className="size-5 shrink-0" />,
       },
       {
         key: "buyers",
         label: "Clientes",
-        href: "/buyers",
+        href: "/dashboard/buyers",
         icon: <UsersIcon className="size-5 shrink-0" />,
       },
       {
         key: "appointments",
         label: "Citas",
-        href: "/appointments",
+        href: "/dashboard/appointments",
         icon: <CalendarIcon className="size-5 shrink-0" />,
       },
       {
         key: "products",
         label: "Productos",
-        href: "/products",
+        href: "/dashboard/products",
         icon: <DevicePhoneMobileIcon className="size-5 shrink-0" />,
       },
       {
         key: "sales",
         label: "Ventas",
-        href: "/sales",
+        href: "/dashboard/sales",
         icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
       },
     ],
@@ -174,6 +175,9 @@ export default function DashboardLayout({
             })}
           </ul>
         </nav>
+        <div className="border-t border-base-300 px-2 py-2">
+          <UserSessionMenu menu="side" />
+        </div>
       </aside>
 
       <div className="min-h-screen">

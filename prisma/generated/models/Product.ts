@@ -871,10 +871,6 @@ export type EnumProductTypeFieldUpdateOperationsInput = {
   set?: $Enums.ProductType
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
-}
-
 export type NullableIntFieldUpdateOperationsInput = {
   set?: number | null
   increment?: number
@@ -885,10 +881,6 @@ export type NullableIntFieldUpdateOperationsInput = {
 
 export type NullableEnumConditionFieldUpdateOperationsInput = {
   set?: $Enums.Condition | null
-}
-
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
 }
 
 export type DecimalFieldUpdateOperationsInput = {

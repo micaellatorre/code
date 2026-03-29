@@ -1,7 +1,7 @@
 
 'use client';
 
-import { SaleMeta } from '@/app/sales/new/page';
+import type { SaleMeta } from '@/app/dashboard/sales/new/form';
 import { toArgDateTimeInputValue, fromArgDateTimeInputValue } from '@/lib/timezone';
 
 interface SaleMetaSectionProps {

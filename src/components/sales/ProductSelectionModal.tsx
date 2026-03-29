@@ -1,6 +1,6 @@
 'use client'
 
-import { SaleItemDraft } from '@/app/sales/new/page'
+import type { SaleItemDraft } from '@/app/dashboard/sales/new/form'
 import type { Product, ProductType, ProductStatus } from '../../../prisma/generated/client'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 

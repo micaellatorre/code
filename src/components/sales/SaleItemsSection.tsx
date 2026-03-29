@@ -1,7 +1,7 @@
 
 'use client';
 
-import { SaleItemDraft } from '@/app/sales/new/page';
+import type { SaleItemDraft } from '@/app/dashboard/sales/new/form';
 import type { SaleItemKind } from '../../../prisma/generated/client';
 import { useState } from 'react';
 import ProductSelectionModal from './ProductSelectionModal';

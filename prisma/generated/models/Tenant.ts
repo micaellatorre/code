@@ -181,6 +181,7 @@ export type TenantWhereInput = {
   purchases?: Prisma.PurchaseListRelationFilter
   suppliers?: Prisma.SupplierListRelationFilter
   buyers?: Prisma.BuyerListRelationFilter
+  users?: Prisma.UserListRelationFilter
   appointments?: Prisma.AppointmentListRelationFilter
 }
 
@@ -196,6 +197,7 @@ export type TenantOrderByWithRelationInput = {
   purchases?: Prisma.PurchaseOrderByRelationAggregateInput
   suppliers?: Prisma.SupplierOrderByRelationAggregateInput
   buyers?: Prisma.BuyerOrderByRelationAggregateInput
+  users?: Prisma.UserOrderByRelationAggregateInput
   appointments?: Prisma.AppointmentOrderByRelationAggregateInput
 }
 
@@ -214,6 +216,7 @@ export type TenantWhereUniqueInput = Prisma.AtLeast<{
   purchases?: Prisma.PurchaseListRelationFilter
   suppliers?: Prisma.SupplierListRelationFilter
   buyers?: Prisma.BuyerListRelationFilter
+  users?: Prisma.UserListRelationFilter
   appointments?: Prisma.AppointmentListRelationFilter
 }, "id">
 
@@ -249,6 +252,7 @@ export type TenantCreateInput = {
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -264,6 +268,7 @@ export type TenantUncheckedCreateInput = {
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -279,6 +284,7 @@ export type TenantUpdateInput = {
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -294,6 +300,7 @@ export type TenantUncheckedUpdateInput = {
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -316,6 +323,11 @@ export type TenantUncheckedUpdateManyInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type TenantNullableScalarRelationFilter = {
+  is?: Prisma.TenantWhereInput | null
+  isNot?: Prisma.TenantWhereInput | null
 }
 
 export type TenantCountOrderByAggregateInput = {
@@ -344,12 +356,20 @@ export type TenantScalarRelationFilter = {
   isNot?: Prisma.TenantWhereInput
 }
 
-export type StringFieldUpdateOperationsInput = {
-  set?: string
+export type TenantCreateNestedOneWithoutUsersInput = {
+  create?: Prisma.XOR<Prisma.TenantCreateWithoutUsersInput, Prisma.TenantUncheckedCreateWithoutUsersInput>
+  connectOrCreate?: Prisma.TenantCreateOrConnectWithoutUsersInput
+  connect?: Prisma.TenantWhereUniqueInput
 }
 
-export type DateTimeFieldUpdateOperationsInput = {
-  set?: Date | string
+export type TenantUpdateOneWithoutUsersNestedInput = {
+  create?: Prisma.XOR<Prisma.TenantCreateWithoutUsersInput, Prisma.TenantUncheckedCreateWithoutUsersInput>
+  connectOrCreate?: Prisma.TenantCreateOrConnectWithoutUsersInput
+  upsert?: Prisma.TenantUpsertWithoutUsersInput
+  disconnect?: Prisma.TenantWhereInput | boolean
+  delete?: Prisma.TenantWhereInput | boolean
+  connect?: Prisma.TenantWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TenantUpdateToOneWithWhereWithoutUsersInput, Prisma.TenantUpdateWithoutUsersInput>, Prisma.TenantUncheckedUpdateWithoutUsersInput>
 }
 
 export type TenantCreateNestedOneWithoutProductsInput = {
@@ -464,6 +484,82 @@ export type TenantUpdateOneRequiredWithoutAppointmentsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TenantUpdateToOneWithWhereWithoutAppointmentsInput, Prisma.TenantUpdateWithoutAppointmentsInput>, Prisma.TenantUncheckedUpdateWithoutAppointmentsInput>
 }
 
+export type TenantCreateWithoutUsersInput = {
+  id?: string
+  name: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  products?: Prisma.ProductCreateNestedManyWithoutTenantInput
+  sales?: Prisma.SaleCreateNestedManyWithoutTenantInput
+  orders?: Prisma.WholesaleOrderCreateNestedManyWithoutTenantInput
+  costProfiles?: Prisma.CostProfileCreateNestedManyWithoutTenantInput
+  purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
+  suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
+  buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
+}
+
+export type TenantUncheckedCreateWithoutUsersInput = {
+  id?: string
+  name: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  products?: Prisma.ProductUncheckedCreateNestedManyWithoutTenantInput
+  sales?: Prisma.SaleUncheckedCreateNestedManyWithoutTenantInput
+  orders?: Prisma.WholesaleOrderUncheckedCreateNestedManyWithoutTenantInput
+  costProfiles?: Prisma.CostProfileUncheckedCreateNestedManyWithoutTenantInput
+  purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
+  suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
+  buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
+}
+
+export type TenantCreateOrConnectWithoutUsersInput = {
+  where: Prisma.TenantWhereUniqueInput
+  create: Prisma.XOR<Prisma.TenantCreateWithoutUsersInput, Prisma.TenantUncheckedCreateWithoutUsersInput>
+}
+
+export type TenantUpsertWithoutUsersInput = {
+  update: Prisma.XOR<Prisma.TenantUpdateWithoutUsersInput, Prisma.TenantUncheckedUpdateWithoutUsersInput>
+  create: Prisma.XOR<Prisma.TenantCreateWithoutUsersInput, Prisma.TenantUncheckedCreateWithoutUsersInput>
+  where?: Prisma.TenantWhereInput
+}
+
+export type TenantUpdateToOneWithWhereWithoutUsersInput = {
+  where?: Prisma.TenantWhereInput
+  data: Prisma.XOR<Prisma.TenantUpdateWithoutUsersInput, Prisma.TenantUncheckedUpdateWithoutUsersInput>
+}
+
+export type TenantUpdateWithoutUsersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  products?: Prisma.ProductUpdateManyWithoutTenantNestedInput
+  sales?: Prisma.SaleUpdateManyWithoutTenantNestedInput
+  orders?: Prisma.WholesaleOrderUpdateManyWithoutTenantNestedInput
+  costProfiles?: Prisma.CostProfileUpdateManyWithoutTenantNestedInput
+  purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
+  suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
+  buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
+}
+
+export type TenantUncheckedUpdateWithoutUsersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  products?: Prisma.ProductUncheckedUpdateManyWithoutTenantNestedInput
+  sales?: Prisma.SaleUncheckedUpdateManyWithoutTenantNestedInput
+  orders?: Prisma.WholesaleOrderUncheckedUpdateManyWithoutTenantNestedInput
+  costProfiles?: Prisma.CostProfileUncheckedUpdateManyWithoutTenantNestedInput
+  purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
+  suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
+  buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
+}
+
 export type TenantCreateWithoutProductsInput = {
   id?: string
   name: string
@@ -475,6 +571,7 @@ export type TenantCreateWithoutProductsInput = {
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -489,6 +586,7 @@ export type TenantUncheckedCreateWithoutProductsInput = {
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -519,6 +617,7 @@ export type TenantUpdateWithoutProductsInput = {
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -533,6 +632,7 @@ export type TenantUncheckedUpdateWithoutProductsInput = {
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -547,6 +647,7 @@ export type TenantCreateWithoutBuyersInput = {
   costProfiles?: Prisma.CostProfileCreateNestedManyWithoutTenantInput
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -561,6 +662,7 @@ export type TenantUncheckedCreateWithoutBuyersInput = {
   costProfiles?: Prisma.CostProfileUncheckedCreateNestedManyWithoutTenantInput
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -591,6 +693,7 @@ export type TenantUpdateWithoutBuyersInput = {
   costProfiles?: Prisma.CostProfileUpdateManyWithoutTenantNestedInput
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -605,6 +708,7 @@ export type TenantUncheckedUpdateWithoutBuyersInput = {
   costProfiles?: Prisma.CostProfileUncheckedUpdateManyWithoutTenantNestedInput
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -619,6 +723,7 @@ export type TenantCreateWithoutSalesInput = {
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -633,6 +738,7 @@ export type TenantUncheckedCreateWithoutSalesInput = {
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -663,6 +769,7 @@ export type TenantUpdateWithoutSalesInput = {
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -677,6 +784,7 @@ export type TenantUncheckedUpdateWithoutSalesInput = {
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -691,6 +799,7 @@ export type TenantCreateWithoutOrdersInput = {
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -705,6 +814,7 @@ export type TenantUncheckedCreateWithoutOrdersInput = {
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -735,6 +845,7 @@ export type TenantUpdateWithoutOrdersInput = {
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -749,6 +860,7 @@ export type TenantUncheckedUpdateWithoutOrdersInput = {
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -763,6 +875,7 @@ export type TenantCreateWithoutCostProfilesInput = {
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -777,6 +890,7 @@ export type TenantUncheckedCreateWithoutCostProfilesInput = {
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -807,6 +921,7 @@ export type TenantUpdateWithoutCostProfilesInput = {
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -821,6 +936,7 @@ export type TenantUncheckedUpdateWithoutCostProfilesInput = {
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -835,6 +951,7 @@ export type TenantCreateWithoutSuppliersInput = {
   costProfiles?: Prisma.CostProfileCreateNestedManyWithoutTenantInput
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -849,6 +966,7 @@ export type TenantUncheckedCreateWithoutSuppliersInput = {
   costProfiles?: Prisma.CostProfileUncheckedCreateNestedManyWithoutTenantInput
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -879,6 +997,7 @@ export type TenantUpdateWithoutSuppliersInput = {
   costProfiles?: Prisma.CostProfileUpdateManyWithoutTenantNestedInput
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -893,6 +1012,7 @@ export type TenantUncheckedUpdateWithoutSuppliersInput = {
   costProfiles?: Prisma.CostProfileUncheckedUpdateManyWithoutTenantNestedInput
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -907,6 +1027,7 @@ export type TenantCreateWithoutPurchasesInput = {
   costProfiles?: Prisma.CostProfileCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentCreateNestedManyWithoutTenantInput
 }
 
@@ -921,6 +1042,7 @@ export type TenantUncheckedCreateWithoutPurchasesInput = {
   costProfiles?: Prisma.CostProfileUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
   appointments?: Prisma.AppointmentUncheckedCreateNestedManyWithoutTenantInput
 }
 
@@ -951,6 +1073,7 @@ export type TenantUpdateWithoutPurchasesInput = {
   costProfiles?: Prisma.CostProfileUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUpdateManyWithoutTenantNestedInput
 }
 
@@ -965,6 +1088,7 @@ export type TenantUncheckedUpdateWithoutPurchasesInput = {
   costProfiles?: Prisma.CostProfileUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
   appointments?: Prisma.AppointmentUncheckedUpdateManyWithoutTenantNestedInput
 }
 
@@ -980,6 +1104,7 @@ export type TenantCreateWithoutAppointmentsInput = {
   purchases?: Prisma.PurchaseCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserCreateNestedManyWithoutTenantInput
 }
 
 export type TenantUncheckedCreateWithoutAppointmentsInput = {
@@ -994,6 +1119,7 @@ export type TenantUncheckedCreateWithoutAppointmentsInput = {
   purchases?: Prisma.PurchaseUncheckedCreateNestedManyWithoutTenantInput
   suppliers?: Prisma.SupplierUncheckedCreateNestedManyWithoutTenantInput
   buyers?: Prisma.BuyerUncheckedCreateNestedManyWithoutTenantInput
+  users?: Prisma.UserUncheckedCreateNestedManyWithoutTenantInput
 }
 
 export type TenantCreateOrConnectWithoutAppointmentsInput = {
@@ -1024,6 +1150,7 @@ export type TenantUpdateWithoutAppointmentsInput = {
   purchases?: Prisma.PurchaseUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUpdateManyWithoutTenantNestedInput
 }
 
 export type TenantUncheckedUpdateWithoutAppointmentsInput = {
@@ -1038,6 +1165,7 @@ export type TenantUncheckedUpdateWithoutAppointmentsInput = {
   purchases?: Prisma.PurchaseUncheckedUpdateManyWithoutTenantNestedInput
   suppliers?: Prisma.SupplierUncheckedUpdateManyWithoutTenantNestedInput
   buyers?: Prisma.BuyerUncheckedUpdateManyWithoutTenantNestedInput
+  users?: Prisma.UserUncheckedUpdateManyWithoutTenantNestedInput
 }
 
 
@@ -1053,6 +1181,7 @@ export type TenantCountOutputType = {
   purchases: number
   suppliers: number
   buyers: number
+  users: number
   appointments: number
 }
 
@@ -1064,6 +1193,7 @@ export type TenantCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions
   purchases?: boolean | TenantCountOutputTypeCountPurchasesArgs
   suppliers?: boolean | TenantCountOutputTypeCountSuppliersArgs
   buyers?: boolean | TenantCountOutputTypeCountBuyersArgs
+  users?: boolean | TenantCountOutputTypeCountUsersArgs
   appointments?: boolean | TenantCountOutputTypeCountAppointmentsArgs
 }
 
@@ -1129,6 +1259,13 @@ export type TenantCountOutputTypeCountBuyersArgs<ExtArgs extends runtime.Types.E
 /**
  * TenantCountOutputType without action
  */
+export type TenantCountOutputTypeCountUsersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.UserWhereInput
+}
+
+/**
+ * TenantCountOutputType without action
+ */
 export type TenantCountOutputTypeCountAppointmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.AppointmentWhereInput
 }
@@ -1146,6 +1283,7 @@ export type TenantSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   purchases?: boolean | Prisma.Tenant$purchasesArgs<ExtArgs>
   suppliers?: boolean | Prisma.Tenant$suppliersArgs<ExtArgs>
   buyers?: boolean | Prisma.Tenant$buyersArgs<ExtArgs>
+  users?: boolean | Prisma.Tenant$usersArgs<ExtArgs>
   appointments?: boolean | Prisma.Tenant$appointmentsArgs<ExtArgs>
   _count?: boolean | Prisma.TenantCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["tenant"]>
@@ -1180,6 +1318,7 @@ export type TenantInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   purchases?: boolean | Prisma.Tenant$purchasesArgs<ExtArgs>
   suppliers?: boolean | Prisma.Tenant$suppliersArgs<ExtArgs>
   buyers?: boolean | Prisma.Tenant$buyersArgs<ExtArgs>
+  users?: boolean | Prisma.Tenant$usersArgs<ExtArgs>
   appointments?: boolean | Prisma.Tenant$appointmentsArgs<ExtArgs>
   _count?: boolean | Prisma.TenantCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -1196,6 +1335,7 @@ export type $TenantPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     purchases: Prisma.$PurchasePayload<ExtArgs>[]
     suppliers: Prisma.$SupplierPayload<ExtArgs>[]
     buyers: Prisma.$BuyerPayload<ExtArgs>[]
+    users: Prisma.$UserPayload<ExtArgs>[]
     appointments: Prisma.$AppointmentPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -1604,6 +1744,7 @@ export interface Prisma__TenantClient<T, Null = never, ExtArgs extends runtime.T
   purchases<T extends Prisma.Tenant$purchasesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Tenant$purchasesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PurchasePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   suppliers<T extends Prisma.Tenant$suppliersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Tenant$suppliersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SupplierPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   buyers<T extends Prisma.Tenant$buyersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Tenant$buyersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BuyerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  users<T extends Prisma.Tenant$usersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Tenant$usersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   appointments<T extends Prisma.Tenant$appointmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Tenant$appointmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AppointmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -2196,6 +2337,30 @@ export type Tenant$buyersArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.BuyerScalarFieldEnum | Prisma.BuyerScalarFieldEnum[]
+}
+
+/**
+ * Tenant.users
+ */
+export type Tenant$usersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the User
+   */
+  select?: Prisma.UserSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the User
+   */
+  omit?: Prisma.UserOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserInclude<ExtArgs> | null
+  where?: Prisma.UserWhereInput
+  orderBy?: Prisma.UserOrderByWithRelationInput | Prisma.UserOrderByWithRelationInput[]
+  cursor?: Prisma.UserWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.UserScalarFieldEnum | Prisma.UserScalarFieldEnum[]
 }
 
 /**
