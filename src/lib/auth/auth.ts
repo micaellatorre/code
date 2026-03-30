@@ -31,33 +31,29 @@ export async function requireAuthPage() {
 
 export async function requireRolePage(roles: Role[]) {
   const session = await requireAuthPage()
-
-  if (!roles.includes(session.user.activeRole)) {
-    redirect("/dashboard")
-  }
-
-  return session
-}
-
-export async function requireRolePageWithFallback(roles: Role[], currentRoute?: string) {
-  const session = await requireAuthPage()
-
   const activeRole = session.user.activeRole
 
   if (!roles.includes(activeRole)) {
     redirect(getDefaultRouteByRole(activeRole))
   }
 
-  // For non-admin roles, if they are on an allowed page but not their role default,
-  // send them to their default landing page to preserve role-context flow.
-  if (activeRole !== "ADMIN" && currentRoute) {
-    const defaultRoute = getDefaultRouteByRole(activeRole)
+  return session
+}
 
-    if (currentRoute !== defaultRoute) {
-      redirect(defaultRoute)
-    }
+export async function requireRolePageWithFallback(
+  roles: Role[],
+  fallbackRoute?: string,
+) {
+  const session = await requireAuthPage()
+  const activeRole = session.user.activeRole
+  const target = fallbackRoute ?? getDefaultRouteByRole(activeRole)
+
+  if (!roles.includes(activeRole)) {
+    console.log("[RBAC] forbidden -> redirecting")
+    redirect(target)
   }
 
+  console.log("[RBAC] allowed -> staying on page")
   return session
 }
 

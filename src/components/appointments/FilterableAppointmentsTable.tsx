@@ -133,7 +133,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                                     <td><span className={`badge badge-outline badge-${a.status === 'CONCRETADA' ? 'success' : 'warning'}`}>{a.status}</span></td>
                                     <td><span className={`badge badge-outline badge-${a.outcome === 'VENTA_CONCRETADA' ? 'success' : 'ghost'}`}>{a.outcome}</span></td>
                                     <td className="space-x-2">
-                                        <Link href={`/appointments/${a.id}/edit`} className="btn btn-xs btn-ghost">
+                                        <Link href={`/dashboard/appointments/${a.id}/edit`} className="btn btn-xs btn-ghost">
                                             Editar
                                         </Link>
                                         <button

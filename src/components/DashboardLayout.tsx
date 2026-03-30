@@ -4,8 +4,10 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import type { ReactNode } from "react"
 import { useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import Navbar from "./Navbar"
 import UserSessionMenu from "./UserSessionMenu"
+import type { Role } from "@/lib/auth/auth"
 import {
   CalendarIcon,
   DevicePhoneMobileIcon,
@@ -20,6 +22,7 @@ export default function DashboardLayout({
   children?: ReactNode
 }) {
   const pathname = usePathname()
+  const { data: session } = useSession()
 
   const tabs = useMemo(
     () => [
@@ -28,30 +31,35 @@ export default function DashboardLayout({
         label: "Dashboard",
         href: "/dashboard",
         icon: <Squares2X2Icon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "SOCIO"] as Role[],
       },
       {
         key: "buyers",
         label: "Clientes",
         href: "/dashboard/buyers",
         icon: <UsersIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
       },
       {
         key: "appointments",
         label: "Citas",
         href: "/dashboard/appointments",
         icon: <CalendarIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
       },
       {
         key: "products",
         label: "Productos",
         href: "/dashboard/products",
         icon: <DevicePhoneMobileIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "VENDEDOR", "STOCK", "SOCIO"] as Role[],
       },
       {
         key: "sales",
         label: "Ventas",
         href: "/dashboard/sales",
         icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"] as Role[],
       },
     ],
     []
@@ -76,6 +84,8 @@ export default function DashboardLayout({
     if (href === "/") return pathname === "/"
     return pathname === href || pathname.startsWith(`${href}/`)
   }
+
+  const activeRole = session?.user?.activeRole
 
   const sidebarWidth = collapsed ? "w-[68px]" : "w-[188px]"
 
@@ -145,31 +155,53 @@ export default function DashboardLayout({
           <ul className="menu gap-1 p-0 mt-1">
             {tabs.map((tab) => {
               const active = isTabActive(tab.href)
+              const disabled = activeRole ? !tab.allowedRoles.includes(activeRole) : false
+              const baseClasses = [
+                "group flex items-center rounded-lg transition-all duration-200",
+                collapsed ? "justify-center h-10 px-0" : "gap-4 h-10 px-2",
+              ].join(" ")
+              const stateClasses = disabled
+                ? "cursor-not-allowed text-base-content/35 bg-transparent"
+                : active
+                  ? "bg-primary text-primary-content"
+                  : "text-base-content hover:bg-base-300/70"
 
               return (
                 <li key={tab.key}>
-                  <Link
-                    href={tab.href}
-                    onClick={closeSidebar}
-                    title={collapsed ? tab.label : undefined}
-                    className={[
-                      "group flex items-center rounded-lg transition-all duration-200",
-                      collapsed ? "justify-center h-10 px-0" : "gap-4 h-10 px-2",
-                      active
-                        ? "bg-primary text-primary-content"
-                        : "text-base-content hover:bg-base-300/70",
-                    ].join(" ")}
-                  >
-                    <span className="shrink-0">{tab.icon}</span>
+                  {disabled ? (
                     <span
-                      className={[
-                        "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-300",
-                        collapsed ? "max-w-0 opacity-0 hidden " : "max-w-[100px] opacity-100",
-                      ].join(" ")}
+                      aria-disabled="true"
+                      title={collapsed ? `${tab.label} (sin acceso)` : undefined}
+                      className={[baseClasses, stateClasses].join(" ")}
                     >
-                      {tab.label}
+                      <span className="shrink-0">{tab.icon}</span>
+                      <span
+                        className={[
+                          "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-300",
+                          collapsed ? "max-w-0 opacity-0 hidden" : "max-w-[100px] opacity-100",
+                        ].join(" ")}
+                      >
+                        {tab.label}
+                      </span>
                     </span>
-                  </Link>
+                  ) : (
+                    <Link
+                      href={tab.href}
+                      onClick={closeSidebar}
+                      title={collapsed ? tab.label : undefined}
+                      className={[baseClasses, stateClasses].join(" ")}
+                    >
+                      <span className="shrink-0">{tab.icon}</span>
+                      <span
+                        className={[
+                          "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-300",
+                          collapsed ? "max-w-0 opacity-0 hidden " : "max-w-[100px] opacity-100",
+                        ].join(" ")}
+                      >
+                        {tab.label}
+                      </span>
+                    </Link>
+                  )}
                 </li>
               )
             })}

@@ -1032,7 +1032,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                   <td>
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/sales/${s.id}/edit`}
+                        href={`/dashboard/sales/${s.id}/edit`}
                         className="btn btn-xs btn-square btn-soft"
                       >
                         <PencilIcon className="size-[1.2em]" />

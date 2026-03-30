@@ -1167,7 +1167,7 @@ export default function FilterableProductsTable() {
         </td>
 
         <td className="flex items-center gap-2">
-          <Link href={`/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
+          <Link href={`/dashboard/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
             <PencilIcon className="size-[1.2em]" />
           </Link>
 
