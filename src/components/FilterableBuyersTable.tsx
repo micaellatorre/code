@@ -299,7 +299,7 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/buyers/new" className="btn btn-primary">
+          <Link href="/dashboard/buyers/new" className="btn btn-primary">
             Nuevo Cliente
           </Link>
         </div>

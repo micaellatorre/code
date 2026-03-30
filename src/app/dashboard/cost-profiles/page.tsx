@@ -21,7 +21,7 @@ export default async function CostProfilesPage() {
         {/* Título y acción */}
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Perfiles de Costo</h2>
-          <Link href="/cost-profiles/new" className="btn btn-primary">
+          <Link href="/dashboard/cost-profiles/new" className="btn btn-primary">
             Nuevo Perfil
           </Link>
         </div>

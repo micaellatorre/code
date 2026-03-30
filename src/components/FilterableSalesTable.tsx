@@ -502,7 +502,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/sales/new" className="btn btn-primary">
+          <Link href="/dashboard/sales/new" className="btn btn-primary">
             Nueva Venta
           </Link>
         </div>

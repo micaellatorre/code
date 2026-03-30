@@ -1291,7 +1291,7 @@ export default function FilterableProductsTable() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/products/new" className="btn btn-primary">
+          <Link href="/dashboard/products/new" className="btn btn-primary">
             Nuevo Producto
           </Link>
         </div>

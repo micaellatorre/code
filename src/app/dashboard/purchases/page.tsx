@@ -25,7 +25,7 @@ export default async function PurchasesPage() {
       <div className="flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Compras</h2>
-          <Link href="/purchases/new" className="btn btn-primary">
+          <Link href="/dashboard/purchases/new" className="btn btn-primary">
             Nueva Compra
           </Link>
         </div>
