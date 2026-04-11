@@ -1,10 +1,17 @@
 // app/api/sales/route.ts
 import prisma from "@/lib/prisma";
+import { requireRoleApi } from "@/lib/auth/auth";
 import { NextResponse } from "next/server";
 import { Prisma, SaleItemKind, ProductState } from "../../../../prisma/generated/client";
 
 // GET: lista de ventas con items, payments y buyer
 export async function GET() {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "SOCIO"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const sales = await prisma.sale.findMany({
     include: {
       items: { include: { product: true } },
@@ -48,6 +55,12 @@ interface ApiError extends Error {
 
 // POST: crea una venta y sus items/pagos; descuenta stock y controla estado
 export async function POST(request: Request) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   let body: SaleInputBody;
   try {
     body = await request.json();

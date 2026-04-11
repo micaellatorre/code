@@ -1,6 +1,7 @@
 // src/app/api/buyers/route.ts
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { requireRoleApi } from '@/lib/auth/auth'
 
 async function getDefaultTenantId() {
     const tenant = await prisma.tenant.findFirst({
@@ -13,6 +14,12 @@ async function getDefaultTenantId() {
 }
 
 export async function GET() {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   try {
     const buyers = await prisma.buyer.findMany({
       orderBy: { createdAt: 'desc' },
@@ -29,6 +36,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const data = await req.json()
   const tenantId = await getDefaultTenantId()
 

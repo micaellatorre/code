@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { Prisma } from '../../../../../prisma/generated/client'
+import { requireRoleApi } from '@/lib/auth/auth'
 
 // GET /api/sales/search?q=term
 export async function GET(req: Request) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "SOCIO"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q')?.trim()
 

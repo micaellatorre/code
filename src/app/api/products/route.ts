@@ -1,5 +1,6 @@
 // app/api/products/route.ts
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 import { Prisma } from "../../../../prisma/generated/client";
 
 import { NextResponse } from "next/server"
@@ -69,6 +70,12 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>
  * Returns: { products: SerializedProduct[], nextCursor: string | null, totalProducts: number }
  */
 export async function GET(request: Request) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "STOCK", "SOCIO"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
 
@@ -165,6 +172,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   try {
     const body = await request.json()
     const tenantId = body.tenantId ?? process.env.DEFAULT_TENANT_ID

@@ -5,14 +5,14 @@ import SearchBar from '@/components/SearchBar'
 import prisma from '@/lib/prisma'
 import { formatInTimeZone } from 'date-fns-tz'
 import { AR_TIME_ZONE } from '@/lib/timezone'
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 
 /**
  * Listado de compras.
  * Incluye buscador y utiliza el diseño común del dashboard para mayor coherencia.
  */
 export default async function PurchasesPage() {
-  await requireRolePageWithFallback(['ADMIN', 'STOCK'], '/dashboard/purchases')
+  await requireRolePage(['ADMIN', 'STOCK'])
 
   const purchases = await prisma.purchase.findMany({
     include: { supplier: true },

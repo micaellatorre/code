@@ -4,7 +4,7 @@ import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableBuyersTable from '@/components/FilterableBuyersTable'
 import prisma from '@/lib/prisma'
 import type { Metadata } from 'next'
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 
 // SEO
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ function toStr(v: any) {
 }
 
 export default async function ClientsPage() {
-  await requireRolePageWithFallback(['ADMIN', 'VENDEDOR'], '/dashboard/buyers')
+  await requireRolePage(['ADMIN', 'VENDEDOR'])
 
   const buyers = await prisma.buyer.findMany({
     orderBy: { createdAt: 'desc' },

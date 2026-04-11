@@ -5,7 +5,7 @@ import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableSalesTable from '@/components/FilterableSalesTable'
 import prisma from '@/lib/prisma'
 import type { Metadata } from 'next'
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 
 // SEO
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ function toStr(v: any) {
 }
 
 export default async function SalesPage() {
-  await requireRolePageWithFallback(['ADMIN', 'VENDEDOR', 'SOCIO'], '/dashboard/sales')
+  await requireRolePage(['ADMIN', 'VENDEDOR', 'SOCIO'])
 
   // Trae solo lo necesario y con shape estable para el cliente
   const sales = await prisma.sale.findMany({

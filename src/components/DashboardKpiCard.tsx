@@ -1,48 +1,60 @@
 import type { ReactNode } from 'react'
 
 export interface DashboardKpiCardProps {
-  /**
-   * Título descriptivo de la métrica, p. ej. "Productos" o "Facturación del día".
-   */
   title: string
-  /**
-   * Valor numérico o string que se desea mostrar. Formatea la cifra antes de
-   * pasarla aquí para evitar cálculos en el cliente.
-   */
   value: string | number
-  /**
-   * Elemento opcional que se mostrará como icono decorativo. Puede ser un
-   * componente de lucide-react, un emoji o cualquier nodo de React.
-   */
   icon?: ReactNode
-  /**
-   * Tendencia de la métrica en porcentaje (positiva o negativa). Si se
-   * proporciona, se mostrará una descripción debajo del valor.
-   */
   trend?: number
+  subtitle?: string
+  tone?: 'default' | 'success' | 'warning' | 'error' | 'info'
 }
 
-/**
- * Tarjeta reutilizable para mostrar KPIs en el dashboard. Se apoya en los
- * componentes `stat` de DaisyUI para proporcionar un diseño claro y
- * consistente. Ajusta la anchura mediante utilidades de Tailwind (`w-full`,
- * `md:w-1/2`, etc.) en el contenedor padre.
- */
-export default function DashboardKpiCard({ title, value, icon, trend }: DashboardKpiCardProps) {
+const toneMap: Record<NonNullable<DashboardKpiCardProps['tone']>, string> = {
+  default: 'text-primary',
+  success: 'text-success',
+  warning: 'text-warning',
+  error: 'text-error',
+  info: 'text-info',
+}
+
+export default function DashboardKpiCard({
+  title,
+  value,
+  icon,
+  trend,
+  subtitle,
+  tone = 'default',
+}: DashboardKpiCardProps) {
+  const toneClass = toneMap[tone]
+
   return (
-    <div className="stats shadow bg-base-100">
-      <div className="stat">
-        {icon && <div className="stat-figure text-primary">{icon}</div>}
-        <div className="stat-title">{title}</div>
-        <div className="stat-value text-3xl font-semibold">
-          {typeof value === 'number' ? value.toLocaleString() : value}
-        </div>
-        {typeof trend === 'number' && (
-          <div className="stat-desc">
-            {trend >= 0 ? '+' : ''}
-            {trend.toFixed(1)}%
+    <div className="rounded-2xl border border-base-content/10 bg-base-100 shadow-sm">
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm text-base-content/60">{title}</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight">
+              {typeof value === 'number' ? value.toLocaleString() : value}
+            </div>
+
+            {subtitle ? (
+              <div className="mt-2 text-xs text-base-content/50">{subtitle}</div>
+            ) : null}
+
+            {typeof trend === 'number' ? (
+              <div className={`mt-3 text-xs font-medium ${trend >= 0 ? 'text-success' : 'text-error'}`}>
+                {trend >= 0 ? '+' : ''}
+                {trend.toFixed(1)}% vs. período anterior
+              </div>
+            ) : null}
           </div>
-        )}
+
+          {icon ? (
+            <div className={`shrink-0 rounded-xl bg-base-200 p-3 ${toneClass}`}>
+              {icon}
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   )

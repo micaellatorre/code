@@ -5,14 +5,14 @@ import SearchBar from '@/components/SearchBar'
 import prisma from '@/lib/prisma'
 import { formatInTimeZone } from 'date-fns-tz'
 import { AR_TIME_ZONE } from '@/lib/timezone'
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 
 /**
  * Listado de pedidos mayoristas (WholesaleOrder).
  * Utiliza el layout del dashboard y añade buscador para mejorar la UX.
  */
 export default async function WholesaleOrdersPage() {
-  await requireRolePageWithFallback(['ADMIN', 'VENDEDOR'], '/dashboard/wholesale-orders')
+  await requireRolePage(['ADMIN', 'VENDEDOR'])
 
   const orders = await prisma.wholesaleOrder.findMany({ orderBy: { requestedAt: 'desc' } })
   return (

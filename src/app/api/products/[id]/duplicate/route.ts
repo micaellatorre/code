@@ -2,10 +2,17 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function POST(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   try {
     const { id } = await params
 

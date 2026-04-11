@@ -3,14 +3,14 @@ import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import SearchBar from '@/components/SearchBar'
 import prisma from '@/lib/prisma'
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 
 /**
  * Listado de proveedores.
  * Se integra con el layout del dashboard y añade un buscador.
  */
 export default async function SuppliersPage() {
-  await requireRolePageWithFallback(['ADMIN', 'STOCK'], '/dashboard/suppliers')
+  await requireRolePage(['ADMIN', 'STOCK'])
 
   const suppliers = await prisma.supplier.findMany({ orderBy: { name: 'asc' } })
   return (

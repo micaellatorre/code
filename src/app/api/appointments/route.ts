@@ -2,9 +2,16 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "../../../../prisma/generated/client";
 import { NextResponse } from "next/server";
+import { requireRoleApi } from "@/lib/auth/auth";
 
 // GET: lista de todas las citas
 export async function GET() {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const appointments = await prisma.appointment.findMany({
     include: {
       buyer: true,
@@ -17,6 +24,12 @@ export async function GET() {
 
 // POST: crea una nueva cita
 export async function POST(request: Request) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   let body: {
     buyerId?: string;
     scheduledAt?: string;

@@ -1,4 +1,4 @@
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 import EditAppointmentForm from './form'
 
 interface EditAppointmentPageProps {
@@ -6,6 +6,6 @@ interface EditAppointmentPageProps {
 }
 
 export default async function EditAppointmentPage({ params }: EditAppointmentPageProps) {
-  await requireRolePageWithFallback(['ADMIN', 'VENDEDOR'], '/dashboard/appointments/[id]/edit')
+  await requireRolePage(['ADMIN', 'VENDEDOR'])
   return <EditAppointmentForm id={params.id} />
 }

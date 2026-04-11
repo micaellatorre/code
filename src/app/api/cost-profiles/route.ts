@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { requireRoleApi } from '@/lib/auth/auth'
 
 /**
  * API para listar y crear perfiles de costo (CostProfile).
@@ -8,6 +9,12 @@ import { NextResponse } from 'next/server'
  * que se pueden aplicar a un producto vendido para calcular la rentabilidad real.
  */
 export async function GET() {
+  const auth = await requireRoleApi(["ADMIN"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const profiles = await prisma.costProfile.findMany({
     orderBy: { name: 'asc' },
   })
@@ -15,6 +22,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireRoleApi(["ADMIN"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const body = await request.json()
   try {
     const profile = await prisma.costProfile.create({ data: body })

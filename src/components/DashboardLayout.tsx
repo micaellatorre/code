@@ -7,7 +7,7 @@ import { useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import Navbar from "./Navbar"
 import UserSessionMenu from "./UserSessionMenu"
-import type { Role } from "@/lib/auth/auth"
+import type { Role } from "@/lib/auth/roles"
 import {
   CalendarIcon,
   DevicePhoneMobileIcon,

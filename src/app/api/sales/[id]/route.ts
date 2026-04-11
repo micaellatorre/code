@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "../../../../../prisma/generated/client";
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 
 export const runtime = "nodejs"
 
@@ -28,6 +29,12 @@ function toDecimal(v: unknown): Prisma.Decimal | null {
 }
 
 export async function GET(_: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const sale = await prisma.sale.findUnique({
     where: { id },
@@ -38,6 +45,12 @@ export async function GET(_: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   try {
     await prisma.$transaction(async (tx) => {
@@ -52,6 +65,12 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
 

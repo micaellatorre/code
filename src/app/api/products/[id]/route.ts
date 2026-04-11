@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 import { NextRequest, NextResponse } from "next/server"
 
 type Ctx = {
@@ -6,6 +7,12 @@ type Ctx = {
 }
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "STOCK", "SOCIO"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const product = await prisma.product.findUnique({ where: { id } })
   if (!product) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
@@ -13,6 +20,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PUT(request: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const body = await request.json()
   try {
@@ -25,6 +38,12 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(request: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const body = await request.json()
 
@@ -138,6 +157,12 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   try {
     await prisma.product.delete({ where: { id } })

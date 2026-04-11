@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import SearchBar from "@/components/SearchBar";
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
+import type { Role } from "@/lib/auth/roles";
 
 // ====== Tipos ======
 type SerializedBuyer = {
@@ -35,6 +37,18 @@ function normalizeBuyers(input: any[]): SerializedBuyer[] {
 
 // ====== Componente ======
 export default function FilterableBuyersTable({ initial }: { initial: SerializedBuyer[] }) {
+  const { data: session } = useSession();
+  const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
+  const isAdmin = activeRole === "ADMIN";
+  const isSeller = activeRole === "VENDEDOR";
+  const isStock = activeRole === "STOCK";
+  const isSocio = activeRole === "SOCIO";
+  const canCreateBuyers = isAdmin || isSeller;
+  const canEditBuyers = isAdmin || isSeller;
+  const canDeleteBuyers = isAdmin || isSeller;
+  const isReadOnly = !canEditBuyers && !canDeleteBuyers;
+  const hasBuyerActions = canEditBuyers || canDeleteBuyers;
+
   const [buyers, setBuyers] = useState<SerializedBuyer[]>(() =>
     normalizeBuyers(initial)
   );
@@ -173,6 +187,8 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
     editingFields[buyerId]?.[fieldName] ?? "";
 
   const startEditField = (buyerId: string, fieldName: string, currentValue: any) => {
+    if (!canEditBuyers) return;
+
     setEditingFields((prev) => ({
       ...prev,
       [buyerId]: {
@@ -204,6 +220,8 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
   };
 
   async function persistFieldUpdate(buyerId: string, fieldName: string, value: any) {
+    if (!canEditBuyers) return;
+
     setSavingField({ buyerId, fieldName });
     try {
       const res = await fetch(`/api/buyers/${buyerId}`, {
@@ -228,6 +246,8 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
   }
 
   function commitEditField(buyerId: string, fieldName: string) {
+    if (!canEditBuyers) return;
+
     const editingValue = editingFields[buyerId]?.[fieldName];
     if (editingValue === undefined) return;
 
@@ -252,6 +272,8 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
   }
 
   const deleteBuyer = async (id: string) => {
+    if (!canDeleteBuyers) return;
+
     if (!window.confirm("¿Está seguro que desea eliminar este cliente?")) return;
     setDeletingId(id);
 
@@ -298,11 +320,13 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
             )}
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/buyers/new" className="btn btn-primary">
-            Nuevo Cliente
-          </Link>
-        </div>
+        {canCreateBuyers ? (
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/buyers/new" className="btn btn-primary">
+              Nuevo Cliente
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between">
@@ -433,7 +457,7 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
                 <th>Email</th>
                 <th>CUIT</th>
                 <th>DNI</th>
-                <th>Acciones</th>
+                {hasBuyerActions ? <th>Acciones</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -446,14 +470,18 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
                   <td>{b.email}</td>
                   <td>{b.cuit}</td>
                   <td>{b.dni}</td>
+                  {hasBuyerActions ? (
                   <td>
                     <div className="flex items-center gap-2">
+                      {canEditBuyers ? (
                       <Link
                         href={`/buyers/${b.id}/edit`}
                         className="btn btn-xs btn-square btn-soft"
                       >
                         <PencilIcon className="size-[1.2em]" />
                       </Link>
+                      ) : null}
+                      {canDeleteBuyers ? (
                       <button
                         className="btn btn-xs btn-square btn-soft btn-error"
                         onClick={() => deleteBuyer(b.id)}
@@ -470,8 +498,10 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
                           </>
                         }
                       </button>
+                      ) : null}
                     </div>
                   </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

@@ -3,7 +3,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableProductsTable from '@/components/FilterableProductsTable'
 import type { Metadata } from 'next'
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ProductsPage() {
-  await requireRolePageWithFallback(['ADMIN', 'VENDEDOR', 'STOCK', 'SOCIO'], '/dashboard/products')
+  await requireRolePage(['ADMIN', 'VENDEDOR', 'STOCK', 'SOCIO'])
 
   return (
     <DashboardLayout >

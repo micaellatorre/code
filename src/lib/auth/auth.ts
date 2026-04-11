@@ -1,73 +1,62 @@
 import { getServerSession } from "next-auth"
-import { authOptions } from "./auth-options"
 import { redirect } from "next/navigation"
-
-export type Role = "ADMIN" | "VENDEDOR" | "STOCK" | "SOCIO"
-
-const defaultRouteByRole: Record<Role, string> = {
-  ADMIN: "/dashboard",
-  SOCIO: "/dashboard",
-  VENDEDOR: "/dashboard/sales",
-  STOCK: "/dashboard/products",
-}
-
-export function getDefaultRouteByRole(role: Role) {
-  return defaultRouteByRole[role] ?? "/dashboard"
-}
+import { authOptions } from "./auth-options"
+import { getDefaultRouteByRole } from "./roles"
 
 export async function getAuthSession() {
   return getServerSession(authOptions)
 }
 
+/**
+ * Guard base para páginas server-side.
+ * Exige sesión válida y usuario activo.
+ */
 export async function requireAuthPage() {
   const session = await getAuthSession()
 
-  if (!session?.user) {
+  if (!session?.user || !session.user.isActive) {
     redirect("/auth/login")
   }
 
   return session
 }
 
-export async function requireRolePage(roles: Role[]) {
+/**
+ * Guard por rol para páginas server-side.
+ * Si el rol activo no está permitido, redirige
+ * a la ruta principal correspondiente a ese rol.
+ */
+export async function requireRolePage(roles: import("./roles").Role[]) {
   const session = await requireAuthPage()
   const activeRole = session.user.activeRole
+  const target = getDefaultRouteByRole(activeRole)
 
   if (!roles.includes(activeRole)) {
-    redirect(getDefaultRouteByRole(activeRole))
-  }
-
-  return session
-}
-
-export async function requireRolePageWithFallback(
-  roles: Role[],
-  fallbackRoute?: string,
-) {
-  const session = await requireAuthPage()
-  const activeRole = session.user.activeRole
-  const target = fallbackRoute ?? getDefaultRouteByRole(activeRole)
-
-  if (!roles.includes(activeRole)) {
-    console.log("[RBAC] forbidden -> redirecting")
     redirect(target)
   }
 
-  console.log("[RBAC] allowed -> staying on page")
   return session
 }
 
+/**
+ * Guard base para API routes.
+ * Devuelve 401 si no hay sesión o el usuario está inactivo.
+ */
 export async function requireAuthApi() {
   const session = await getAuthSession()
 
-  if (!session?.user) {
+  if (!session?.user || !session.user.isActive) {
     return { ok: false as const, status: 401 }
   }
 
   return { ok: true as const, session }
 }
 
-export async function requireRoleApi(roles: Role[]) {
+/**
+ * Guard por rol para API routes.
+ * Devuelve 403 si el rol activo no está autorizado.
+ */
+export async function requireRoleApi(roles: import("./roles").Role[]) {
   const result = await requireAuthApi()
 
   if (!result.ok) return result

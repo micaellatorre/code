@@ -1,7 +1,7 @@
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 import NewPurchaseForm from './form'
 
 export default async function NewPurchasePage() {
-  await requireRolePageWithFallback(['ADMIN', 'STOCK'], '/dashboard/purchases/new')
+  await requireRolePage(['ADMIN', 'STOCK'])
   return <NewPurchaseForm />
 }

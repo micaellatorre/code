@@ -1,5 +1,6 @@
 // src/app/api/appointments/[id]/route.ts
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 import { NextRequest, NextResponse } from "next/server"
 
 type Ctx = {
@@ -7,6 +8,12 @@ type Ctx = {
 }
 
 export async function DELETE(_request: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   try {
     const { id } = await params
 

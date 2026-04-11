@@ -1,10 +1,17 @@
 // src/app/api/buyers/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   try {
     const buyer = await prisma.buyer.findUnique({ where: { id } })
@@ -19,6 +26,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const data = await req.json()
 
@@ -35,6 +48,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
 
   try {

@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import SearchBar from "@/components/SearchBar";import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, PencilIcon, TrashIcon, ArrowTrendingDownIcon, CurrencyDollarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/solid'
+import { useSession } from "next-auth/react";
+import SearchBar from "@/components/SearchBar";
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, PencilIcon, TrashIcon, ArrowTrendingDownIcon, CurrencyDollarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/solid'
 import { formatInTimeZone } from 'date-fns-tz'
 import { startOfDay, endOfDay } from 'date-fns'
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
+import type { Role } from "@/lib/auth/roles";
 
 // ====== Tipos ======
 type SerializedSale = {
@@ -89,6 +92,23 @@ const getMainModel = (items: any[] | undefined) => {
 
 // ====== Componente ======
 export default function FilterableSalesTable({ initial }: { initial: SerializedSale[] }) {
+  const { data: session } = useSession();
+  const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
+  const isAdmin = activeRole === "ADMIN";
+  const isSeller = activeRole === "VENDEDOR";
+  const isStock = activeRole === "STOCK";
+  const isSocio = activeRole === "SOCIO";
+  const canSeeCosts = isAdmin || isSocio;
+  const canSeeProfit = isAdmin || isSocio;
+  const canSeeTotal = isAdmin || isSeller || isSocio;
+  const canSeeFinancialStats = isAdmin || isSocio;
+  const canCreateSales = isAdmin || isSeller;
+  const canEditSales = isAdmin || isSeller;
+  const canDeleteSales = isAdmin;
+  const canEditSensitiveFinancialFields = isAdmin;
+  const isReadOnly = !canEditSales && !canDeleteSales;
+  const hasSaleActions = canEditSales || canDeleteSales;
+
   // Normaliza SSR inicial
   const [items, setItems] = useState<SerializedSale[]>(() =>
     normalizeSales(initial)
@@ -114,6 +134,18 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   const [maxTotal, setMaxTotal] = useState<string>("");
   const [minProfit, setMinProfit] = useState<string>("");
   const [maxProfit, setMaxProfit] = useState<string>("");
+
+  useEffect(() => {
+    if (!activeRole) return;
+    if (!canSeeTotal) {
+      setMinTotal("");
+      setMaxTotal("");
+    }
+    if (!canSeeProfit) {
+      setMinProfit("");
+      setMaxProfit("");
+    }
+  }, [activeRole, canSeeProfit, canSeeTotal]);
 
   function clearFilters() {
     setSearchQuery("");
@@ -272,7 +304,31 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   const getEditingValue = (saleId: string, fieldName: string) =>
     editingFields[saleId]?.[fieldName] ?? "";
 
+  function canEditField(fieldName: string) {
+    if (["costTotal", "profit", "total"].includes(fieldName)) {
+      return canEditSales && canEditSensitiveFinancialFields;
+    }
+
+    return canEditSales;
+  }
+
+  function editableCellProps(saleId: string, fieldName: string, currentValue: any) {
+    if (!canEditField(fieldName)) {
+      return {
+        className: "rounded px-1",
+      };
+    }
+
+    return {
+      className: "cursor-pointer hover:bg-base-200 rounded px-1",
+      onClick: () => startEditField(saleId, fieldName, currentValue),
+      title: "Click para editar",
+    };
+  }
+
   const startEditField = (saleId: string, fieldName: string, currentValue: any) => {
+    if (!canEditField(fieldName)) return;
+
     let formattedValue = currentValue;
     if (fieldName === "date" && currentValue) {
       formattedValue = toArgDateInputValue(new Date(currentValue)); // currentValue is ISO string
@@ -311,6 +367,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
   // === NUEVO: persistFieldUpdate (estilo Products) ===
   async function persistFieldUpdate(saleId: string, fieldName: string, value: any) {
+    if (!canEditField(fieldName)) return;
+
     setSavingField({ saleId, fieldName });
     try {
       // Caso especial: buyer.name / buyer.surname -> mandamos ambos juntos
@@ -375,6 +433,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   }
 
   function commitEditField(saleId: string, fieldName: string) {
+    if (!canEditField(fieldName)) return;
+
     const editingValue = editingFields[saleId]?.[fieldName];
     if (editingValue === undefined) return;
 
@@ -412,6 +472,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
   // ====== Delete ======
   const deleteSale = async (id: string) => {
+    if (!canDeleteSales) return;
+
     if (!window.confirm("¿Está seguro que desea eliminar esta venta?")) return;
     setDeletingId(id);
 
@@ -469,6 +531,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
               <ArrowsPointingOutIcon className="size-6" />
             )}
           </button>
+          {canSeeFinancialStats ? (
           <div className="stats bg-base-100/50">
             <div className="stat px-4 py-2 text-error">
               <div className="stat-figure text-error">
@@ -500,12 +563,15 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
               </div>
             </div>
           </div>
+          ) : null}
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/sales/new" className="btn btn-primary">
-            Nueva Venta
-          </Link>
-        </div>
+        {canCreateSales ? (
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/sales/new" className="btn btn-primary">
+              Nueva Venta
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       {/* Header: búsqueda, filtros */}
@@ -542,7 +608,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                   </button>
                 </span>
               )}
-              {(minTotal || maxTotal) && (
+              {canSeeTotal && (minTotal || maxTotal) && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                   Total: {minTotal ? `Min $${minTotal}` : ''}{minTotal && maxTotal ? ' - ' : ''}{maxTotal ? `Max $${maxTotal}` : ''}
                   <button
@@ -557,7 +623,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                   </button>
                 </span>
               )}
-              {(minProfit || maxProfit) && (
+              {canSeeProfit && (minProfit || maxProfit) && (
                 <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                   Ganancia: {minProfit ? `Min $${minProfit}` : ''}{minProfit && maxProfit ? ' - ' : ''}{maxProfit ? `Max $${maxProfit}` : ''}
                   <button
@@ -628,54 +694,62 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                     className="input input-bordered"
                   />
                 </div>
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Total Min</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={minTotal}
-                    onChange={(e) => setMinTotal(e.target.value)}
-                    className="input input-bordered"
-                  />
-                </div>
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Total Max</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={maxTotal}
-                    onChange={(e) => setMaxTotal(e.target.value)}
-                    className="input input-bordered"
-                  />
-                </div>
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Gcia. Min</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={minProfit}
-                    onChange={(e) => setMinProfit(e.target.value)}
-                    className="input input-bordered"
-                  />
-                </div>
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Gcia. Max</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={maxProfit}
-                    onChange={(e) => setMaxProfit(e.target.value)}
-                    className="input input-bordered"
-                  />
-                </div>
+                {canSeeTotal ? (
+                  <>
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text">Total Min</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={minTotal}
+                        onChange={(e) => setMinTotal(e.target.value)}
+                        className="input input-bordered"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text">Total Max</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={maxTotal}
+                        onChange={(e) => setMaxTotal(e.target.value)}
+                        className="input input-bordered"
+                      />
+                    </div>
+                  </>
+                ) : null}
+                {canSeeProfit ? (
+                  <>
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text">Gcia. Min</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={minProfit}
+                        onChange={(e) => setMinProfit(e.target.value)}
+                        className="input input-bordered"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text">Gcia. Max</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={maxProfit}
+                        onChange={(e) => setMaxProfit(e.target.value)}
+                        className="input input-bordered"
+                      />
+                    </div>
+                  </>
+                ) : null}
 
                 <div className="divider" />
 
@@ -726,11 +800,11 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                 <th>Cliente</th>
                 <th>Modelo</th>
                 <th>Items</th>
-                <th>Costo</th>
-                <th>Total</th>
-                <th>Ganancia</th>
+                {canSeeCosts ? <th>Costo</th> : null}
+                {canSeeTotal ? <th>Total</th> : null}
+                {canSeeProfit ? <th>Ganancia</th> : null}
                 <th>Origen</th>
-                <th>Acciones</th>
+                {hasSaleActions ? <th>Acciones</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -738,7 +812,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                 <tr key={s.id ?? `sale-${idx}`}>
                   {/* Fecha (click para editar) */}
                   <td>
-                    {isEditing(s.id, "date") ? (
+                    {canEditField("date") && isEditing(s.id, "date") ? (
                       <div className="flex items-center gap-2">
                         <input
                           autoFocus
@@ -766,11 +840,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         </div>
                       </div>
                     ) : (
-                      <span
-                        className="cursor-pointer hover:bg-base-200 rounded px-1"
-                        onClick={() => startEditField(s.id, "date", s.date ? new Date(s.date).toISOString().split('T')[0] : '')}
-                        title="Click para editar"
-                      >
+                      <span {...editableCellProps(s.id, "date", s.date ? new Date(s.date).toISOString().split('T')[0] : '')}>
                         <div className='tooltip tooltip-right' data-tip={s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy HH:mm') : ''}>
                           <span className="underline decoration-dotted cursor-help">
                             {s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy') : '-'}
@@ -782,7 +852,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
                   {/* Cliente (buyer.name + buyer.surname) */}
                   <td>
-                    {isEditing(s.id, "buyer.name") || isEditing(s.id, "buyer.surname") ? (
+                    {canEditField("buyer.name") && (isEditing(s.id, "buyer.name") || isEditing(s.id, "buyer.surname")) ? (
                       <div className="flex items-center gap-2">
                         <input
                           className="input input-xs w-24"
@@ -825,12 +895,18 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                       </div>
                     ) : (
                       <span
-                        className="cursor-pointer hover:bg-base-200 rounded px-1"
-                        title="Click para editar"
-                        onClick={() => {
+                        {...(canEditField("buyer.name")
+                          ? {
+                            className: "cursor-pointer hover:bg-base-200 rounded px-1",
+                            title: "Click para editar",
+                            onClick: () => {
                           startEditField(s.id, "buyer.name", s.buyer?.name ?? "");
                           startEditField(s.id, "buyer.surname", s.buyer?.surname ?? "");
-                        }}
+                            },
+                          }
+                          : {
+                            className: "rounded px-1",
+                          })}
                       >
                         {s.buyer
                           ? `${s.buyer.name ?? ''} ${s.buyer.surname ?? ''}`.trim() || '-'
@@ -875,8 +951,9 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                   </td>
 
                   {/* Costo */}
+                  {canSeeCosts ? (
                   <td>
-                    {isEditing(s.id, "costTotal") ? (
+                    {canEditField("costTotal") && isEditing(s.id, "costTotal") ? (
                       <div className="flex items-center gap-2">
                         <input
                           className="input input-xs w-20"
@@ -900,18 +977,17 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         </div>
                       </div>
                     ) : (
-                      <span
-                        className="cursor-pointer hover:bg-base-200 rounded px-1"
-                        onClick={() => startEditField(s.id, 'costTotal', s.costTotal)}
-                        title="Click para editar">
+                      <span {...editableCellProps(s.id, "costTotal", s.costTotal)}>
                         $ {s.costTotal ? Number(s.costTotal).toFixed(2) : "-"}
                       </span>
                     )}
                   </td>
+                  ) : null}
 
                   {/* Total (editable decimal) */}
+                  {canSeeTotal ? (
                   <td>
-                    {isEditing(s.id, "total") ? (
+                    {canEditField("total") && isEditing(s.id, "total") ? (
                       <div className="flex items-center gap-2">
                         <input
                           className="input input-xs w-20"
@@ -936,19 +1012,17 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         </div>
                       </div>
                     ) : (
-                      <span
-                        className="cursor-pointer hover:bg-base-200 rounded px-1"
-                        onClick={() => startEditField(s.id, "total", s.total)}
-                        title="Click para editar"
-                      >
+                      <span {...editableCellProps(s.id, "total", s.total)}>
                         $ {s.total ? Number(s.total).toFixed(2) : "-"}
                       </span>
                     )}
                   </td>
+                  ) : null}
 
                   {/* Ganancia (editable decimal) */}
+                  {canSeeProfit ? (
                   <td>
-                    {isEditing(s.id, "profit") ? (
+                    {canEditField("profit") && isEditing(s.id, "profit") ? (
                       <div className="flex items-center gap-2">
                         <input
                           className="input input-xs w-20"
@@ -974,19 +1048,16 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         </div>
                       </div>
                     ) : (
-                      <span
-                        className="cursor-pointer hover:bg-base-200 rounded px-1"
-                        onClick={() => startEditField(s.id, "profit", s.profit)}
-                        title="Click para editar"
-                      >
+                      <span {...editableCellProps(s.id, "profit", s.profit)}>
                         $ {s.profit ? Number(s.profit).toFixed(2) : "-"}
                       </span>
                     )}
                   </td>
+                  ) : null}
 
                   {/* Origen (editable select) */}
                   <td>
-                    {isEditing(s.id, "origin") ? (
+                    {canEditField("origin") && isEditing(s.id, "origin") ? (
                       <div className="flex items-center gap-2">
                         <select
                           className="select select-xs w-20"
@@ -1018,25 +1089,25 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         </div>
                       </div>
                     ) : (
-                      <span
-                        className="cursor-pointer hover:bg-base-200 rounded px-1"
-                        onClick={() => startEditField(s.id, "origin", s.origin)}
-                        title="Click para editar"
-                      >
+                      <span {...editableCellProps(s.id, "origin", s.origin)}>
                         {s.origin ?? "-"}
                       </span>
                     )}
                   </td>
 
                   {/* Acciones */}
+                  {hasSaleActions ? (
                   <td>
                     <div className="flex items-center gap-2">
+                      {canEditSales ? (
                       <Link
                         href={`/dashboard/sales/${s.id}/edit`}
                         className="btn btn-xs btn-square btn-soft"
                       >
                         <PencilIcon className="size-[1.2em]" />
                       </Link>
+                      ) : null}
+                      {canDeleteSales ? (
                       <button
                         className="btn btn-xs btn-square btn-soft btn-error"
                         onClick={() => deleteSale(s.id)}
@@ -1053,8 +1124,10 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                           </>
                         }
                       </button>
+                      ) : null}
                     </div>
                   </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

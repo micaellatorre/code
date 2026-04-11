@@ -1,8 +1,10 @@
+// code\src\components\FilterableProductsTable.tsx
 "use client"
 
 import React, { useMemo, useState, useEffect } from "react"
 import useSWR from "swr"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import {
   ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
@@ -19,6 +21,7 @@ import {
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from "@/lib/timezone"
 import SearchBar from "@/components/SearchBar"
+import type { Role } from "@/lib/auth/roles"
 
 type SerializedProduct = {
   id: string
@@ -113,6 +116,23 @@ function newestCreatedAt(items: SerializedProduct[]) {
 }
 
 export default function FilterableProductsTable() {
+  const { data: session } = useSession()
+  const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
+  const isAdmin = activeRole === "ADMIN"
+  const isSeller = activeRole === "VENDEDOR"
+  const isStock = activeRole === "STOCK"
+  const isSocio = activeRole === "SOCIO"
+  const canSeeCosts = isAdmin
+  const canSeeSalePrice = isAdmin || isSeller || isSocio
+  const canCreateProducts = isAdmin || isStock
+  const canEditProducts = isAdmin || isStock
+  const canDuplicateProducts = isAdmin
+  const canDeleteProducts = isAdmin
+  const canEditStock = isAdmin || isStock
+  const canEditState = isAdmin || isStock
+  const isReadOnly = !canEditProducts
+  const hasProductActions = canEditProducts || canDuplicateProducts || canDeleteProducts
+
   const [viewMode, setViewMode] = useState<"DETAIL" | "GENERAL">("GENERAL")
 
   // server-backed filters (hit the API)
@@ -133,6 +153,8 @@ export default function FilterableProductsTable() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [showCostColumn, setShowCostColumn] = useState(true)
+  const visibleCostColumn = canSeeCosts && showCostColumn
+  const generalColumnCount = 6 + (visibleCostColumn ? 1 : 0) + (canSeeSalePrice ? 1 : 0) + (canSeeCosts ? 1 : 0)
 
   // editing state
   const [editingFields, setEditingFields] = useState<Record<string, Record<string, string>>>({})
@@ -150,6 +172,10 @@ export default function FilterableProductsTable() {
   useEffect(() => {
     setCursor(null)
   }, [search, typeFilter, stateFilter])
+
+  useEffect(() => {
+    if (activeRole && !canSeeCosts) setShowCostColumn(false)
+  }, [activeRole, canSeeCosts])
 
   const apiUrl = useMemo(() => {
     const sp = new URLSearchParams()
@@ -312,7 +338,31 @@ export default function FilterableProductsTable() {
     setStateFilter("")
   }
 
+  function canEditField(fieldName: string) {
+    if (fieldName === "costPrice") return canSeeCosts && canEditProducts
+    if (fieldName === "salePrice") return canSeeSalePrice && canEditProducts
+    if (["stock", "stockInitial", "stockAvailable"].includes(fieldName)) return canEditStock
+    if (fieldName === "state") return canEditState
+    return canEditProducts
+  }
+
+  function editableCellProps(productId: string, fieldName: string, currentValue: any) {
+    if (!canEditField(fieldName)) {
+      return {
+        className: "rounded px-1",
+      }
+    }
+
+    return {
+      className: "cursor-pointer hover:bg-base-200 rounded px-1",
+      onClick: () => startEditField(productId, fieldName, currentValue),
+      title: "Click para editar",
+    }
+  }
+
   function startEditField(productId: string, fieldName: string, currentValue: any) {
+    if (!canEditField(fieldName)) return
+
     setEditingFields((prev) => ({
       ...prev,
       [productId]: {
@@ -346,6 +396,8 @@ export default function FilterableProductsTable() {
   }
 
   async function persistFieldUpdate(productId: string, fieldName: string, value: any, rollback: SerializedProduct | null) {
+    if (!canEditField(fieldName)) return
+
     setSavingField({ productId, fieldName })
     try {
       const updateBody: any = { [fieldName]: value }
@@ -393,6 +445,8 @@ export default function FilterableProductsTable() {
   }
 
   function commitEditField(productId: string, fieldName: string) {
+    if (!canEditField(fieldName)) return
+
     const editingValue = editingFields[productId]?.[fieldName]
     if (editingValue === undefined) return
 
@@ -461,6 +515,8 @@ export default function FilterableProductsTable() {
   }
 
   async function persistStockUpdate(id: string, newStock: number, newStockAvailable?: number) {
+    if (!canEditStock) return
+
     setSavingField({ productId: id, fieldName: "stock" })
     const original = productsLocal.find((p) => p.id === id) ?? null
 
@@ -522,10 +578,14 @@ export default function FilterableProductsTable() {
   }
 
   function startEditStock(id: string, value: number) {
+    if (!canEditStock) return
+
     startEditField(id, "stock", value)
   }
 
   function changeStockBy(id: string, delta: number) {
+    if (!canEditStock) return
+
     const p = productsLocal.find((x) => x.id === id)
     if (!p) return
     const newStock = Math.max(0, (p.stock ?? 0) + delta)
@@ -538,6 +598,8 @@ export default function FilterableProductsTable() {
   }
 
   async function persistStateUpdate(id: string, newState: string) {
+    if (!canEditState) return
+
     setSavingStateId(id)
     const rollback = productsLocal.find((p) => p.id === id) ?? null
 
@@ -560,11 +622,15 @@ export default function FilterableProductsTable() {
   }
 
   function changeState(id: string, newState: string) {
+    if (!canEditState) return
+
     setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: newState } : p)))
     persistStateUpdate(id, newState)
   }
 
   async function deleteProduct(id: string) {
+    if (!canDeleteProducts) return
+
     const ok = window.confirm("¿Eliminar este producto? Esta acción no se puede deshacer.")
     if (!ok) return
     setDeletingId(id)
@@ -592,6 +658,8 @@ export default function FilterableProductsTable() {
   }
 
   async function duplicateProduct(id: string) {
+    if (!canDuplicateProducts) return
+
     setDuplicatingId(id)
     try {
       const res = await fetch(`/api/products/${id}/duplicate`, {
@@ -624,7 +692,7 @@ export default function FilterableProductsTable() {
     return (
       <tr key={p.id}>
         <td className="text-xs text-base-content/60">
-          {isEditing(p.id, "createdAt") ? (
+          {canEditField("createdAt") && isEditing(p.id, "createdAt") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -649,13 +717,7 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() =>
-                startEditField(p.id, "createdAt", p.createdAt ? toArgDateInputValue(new Date(p.createdAt)) : "")
-              }
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "createdAt", p.createdAt ? toArgDateInputValue(new Date(p.createdAt)) : "")}>
               <div
                 className="tooltip tooltip-right"
                 data-tip={p.createdAt ? formatInTimeZone(new Date(p.createdAt), AR_TIME_ZONE, "dd/MM/yyyy HH:mm") : ""}
@@ -669,7 +731,7 @@ export default function FilterableProductsTable() {
         </td>
 
         <td>
-          {isEditing(p.id, "modelName") ? (
+          {canEditField("modelName") && isEditing(p.id, "modelName") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -694,11 +756,7 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "modelName", p.modelName)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "modelName", p.modelName)}>
               {p.notes ? (
                 <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ""}>
                   <span className="underline decoration-dotted">{p.modelName}</span>
@@ -711,7 +769,7 @@ export default function FilterableProductsTable() {
         </td>
 
         <td>
-          {isEditing(p.id, "location") ? (
+          {canEditField("location") && isEditing(p.id, "location") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -736,18 +794,14 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "location", p.location)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "location", p.location)}>
               {p.location || "-"}
             </span>
           )}
         </td>
 
         <td>
-          {isEditing(p.id, "imei") ? (
+          {canEditField("imei") && isEditing(p.id, "imei") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -772,18 +826,14 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "imei", p.imei)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "imei", p.imei)}>
               {p.imei || "-"}
             </span>
           )}
         </td>
 
         <td>
-          {isEditing(p.id, "batteryPct") ? (
+          {canEditField("batteryPct") && isEditing(p.id, "batteryPct") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -810,11 +860,7 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "batteryPct", p.batteryPct)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "batteryPct", p.batteryPct)}>
               {p.batteryPct != null ? (
                 <>
                   {p.batteryPct}
@@ -828,7 +874,7 @@ export default function FilterableProductsTable() {
         </td>
 
         <td>
-          {isEditing(p.id, "color") ? (
+          {canEditField("color") && isEditing(p.id, "color") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -853,18 +899,14 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "color", p.color)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "color", p.color)}>
               {p.color ?? "-"}
             </span>
           )}
         </td>
 
         <td>
-          {isEditing(p.id, 'capacityGB') ? (
+          {canEditField("capacityGB") && isEditing(p.id, 'capacityGB') ? (
             <div className="flex items-center gap-2">
               <select
                 autoFocus
@@ -897,11 +939,7 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, 'capacityGB', p.capacityGB)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "capacityGB", p.capacityGB)}>
               {(p.capacityGB != null) ? (
                 <>
                   {p.capacityGB}<span className="text-xs text-base-content/50"> GB</span>
@@ -914,7 +952,7 @@ export default function FilterableProductsTable() {
         </td>
 
         <td>
-          {isEditing(p.id, "condition") ? (
+          {canEditField("condition") && isEditing(p.id, "condition") ? (
             <div className="flex items-center gap-2">
               <select
                 autoFocus
@@ -945,19 +983,15 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "condition", p.condition)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "condition", p.condition)}>
               {p.condition == null ? "-" : conditionLabelMap[p.condition] ?? p.condition}
             </span>
           )}
         </td>
 
-        {showCostColumn ? (
+        {visibleCostColumn ? (
           <td>
-            {isEditing(p.id, "costPrice") ? (
+            {canEditField("costPrice") && isEditing(p.id, "costPrice") ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-base-content/50">$ </span>
                 <input
@@ -985,11 +1019,7 @@ export default function FilterableProductsTable() {
                 </div>
               </div>
             ) : (
-              <span
-                className="cursor-pointer hover:bg-base-200 rounded px-1"
-                onClick={() => startEditField(p.id, "costPrice", p.costPrice)}
-                title="Click para editar"
-              >
+              <span {...editableCellProps(p.id, "costPrice", p.costPrice)}>
                 <span className="text-xs text-base-content/50">$ </span>
                 {formatDecimal((p as any).costPrice)}
               </span>
@@ -997,8 +1027,9 @@ export default function FilterableProductsTable() {
           </td>
         ) : null}
 
+        {canSeeSalePrice ? (
         <td>
-          {isEditing(p.id, "salePrice") ? (
+          {canEditField("salePrice") && isEditing(p.id, "salePrice") ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-base-content/50">$ </span>
               <input
@@ -1026,19 +1057,16 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "salePrice", p.salePrice)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "salePrice", p.salePrice)}>
               <span className="text-xs text-base-content/50">$ </span>
               {formatDecimal((p as any).salePrice)}
             </span>
           )}
         </td>
+        ) : null}
 
         <td>
-          {isEditing(p.id, "stockInitial") ? (
+          {canEditField("stockInitial") && isEditing(p.id, "stockInitial") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -1071,18 +1099,14 @@ export default function FilterableProductsTable() {
               </div>
             </div>
           ) : (
-            <span
-              className="cursor-pointer hover:bg-base-200 rounded px-1"
-              onClick={() => startEditField(p.id, "stockInitial", p.stockInitial)}
-              title="Click para editar"
-            >
+            <span {...editableCellProps(p.id, "stockInitial", p.stockInitial)}>
               {p.stockInitial}
             </span>
           )}
         </td>
 
         <td>
-          {isEditing(p.id, "stock") ? (
+          {canEditField("stock") && isEditing(p.id, "stock") ? (
             <div className="flex items-center gap-2">
               <input
                 autoFocus
@@ -1110,6 +1134,7 @@ export default function FilterableProductsTable() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              {canEditStock ? (
               <div className="flex flex-row btn-group gap-1 items-center">
                 <button
                   className="btn btn-ghost btn-xs"
@@ -1135,11 +1160,15 @@ export default function FilterableProductsTable() {
                   ▲
                 </button>
               </div>
+              ) : (
+                <span>{p.stock}</span>
+              )}
             </div>
           )}
         </td>
 
         <td>
+          {canEditState ? (
           <div className="dropdown dropdown-start relative">
             <div
               tabIndex={0}
@@ -1164,13 +1193,20 @@ export default function FilterableProductsTable() {
               ))}
             </ul>
           </div>
+          ) : (
+            <span className={`badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
+          )}
         </td>
 
+        {hasProductActions ? (
         <td className="flex items-center gap-2">
+          {canEditProducts ? (
           <Link href={`/dashboard/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
             <PencilIcon className="size-[1.2em]" />
           </Link>
+          ) : null}
 
+          {canDuplicateProducts ? (
           <button
             className="btn btn-xs btn-square btn-soft"
             onClick={() => duplicateProduct(p.id)}
@@ -1183,7 +1219,9 @@ export default function FilterableProductsTable() {
               <DocumentDuplicateIcon className="size-[1.2em]" />
             )}
           </button>
+          ) : null}
 
+          {canDeleteProducts ? (
           <button
             className="btn btn-xs btn-square btn-soft btn-error"
             onClick={() => deleteProduct(p.id)}
@@ -1193,8 +1231,10 @@ export default function FilterableProductsTable() {
           >
             {deletingId === p.id ? <span className="loading loading-bars loading-xs"></span> : <TrashIcon className="size-[1.2em]" />}
           </button>
+          ) : null}
         </td>
-        <td></td>
+        ) : null}
+        {canSeeCosts ? <td></td> : null}
       </tr>
     )
   }
@@ -1290,11 +1330,13 @@ export default function FilterableProductsTable() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/products/new" className="btn btn-primary">
-            Nuevo Producto
-          </Link>
-        </div>
+        {canCreateProducts ? (
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/products/new" className="btn btn-primary">
+              Nuevo Producto
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -1609,12 +1651,13 @@ export default function FilterableProductsTable() {
                 <th>Color</th>
                 <th>Capacidad (GB)</th>
                 <th>Condición</th>
-                {showCostColumn ? <th>Costo (USD)</th> : null}
-                <th>Precio Venta (USD)</th>
+                {visibleCostColumn ? <th>Costo (USD)</th> : null}
+                {canSeeSalePrice ? <th>Precio Venta (USD)</th> : null}
                 <th>Stock Inicial</th>
                 <th>Stock</th>
                 <th>Estado</th>
-                <th>Acciones</th>
+                {hasProductActions ? <th>Acciones</th> : null}
+                {canSeeCosts ? (
                 <th className="text-right">
                   <button
                     type="button"
@@ -1626,6 +1669,7 @@ export default function FilterableProductsTable() {
                     {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
                   </button>
                 </th>
+                ) : null}
               </tr>
             </thead>
             <tbody key="filtered-products" className="h-full">
@@ -1643,9 +1687,10 @@ export default function FilterableProductsTable() {
                 <th>Items</th>
                 <th>Stock</th>
                 <th>Disponible</th>
-                {showCostColumn ? <th>Costo (USD)</th> : null}
-                <th>Precio Venta (USD)</th>
+                {visibleCostColumn ? <th>Costo (USD)</th> : null}
+                {canSeeSalePrice ? <th>Precio Venta (USD)</th> : null}
                 <th className="text-right">Último agregado</th>
+                {canSeeCosts ? (
                 <th className="text-right">
                   <button
                     type="button"
@@ -1657,6 +1702,7 @@ export default function FilterableProductsTable() {
                     {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
                   </button>
                 </th>
+                ) : null}
               </tr>
             </thead>
             <tbody className="h-full">
@@ -1693,23 +1739,25 @@ export default function FilterableProductsTable() {
                       </td>
                       <td>{g.stockSum}</td>
                       <td>{g.availSum}</td>
-                      {showCostColumn ? (
+                      {visibleCostColumn ? (
                         <td>
                           <span className="text-xs text-base-content/50">$ </span>
                           {costLabel}
                         </td>
                       ) : null}
+                      {canSeeSalePrice ? (
                       <td>
                         <span className="text-xs text-base-content/50">$ </span>
                         {saleLabel}
                       </td>
+                      ) : null}
                       <td className="text-right text-xs text-base-content/60">{last}</td>
-                      <td></td>
+                      {canSeeCosts ? <td></td> : null}
                     </tr>
 
                     {isOpen ? (
                       <tr key={`group-body-${g.key}`}>
-                        <td colSpan={showCostColumn ? 9 : 8} className="p-0">
+                        <td colSpan={generalColumnCount} className="p-0">
                           <div className="bg-base-100 border-t border-base-content/5">
                             <div className="px-3 py-2 text-xs text-base-content/60 flex items-center justify-between">
                               <span>
@@ -1731,12 +1779,13 @@ export default function FilterableProductsTable() {
                                     <th>Color</th>
                                     <th>Capacidad (GB)</th>
                                     <th>Condición</th>
-                                    {showCostColumn ? <th>Costo (USD)</th> : null}
-                                    <th>Precio Venta (USD)</th>
+                                    {visibleCostColumn ? <th>Costo (USD)</th> : null}
+                                    {canSeeSalePrice ? <th>Precio Venta (USD)</th> : null}
                                     <th>Stock Inicial</th>
                                     <th>Stock</th>
                                     <th>Estado</th>
-                                    <th>Acciones</th>
+                                    {hasProductActions ? <th>Acciones</th> : null}
+                                    {canSeeCosts ? (
                                     <th className="text-right">
                                       <button
                                         type="button"
@@ -1748,6 +1797,7 @@ export default function FilterableProductsTable() {
                                         {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
                                       </button>
                                     </th>
+                                    ) : null}
                                   </tr>
                                 </thead>
                                 <tbody>

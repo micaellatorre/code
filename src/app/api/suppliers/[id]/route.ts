@@ -1,5 +1,6 @@
 // src/app/api/suppliers/[id]/route.ts
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 import { NextRequest, NextResponse } from "next/server"
 
 type Ctx = {
@@ -8,6 +9,12 @@ type Ctx = {
 
 // GET: proveedor por ID
 export async function GET(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
 
   const supplier = await prisma.supplier.findUnique({ where: { id } })
@@ -19,6 +26,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 // PUT: actualiza proveedor
 export async function PUT(request: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const body = await request.json()
 
@@ -33,6 +46,12 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
 
 // DELETE: elimina proveedor
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
 
   try {

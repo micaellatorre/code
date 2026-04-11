@@ -1,4 +1,4 @@
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 import EditProductForm from './form'
 
 interface EditProductPageProps {
@@ -6,6 +6,6 @@ interface EditProductPageProps {
 }
 
 export default async function EditProductPage({ params }: EditProductPageProps) {
-  await requireRolePageWithFallback(['ADMIN', 'STOCK'], '/dashboard/products/[id]/edit')
+  await requireRolePage(['ADMIN', 'STOCK'])
   return <EditProductForm id={params.id} />
 }

@@ -6,7 +6,7 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import prisma from '@/lib/prisma';
 import type { Metadata } from 'next';
 import FilterableAppointmentsTable from '@/components/appointments/FilterableAppointmentsTable';
-import { requireRolePageWithFallback } from '@/lib/auth/auth';
+import { requireRolePage } from '@/lib/auth/auth';
 
 // SEO
 export const metadata: Metadata = {
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function AppointmentsPage() {
-  await requireRolePageWithFallback(['ADMIN', 'VENDEDOR'], '/dashboard/appointments')
+  await requireRolePage(['ADMIN', 'VENDEDOR'])
 
   const appointments = await prisma.appointment.findMany({
     orderBy: { scheduledAt: 'desc' },

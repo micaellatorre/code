@@ -1,8 +1,15 @@
 // src/app/api/buyers/search/route.ts
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { requireRoleApi } from '@/lib/auth/auth'
 
 export async function GET(req: Request) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q')
 

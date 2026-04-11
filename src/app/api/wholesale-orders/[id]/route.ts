@@ -1,5 +1,6 @@
 // src/app/api/wholesale-orders/[id]/route.ts
 import prisma from "@/lib/prisma"
+import { requireRoleApi } from "@/lib/auth/auth"
 import { NextRequest, NextResponse } from "next/server"
 
 type Ctx = {
@@ -10,6 +11,12 @@ type Ctx = {
  * API para obtener, actualizar o eliminar un pedido mayorista por ID.
  */
 export async function GET(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
 
   const order = await prisma.wholesaleOrder.findUnique({ where: { id } })
@@ -20,6 +27,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PUT(request: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
   const body = await request.json()
 
@@ -33,6 +46,12 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
   const { id } = await params
 
   try {

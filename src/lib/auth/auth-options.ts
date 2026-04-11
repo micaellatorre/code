@@ -1,10 +1,7 @@
 import type { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import prisma from "@/lib/prisma"
-
-type Role = "ADMIN" | "VENDEDOR" | "STOCK" | "SOCIO"
-
-const SIMULABLE_ROLES: Role[] = ["VENDEDOR", "STOCK", "SOCIO"]
+import { SIMULABLE_ROLES, type Role } from "./roles"
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -13,12 +10,15 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
+
   session: {
     strategy: "jwt",
   },
+
   pages: {
     signIn: "/auth/login",
   },
+
   callbacks: {
     async signIn({ user }) {
       if (!user.email) return false
@@ -44,19 +44,22 @@ export const authOptions: NextAuthOptions = {
           where: { email: token.email },
         })
 
-        if (dbUser) {
-          token.uid = dbUser.id
-          token.role = dbUser.role
-          token.tenantId = dbUser.tenantId
-          token.isActive = dbUser.isActive
+        if (!dbUser || !dbUser.isActive) {
+          token.isActive = false
+          return token
+        }
 
-          if (!token.activeRole) {
-            token.activeRole = dbUser.role
-          }
+        token.uid = dbUser.id
+        token.role = dbUser.role
+        token.tenantId = dbUser.tenantId
+        token.isActive = dbUser.isActive
 
-          if (dbUser.role !== "ADMIN") {
-            token.activeRole = dbUser.role
-          }
+        if (!token.activeRole) {
+          token.activeRole = dbUser.role
+        }
+
+        if (dbUser.role !== "ADMIN") {
+          token.activeRole = dbUser.role
         }
       }
 
@@ -70,6 +73,11 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      // Blindaje extra: un usuario que no sea ADMIN nunca puede mantener un activeRole diferente de su rol real.
+      if (token.role !== "ADMIN") {
+        token.activeRole = token.role
+      }
+
       return token
     },
 
@@ -80,7 +88,8 @@ export const authOptions: NextAuthOptions = {
         session.user.activeRole = (token.activeRole as Role) ?? (token.role as Role)
         session.user.tenantId = token.tenantId ?? null
         session.user.isActive = Boolean(token.isActive)
-        session.user.isSimulatingRole = session.user.role === "ADMIN" && session.user.activeRole !== "ADMIN"
+        session.user.isSimulatingRole =
+          session.user.role === "ADMIN" && session.user.activeRole !== "ADMIN"
       }
 
       return session

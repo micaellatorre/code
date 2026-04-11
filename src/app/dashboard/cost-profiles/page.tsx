@@ -3,14 +3,14 @@ import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import SearchBar from '@/components/SearchBar'
 import prisma from '@/lib/prisma'
-import { requireRolePageWithFallback } from '@/lib/auth/auth'
+import { requireRolePage } from '@/lib/auth/auth'
 
 /**
  * Listado de perfiles de costo (CostProfile).
  * Esta pantalla utiliza el layout general del dashboard y un buscador simple.
  */
 export default async function CostProfilesPage() {
-  await requireRolePageWithFallback(['ADMIN'], '/dashboard/cost-profiles')
+  await requireRolePage(['ADMIN'])
 
   const profiles = await prisma.costProfile.findMany({ orderBy: { name: 'asc' } })
   return (
