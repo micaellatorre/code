@@ -1,16 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useDolar } from "@/app/hooks/useDolar"
 import { DolarPanelItem } from "@/app/lib/dolar"
 import {
   Bars3BottomLeftIcon,
   ArrowTopRightOnSquareIcon,
-  ChevronDownIcon,
-  SunIcon,
-  MoonIcon,
 } from "@heroicons/react/24/solid"
 import { signIn, signOut, useSession } from "next-auth/react"
+import ThemeSwitcher from "./ThemeSwitcher"
 import UserSessionMenu from "./UserSessionMenu"
 
 export default function Navbar({
@@ -20,33 +18,7 @@ export default function Navbar({
 }) {
   const { data: session, status } = useSession()
 
-  const themes = [
-    { value: "luxury", label: "Luxury", type: "dark" },
-    { value: "halloween", label: "Halloween", type: "dark" },
-    { value: "forest", label: "Forest", type: "dark" },
-    { value: "black", label: "Black", type: "dark" },
-    { value: "night", label: "Night", type: "dark" },
-    { value: "coffee", label: "Coffee", type: "dark" },
-    { value: "retro", label: "Desert", type: "light" },
-    { value: "fantasy", label: "Fantasy", type: "light" },
-    { value: "wireframe", label: "Wireframe", type: "light" },
-    { value: "cmyk", label: "CMYK", type: "light" },
-    { value: "autumn", label: "Autumn", type: "light" },
-    { value: "lemonade", label: "Lemonade", type: "light" },
-    { value: "winter", label: "Winter", type: "light" },
-  ]
-
-  const [theme, setTheme] = useState("light")
   const { data: dolarData, error, isLoading } = useDolar()
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("theme")
-      const initial = saved ?? "light"
-      setTheme(initial)
-      document.documentElement.setAttribute("data-theme", initial)
-    }
-  }, [])
 
   const dolarBlueVenta =
     dolarData?.panel
@@ -63,14 +35,6 @@ export default function Navbar({
       console.error("Error obteniendo cotizaciones del dólar:", error)
     }
   }, [error])
-
-  const handleThemeChange = (value: string) => {
-    setTheme(value)
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", value)
-      localStorage.setItem("theme", value)
-    }
-  }
 
   return (
     <header className="sticky top-0 z-30 bg-base-100/85 backdrop-blur">
@@ -136,38 +100,7 @@ export default function Navbar({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="dropdown dropdown-end">
-            <div tabIndex={0} role="button" className="btn btn-sm bg-base-200 border-0 shadow-none">
-              Tema
-              <ChevronDownIcon className="inline-block h-3 w-3 fill-current opacity-60 ml-1" />
-            </div>
-
-            <ul
-              tabIndex={0}
-              className="dropdown-content z-[80] menu p-2 shadow-lg bg-base-200 rounded-box w-52"
-            >
-              {themes.map((t) => (
-                <li key={t.value}>
-                  <label className="flex items-center justify-between w-full cursor-pointer relative">
-                    <input
-                      type="radio"
-                      name="theme-dropdown"
-                      className="theme-controller btn btn-sm btn-ghost justify-start"
-                      aria-label={t.label}
-                      value={t.value}
-                      checked={theme === t.value}
-                      onChange={() => handleThemeChange(t.value)}
-                    />
-                    {t.type === "light" ? (
-                      <SunIcon className="size-5 absolute right-2 pointer-events-none" />
-                    ) : (
-                      <MoonIcon className="size-4 absolute right-2 pointer-events-none" />
-                    )}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ThemeSwitcher />
           {session?.user?.isSimulatingRole ? (
             <div className="hidden md:flex items-center px-3 py-1 rounded-full bg-warning/20 text-warning-content text-xs font-medium border border-warning/30">
               Navegando como: {session.user.activeRole}

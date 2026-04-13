@@ -133,12 +133,12 @@ export default function FilterableProductsTable() {
   const isReadOnly = !canEditProducts
   const hasProductActions = canEditProducts || canDuplicateProducts || canDeleteProducts
 
-  const [viewMode, setViewMode] = useState<"DETAIL" | "GENERAL">("GENERAL")
+  const [viewMode, setViewMode] = useState<"DETAIL" | "GENERAL">("DETAIL")
 
   // server-backed filters (hit the API)
   const [search, setSearch] = useState("")
-  const [typeFilter, setTypeFilter] = useState<string>("")
-  const [stateFilter, setStateFilter] = useState<string>("")
+  const [typeFilter, setTypeFilter] = useState<string>("PHONE")
+  const [stateFilter, setStateFilter] = useState<string>("EN_STOCK")
 
   // client-side filters (work on already-fetched page)
   const [brandFilter, setBrandFilter] = useState<string>("")
@@ -166,7 +166,7 @@ export default function FilterableProductsTable() {
   // pagination (cursor-based)
   const [cursor, setCursor] = useState<string | null>(null)
   const [limit] = useState<number>(100)
-  const [orderBy, setOrderBy] = useState("created_desc")
+  const [orderBy, setOrderBy] = useState("alpha_asc")
 
   // Reset pagination when server-backed filters change
   useEffect(() => {

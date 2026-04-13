@@ -5,14 +5,14 @@
 body {
   min-height: 100vh;
   font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f7f9fb;
-  color: #22292f;
+  background-color: hsl(var(--b2));
+  color: hsl(var(--bc));
   letter-spacing: 0.01em;
 }
 
 /* Card base style */
 .cp-card {
-  @apply bg-white rounded-xl shadow-md p-6 transition-shadow duration-200 hover:shadow-lg;
+  @apply bg-base-100 rounded-xl shadow-md p-6 transition-shadow duration-200 hover:shadow-lg;
 }
 
 /* Button base style */

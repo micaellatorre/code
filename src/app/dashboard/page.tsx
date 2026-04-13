@@ -1,572 +1,496 @@
-import DashboardLayout from '@/components/DashboardLayout'
-import DashboardKpiCard from '@/components/DashboardKpiCard'
-import prisma from '@/lib/prisma'
-import type { Metadata } from 'next'
-import { endOfDay, startOfDay, subDays } from 'date-fns'
-import { toDate } from 'date-fns-tz'
-import { AR_TIME_ZONE } from '@/lib/timezone'
-import { requireRolePage } from '@/lib/auth/auth'
-import {
-  ArchiveBoxIcon,
-  BanknotesIcon,
-  BuildingStorefrontIcon,
-  ChartBarIcon,
-  ClipboardDocumentListIcon,
-  CubeIcon,
-  ExclamationTriangleIcon,
-  ShoppingBagIcon,
-  WrenchScrewdriverIcon,
-} from '@heroicons/react/24/solid'
+import DashboardLayout from "@/components/DashboardLayout"
+import DashboardOverviewClient from "@/components/dashboard/DashboardOverviewClient"
+import type {
+  CompareMode,
+  DashboardInventoryInsightItem,
+  DashboardOverviewData,
+  DashboardProductInsightItem,
+  DashboardProductType,
+  DashboardRange,
+  DashboardRevenueTrendPoint,
+  DashboardStockCompositionItem,
+  DashboardTrendPointDetail,
+  DashboardTrendProductSummary,
+} from "@/components/dashboard/DashboardTypes"
+import { requireRolePage } from "@/lib/auth/auth"
+import prisma from "@/lib/prisma"
+import { AR_TIME_ZONE, fromArgDateInputValue, toArgDateInputValue } from "@/lib/timezone"
+import { addDays, differenceInCalendarDays, eachDayOfInterval, subDays, subYears } from "date-fns"
+import { formatInTimeZone } from "date-fns-tz"
+import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: 'Dashboard',
-  description: 'Panel de control con métricas clave del negocio',
+  title: "Dashboard",
+  description: "Panel de control con metricas clave del negocio",
 }
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
-function usd(value: number) {
-  return `U$D ${value.toLocaleString('de-DE', {
+const DEFAULT_CRITICAL_STOCK_THRESHOLD = 2
+const DEFAULT_AGING_DAYS_THRESHOLD = 30
+
+type DashboardPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
+
+type SaleForTrend = {
+  id: string
+  date: Date
+  total: unknown
+  profit: unknown
+}
+
+type SaleItemForInsight = {
+  units: number
+  lineTotal: unknown
+  lineProfit: unknown
+  sale: { date: Date }
+  product: {
+    id: string
+    modelName: string
+    type: DashboardProductType
+  }
+}
+
+function numberParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function parseCompare(value: string | string[] | undefined): CompareMode {
+  const raw = numberParam(value)
+  return raw === "previous" || raw === "yoy" ? raw : "none"
+}
+
+function parseDateParam(value: string | string[] | undefined) {
+  const raw = numberParam(value)
+  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+  const date = fromArgDateInputValue(raw)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function asRange(from: Date, to: Date): DashboardRange {
+  return {
+    from: toArgDateInputValue(from),
+    to: toArgDateInputValue(to),
+    label: `${formatInTimeZone(from, AR_TIME_ZONE, "dd/MM/yyyy")} - ${formatInTimeZone(to, AR_TIME_ZONE, "dd/MM/yyyy")}`,
+  }
+}
+
+function money(value: number) {
+  return `U$D ${value.toLocaleString("de-DE", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
 }
 
-function percentDelta(current: number, previous: number) {
+function percentDelta(current: number, previous?: number | null) {
+  if (previous == null) return undefined
   if (previous === 0) return current > 0 ? 100 : 0
   return ((current - previous) / previous) * 100
 }
 
-export default async function DashboardPage() {
-  const session = await requireRolePage(['ADMIN', 'SOCIO'])
+function buildCompareRange(from: Date, to: Date, compare: CompareMode) {
+  if (compare === "none") return null
 
-  const isAdmin = session.user.activeRole === 'ADMIN'
-  const isSocio = session.user.activeRole === 'SOCIO'
+  if (compare === "yoy") {
+    return { from: subYears(from, 1), to: subYears(to, 1) }
+  }
 
-  const nowInArgentina = toDate(new Date(), { timeZone: AR_TIME_ZONE })
-  const todayStart = startOfDay(nowInArgentina)
-  const todayEnd = endOfDay(nowInArgentina)
+  const days = differenceInCalendarDays(to, from) + 1
+  const compareTo = subDays(from, 1)
+  return { from: subDays(compareTo, days - 1), to: compareTo }
+}
 
-  const previousDayStart = startOfDay(subDays(nowInArgentina, 1))
-  const previousDayEnd = endOfDay(subDays(nowInArgentina, 1))
+function dayKey(date: Date) {
+  return formatInTimeZone(date, AR_TIME_ZONE, "yyyy-MM-dd")
+}
+
+function dayLabel(date: Date) {
+  return formatInTimeZone(date, AR_TIME_ZONE, "dd/MM")
+}
+
+function longDayLabel(date: Date) {
+  return formatInTimeZone(date, AR_TIME_ZONE, "dd/MM/yyyy")
+}
+
+function mapToTopProducts(products: Map<string, DashboardTrendProductSummary>) {
+  return Array.from(products.values())
+    .sort((a, b) => b.units - a.units || b.profit - a.profit)
+    .slice(0, 6)
+}
+
+function buildDailySalesSeries(
+  currentDays: Date[],
+  currentSales: SaleForTrend[],
+  compareSales: Pick<SaleForTrend, "date" | "total">[],
+  saleItems: SaleItemForInsight[],
+  compare: CompareMode,
+): {
+  trend: DashboardRevenueTrendPoint[]
+  details: DashboardTrendPointDetail[]
+} {
+  const currentByDay = new Map<string, { revenue: number; profit: number; salesCount: number }>()
+  for (const sale of currentSales) {
+    const key = dayKey(sale.date)
+    const existing = currentByDay.get(key) ?? { revenue: 0, profit: 0, salesCount: 0 }
+    existing.revenue += Number(sale.total)
+    existing.profit += Number(sale.profit)
+    existing.salesCount += 1
+    currentByDay.set(key, existing)
+  }
+
+  const compareKeys = Array.from(new Set(compareSales.map((sale) => dayKey(sale.date)))).sort()
+  const compareIndexByKey = new Map(compareKeys.map((key, index) => [key, index]))
+  const compareByIndex = compareSales.reduce<number[]>((acc, sale, index) => {
+    const key = dayKey(sale.date)
+    const dayIndex = compareIndexByKey.get(key) ?? index
+    acc[dayIndex] = (acc[dayIndex] ?? 0) + Number(sale.total)
+    return acc
+  }, [])
+
+  const productsByDay = new Map<string, Map<string, DashboardTrendProductSummary>>()
+  for (const item of saleItems) {
+    const key = dayKey(item.sale.date)
+    const productKey = item.product.id
+    const dayProducts = productsByDay.get(key) ?? new Map<string, DashboardTrendProductSummary>()
+    const existing =
+      dayProducts.get(productKey) ??
+      ({
+        id: item.product.id,
+        name: item.product.modelName,
+        type: item.product.type,
+        units: 0,
+        revenue: 0,
+        profit: 0,
+      } satisfies DashboardTrendProductSummary)
+
+    existing.units += item.units
+    existing.revenue += Number(item.lineTotal)
+    existing.profit += Number(item.lineProfit)
+    dayProducts.set(productKey, existing)
+    productsByDay.set(key, dayProducts)
+  }
+
+  const trend: DashboardRevenueTrendPoint[] = []
+  const details: DashboardTrendPointDetail[] = []
+
+  currentDays.forEach((date, index) => {
+    const key = dayKey(date)
+    const current = currentByDay.get(key) ?? { revenue: 0, profit: 0, salesCount: 0 }
+    const comparisonRevenue = compare === "none" ? undefined : compareByIndex[index] ?? 0
+
+    trend.push(
+      compare === "none"
+        ? {
+            date: dayLabel(date),
+            dateKey: key,
+            Ingresos: current.revenue,
+            Utilidad: current.profit,
+          }
+        : {
+            date: dayLabel(date),
+            dateKey: key,
+            Actual: current.revenue,
+            Comparacion: comparisonRevenue,
+          },
+    )
+
+    details.push({
+      dateKey: key,
+      label: longDayLabel(date),
+      revenue: current.revenue,
+      profit: current.profit,
+      salesCount: current.salesCount,
+      comparisonRevenue,
+      products: mapToTopProducts(productsByDay.get(key) ?? new Map<string, DashboardTrendProductSummary>()),
+    })
+  })
+
+  return { trend, details }
+}
+
+function buildTopProductInsights(saleItems: SaleItemForInsight[]): DashboardProductInsightItem[] {
+  const topProductsMap = new Map<string, DashboardProductInsightItem>()
+
+  for (const item of saleItems) {
+    const existing =
+      topProductsMap.get(item.product.id) ??
+      ({
+        id: item.product.id,
+        name: item.product.modelName,
+        type: item.product.type,
+        unitsSold: 0,
+        revenue: 0,
+        profit: 0,
+      } satisfies DashboardProductInsightItem)
+
+    existing.unitsSold += item.units
+    existing.revenue += Number(item.lineTotal)
+    existing.profit += Number(item.lineProfit)
+    topProductsMap.set(item.product.id, existing)
+  }
+
+  return Array.from(topProductsMap.values()).sort((a, b) => b.unitsSold - a.unitsSold || b.profit - a.profit)
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const session = await requireRolePage(["ADMIN", "SOCIO"])
+  const params = (await searchParams) ?? {}
+  const today = fromArgDateInputValue(toArgDateInputValue(new Date()))
+  const defaultTo = today
+  const defaultFrom = subDays(today, 29)
+
+  const parsedFrom = parseDateParam(params.from) ?? defaultFrom
+  const parsedTo = parseDateParam(params.to) ?? defaultTo
+  const rangeFrom = parsedFrom <= parsedTo ? parsedFrom : parsedTo
+  const rangeTo = parsedFrom <= parsedTo ? parsedTo : parsedFrom
+  const compare = parseCompare(params.compare)
+  const compareRangeDates = buildCompareRange(rangeFrom, rangeTo, compare)
+  const rangeEndExclusive = addDays(rangeTo, 1)
+  const compareEndExclusive = compareRangeDates ? addDays(compareRangeDates.to, 1) : null
+  const currentDays = eachDayOfInterval({ start: rangeFrom, end: rangeTo })
 
   const [
-    stockAgg,
-    stockPhones,
-    stockAccessories,
-    totalProducts,
+    currentSales,
+    compareSales,
+    productsForValuation,
+    stockByStateAndType,
+    productsInRepair,
+    productsInTransit,
+    appointments,
+    saleItems,
+    inventoryProductsBase,
+    negativeMarginSales,
     totalSuppliers,
     totalPurchases,
     totalSales,
     totalCostProfiles,
     totalWholesaleOrders,
-    productsEnStock,
-    salesToday,
-    salesPreviousDay,
-    productsInRepair,
-    productsInTransit,
-    criticalStockProducts,
-    oldProducts,
-    productsForRotation,
   ] = await Promise.all([
-    prisma.product.aggregate({
-      _sum: { stock: true, stockAvailable: true },
+    prisma.sale.findMany({
+      where: { date: { gte: rangeFrom, lt: rangeEndExclusive } },
+      select: { id: true, date: true, total: true, profit: true, costTotal: true },
     }),
-    prisma.product.aggregate({
-      where: { type: 'PHONE' },
-      _sum: { stock: true, stockAvailable: true },
+    compareRangeDates
+      ? prisma.sale.findMany({
+          where: { date: { gte: compareRangeDates.from, lt: compareEndExclusive! } },
+          select: { id: true, date: true, total: true, profit: true },
+        })
+      : Promise.resolve([]),
+    prisma.product.findMany({
+      where: { state: "EN_STOCK" },
+      select: { id: true, costPrice: true, stock: true, stockAvailable: true },
     }),
-    prisma.product.aggregate({
-      where: { type: 'ACCESSORY' },
-      _sum: { stock: true, stockAvailable: true },
+    prisma.product.groupBy({
+      by: ["state", "type"],
+      _sum: { stock: true },
     }),
-    prisma.product.count(),
+    prisma.product.count({ where: { state: "EN_REPARACION" } }),
+    prisma.product.count({ where: { state: "EN_CAMINO" } }),
+    prisma.appointment.findMany({
+      where: { scheduledAt: { gte: rangeFrom, lt: rangeEndExclusive } },
+      select: { id: true, status: true, outcome: true, saleId: true },
+    }),
+    prisma.saleItem.findMany({
+      where: { sale: { date: { gte: rangeFrom, lt: rangeEndExclusive } } },
+      select: {
+        units: true,
+        lineTotal: true,
+        lineProfit: true,
+        sale: { select: { date: true } },
+        product: { select: { id: true, modelName: true, type: true } },
+      },
+    }),
+    prisma.product.findMany({
+      where: { status: "AVAILABLE" },
+      orderBy: [{ stockAvailable: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        modelName: true,
+        type: true,
+        stockAvailable: true,
+        stock: true,
+        stockInitial: true,
+        state: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
+    prisma.sale.findMany({
+      where: { date: { gte: rangeFrom, lt: rangeEndExclusive }, profit: { lt: 0 } },
+      select: { id: true, profit: true },
+      take: 8,
+    }),
     prisma.supplier.count(),
     prisma.purchase.count(),
     prisma.sale.count(),
     prisma.costProfile.count(),
     prisma.wholesaleOrder.count(),
-    prisma.product.findMany({
-      where: { state: 'EN_STOCK' },
-      select: {
-        id: true,
-        modelName: true,
-        type: true,
-        costPrice: true,
-        stock: true,
-        stockAvailable: true,
-        createdAt: true,
-      },
-    }),
-    prisma.sale.findMany({
-      where: {
-        date: {
-          gte: todayStart,
-          lt: todayEnd,
-        },
-      },
-      select: {
-        id: true,
-        total: true,
-        profit: true,
-        costTotal: true,
-        createdAt: true,
-      },
-    }),
-    prisma.sale.findMany({
-      where: {
-        date: {
-          gte: previousDayStart,
-          lt: previousDayEnd,
-        },
-      },
-      select: {
-        total: true,
-        profit: true,
-      },
-    }),
-    prisma.product.count({
-      where: { state: 'EN_REPARACION' },
-    }),
-    prisma.product.count({
-      where: { state: 'EN_CAMINO' },
-    }),
-    prisma.product.findMany({
-      where: {
-        stockAvailable: {
-          lte: 2,
-        },
-        state: 'EN_STOCK',
-      },
-      orderBy: [{ stockAvailable: 'asc' }, { updatedAt: 'desc' }],
-      take: 8,
-      select: {
-        id: true,
-        modelName: true,
-        type: true,
-        stockAvailable: true,
-        state: true,
-      },
-    }),
-    prisma.product.findMany({
-      where: {
-        createdAt: {
-          lt: subDays(nowInArgentina, 30),
-        },
-        status: 'AVAILABLE',
-      },
-      orderBy: { createdAt: 'asc' },
-      take: 8,
-      select: {
-        id: true,
-        modelName: true,
-        type: true,
-        createdAt: true,
-        stockAvailable: true,
-      },
-    }),
-    prisma.product.findMany({
-      where: {
-        state: 'EN_STOCK',
-      },
-      orderBy: [{ stockAvailable: 'desc' }, { updatedAt: 'desc' }],
-      take: 10,
-      select: {
-        id: true,
-        modelName: true,
-        type: true,
-        stock: true,
-        stockAvailable: true,
-        salePrice: true,
-        costPrice: true,
-      },
-    }),
   ])
 
-  const stockTotal = stockAgg._sum.stock ?? 0
-  const stockAvailableTotal = stockAgg._sum.stockAvailable ?? 0
-  const stockPhonesTotal = stockPhones._sum.stock ?? 0
-  const stockAccessoriesTotal = stockAccessories._sum.stock ?? 0
-  const stockPhonesAvailable = stockPhones._sum.stockAvailable ?? 0
-  const stockAccessoriesAvailable = stockAccessories._sum.stockAvailable ?? 0
-
-  const inventoryValuation = productsEnStock.reduce(
+  const salesTotal = currentSales.reduce((acc, sale) => acc + Number(sale.total), 0)
+  const profitTotal = currentSales.reduce((acc, sale) => acc + Number(sale.profit), 0)
+  const compareSalesTotal = compareSales.reduce((acc, sale) => acc + Number(sale.total), 0)
+  const compareProfitTotal = compareSales.reduce((acc, sale) => acc + Number(sale.profit), 0)
+  const inventoryValuation = productsForValuation.reduce(
     (acc, product) => acc + Number(product.costPrice) * product.stock,
     0,
   )
+  const stockAvailableTotal = productsForValuation.reduce((acc, product) => acc + product.stockAvailable, 0)
+  const averageTicket = currentSales.length ? salesTotal / currentSales.length : 0
+  const compareAverageTicket = compareSales.length ? compareSalesTotal / compareSales.length : 0
+  const dailyRevenue = buildDailySalesSeries(currentDays, currentSales, compareSales, saleItems, compare)
+  const topProducts = buildTopProductInsights(saleItems)
+  const inventoryProducts: DashboardInventoryInsightItem[] = inventoryProductsBase.map((product) => ({
+    id: product.id,
+    name: product.modelName,
+    type: product.type,
+    stockAvailable: product.stockAvailable,
+    stockTotal: product.stock,
+    stockInitial: product.stockInitial,
+    state: product.state,
+    status: product.status,
+    daysInInventory: differenceInCalendarDays(today, product.createdAt),
+  }))
+  const criticalStockCount = inventoryProducts.filter(
+    (product) => product.state === "EN_STOCK" && product.stockAvailable <= DEFAULT_CRITICAL_STOCK_THRESHOLD,
+  ).length
+  const agingProductsCount = inventoryProducts.filter(
+    (product) => product.stockAvailable > 0 && product.daysInInventory >= DEFAULT_AGING_DAYS_THRESHOLD,
+  ).length
+  const stockComposition: DashboardStockCompositionItem[] = stockByStateAndType.map((row) => ({
+    name: row.state,
+    type: row.type,
+    value: row._sum.stock ?? 0,
+  }))
 
-  const salesTodayTotal = salesToday.reduce(
-    (acc, sale) => acc + Number(sale.total),
-    0,
-  )
-
-  const salesTodayProfit = salesToday.reduce(
-    (acc, sale) => acc + Number(sale.profit),
-    0,
-  )
-
-  const salesTodayCost = salesToday.reduce(
-    (acc, sale) => acc + Number(sale.costTotal),
-    0,
-  )
-
-  const salesPreviousDayTotal = salesPreviousDay.reduce(
-    (acc, sale) => acc + Number(sale.total),
-    0,
-  )
-
-  const salesPreviousDayProfit = salesPreviousDay.reduce(
-    (acc, sale) => acc + Number(sale.profit),
-    0,
-  )
-
-  const salesDelta = percentDelta(salesTodayTotal, salesPreviousDayTotal)
-  const profitDelta = percentDelta(salesTodayProfit, salesPreviousDayProfit)
-
-  const averageTicket =
-    salesToday.length > 0 ? salesTodayTotal / salesToday.length : 0
-
-  const alerts = [
-    criticalStockProducts.length > 0
-      ? {
-          id: 'AL-01',
-          severity: 'Alta',
-          label: `Stock crítico detectado en ${criticalStockProducts.length} producto(s)`,
-        }
-      : null,
-    oldProducts.length > 0
-      ? {
-          id: 'AL-02',
-          severity: 'Media',
-          label: `${oldProducts.length} producto(s) con más de 30 días en inventario`,
-        }
-      : null,
-    productsInRepair > 0
-      ? {
-          id: 'AL-REPAIR',
-          severity: 'Media',
-          label: `${productsInRepair} equipo(s) actualmente en reparación`,
-        }
-      : null,
-  ].filter(Boolean) as { id: string; severity: string; label: string }[]
+  const data: DashboardOverviewData = {
+    role: session.user.activeRole as "ADMIN" | "SOCIO",
+    range: asRange(rangeFrom, rangeTo),
+    compare,
+    compareRange: compareRangeDates ? asRange(compareRangeDates.from, compareRangeDates.to) : null,
+    defaults: {
+      productTypeFilter: "ALL",
+      criticalStockThreshold: DEFAULT_CRITICAL_STOCK_THRESHOLD,
+      agingDaysThreshold: DEFAULT_AGING_DAYS_THRESHOLD,
+      topProductsMetric: "units",
+    },
+    kpis: [
+      {
+        key: "sales-total",
+        title: "Ventas Totales",
+        value: money(salesTotal),
+        subtitle: `${currentSales.length} ventas en el periodo`,
+        trend: percentDelta(salesTotal, compare === "none" ? undefined : compareSalesTotal),
+        tone: "info",
+      },
+      {
+        key: "gross-profit",
+        title: "Utilidad Bruta",
+        value: money(profitTotal),
+        subtitle: "Resultado bruto del periodo",
+        trend: percentDelta(profitTotal, compare === "none" ? undefined : compareProfitTotal),
+        tone: "success",
+      },
+      {
+        key: "inventory-valuation",
+        title: "Valuacion de Inventario",
+        value: money(inventoryValuation),
+        subtitle: "Capital inmovilizado en stock",
+        tone: "warning",
+        sensitive: true,
+      },
+      {
+        key: "available-stock",
+        title: "Stock Disponible",
+        value: `${stockAvailableTotal} u.`,
+        subtitle: "Unidades en estado EN_STOCK",
+        tone: "default",
+      },
+      {
+        key: "appointments",
+        title: "Citas del Periodo",
+        value: appointments.length,
+        subtitle: "Turnos registrados en el rango",
+        tone: "info",
+      },
+      {
+        key: "repair",
+        title: "Equipos en Reparacion",
+        value: productsInRepair,
+        subtitle: "Estado operativo actual",
+        tone: productsInRepair > 0 ? "warning" : "default",
+      },
+      {
+        key: "transit",
+        title: "Logistica en Transito",
+        value: productsInTransit,
+        subtitle: "Equipos marcados EN_CAMINO",
+        tone: "info",
+      },
+      {
+        key: "average-ticket",
+        title: "Ticket Promedio",
+        value: money(averageTicket),
+        subtitle: "Promedio por venta cerrada",
+        trend: percentDelta(averageTicket, compare === "none" ? undefined : compareAverageTicket),
+        tone: "default",
+      },
+    ],
+    alerts: [
+      criticalStockCount
+        ? {
+            id: "AL-01",
+            severity: "Alta",
+            description: `Stock critico en ${criticalStockCount} producto(s) con umbral ${DEFAULT_CRITICAL_STOCK_THRESHOLD}.`,
+          }
+        : null,
+      agingProductsCount
+        ? {
+            id: "AL-02",
+            severity: "Media",
+            description: `${agingProductsCount} producto(s) con aging mayor o igual a ${DEFAULT_AGING_DAYS_THRESHOLD} dias.`,
+          }
+        : null,
+      negativeMarginSales.length
+        ? {
+            id: "AL-03",
+            severity: "Alta",
+            description: `${negativeMarginSales.length} venta(s) del periodo con margen negativo.`,
+          }
+        : null,
+      productsInRepair
+        ? {
+            id: "AL-04",
+            severity: "Media",
+            description: `${productsInRepair} equipo(s) actualmente en reparacion.`,
+          }
+        : null,
+    ].filter(Boolean) as DashboardOverviewData["alerts"],
+    revenueTrend: dailyRevenue.trend,
+    revenueCategories: compare === "none" ? ["Ingresos", "Utilidad"] : ["Actual", "Comparacion"],
+    revenueTrendDetails: dailyRevenue.details,
+    stockComposition,
+    appointmentsFunnel: [
+      { name: "Citas", value: appointments.length },
+      { name: "Concretadas", value: appointments.filter((a) => a.status === "CONCRETADA").length },
+      { name: "Ventas", value: appointments.filter((a) => a.outcome === "VENTA_CONCRETADA" || a.saleId).length },
+      { name: "No venta", value: appointments.filter((a) => a.outcome === "NO_SE_CONCRETO").length },
+    ],
+    topProducts,
+    inventoryProducts,
+    systemStats: [
+      { name: "Proveedores", value: totalSuppliers },
+      { name: "Compras", value: totalPurchases },
+      { name: "Ventas", value: totalSales },
+      { name: "Cost profiles", value: totalCostProfiles },
+      { name: "Pedidos mayoristas", value: totalWholesaleOrders },
+    ],
+  }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Panel de Control</h1>
-            <p className="text-sm text-base-content/60">
-              {isAdmin
-                ? 'Vista gerencial con foco en rentabilidad, stock y salud operativa.'
-                : 'Vista de lectura con foco en indicadores consolidados del negocio.'}
-            </p>
-          </div>
-
-          <div className="text-xs text-base-content/50">
-            Corte diario: {todayStart.toLocaleDateString('es-AR')}
-          </div>
-        </div>
-
-        {alerts.length > 0 ? (
-          <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <ExclamationTriangleIcon className="size-5 text-warning" />
-              <h2 className="font-semibold">Alertas de negocio</h2>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="rounded-xl border border-base-content/10 bg-base-100 px-4 py-3 text-sm"
-                >
-                  <div className="font-medium">{alert.id}</div>
-                  <div className="text-base-content/70">{alert.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <DashboardKpiCard
-            title="Ventas Totales del Día"
-            value={usd(salesTodayTotal)}
-            icon={<BanknotesIcon className="size-6" />}
-            trend={salesDelta}
-            subtitle="Ingresos consolidados del día"
-            tone="warning"
-          />
-
-          {isAdmin ? (
-            <DashboardKpiCard
-              title="Utilidad del Día"
-              value={usd(salesTodayProfit)}
-              icon={<ChartBarIcon className="size-6" />}
-              trend={profitDelta}
-              subtitle="Ganancia bruta diaria"
-              tone="success"
-            />
-          ) : null}
-
-          {isAdmin ? (
-            <DashboardKpiCard
-              title="Valuación de Inventario"
-              value={usd(inventoryValuation)}
-              icon={<ArchiveBoxIcon className="size-6" />}
-              subtitle="Capital inmovilizado en stock"
-              tone="info"
-            />
-          ) : null}
-
-          <DashboardKpiCard
-            title="Stock Disponible"
-            value={`${stockAvailableTotal} u.`}
-            icon={<CubeIcon className="size-6" />}
-            subtitle="Unidades listas para operar"
-            tone="default"
-          />
-
-          <DashboardKpiCard
-            title="Equipos en Reparación"
-            value={productsInRepair}
-            icon={<WrenchScrewdriverIcon className="size-6" />}
-            subtitle="Control técnico actual"
-            tone={productsInRepair > 0 ? 'warning' : 'default'}
-          />
-
-          <DashboardKpiCard
-            title="Logística en Tránsito"
-            value={productsInTransit}
-            icon={<BuildingStorefrontIcon className="size-6" />}
-            subtitle="Equipos marcados EN_CAMINO"
-            tone="info"
-          />
-
-          <DashboardKpiCard
-            title="Ticket Promedio del Día"
-            value={usd(averageTicket)}
-            icon={<ShoppingBagIcon className="size-6" />}
-            subtitle="Promedio por venta cerrada hoy"
-            tone="default"
-          />
-
-          <DashboardKpiCard
-            title="Productos Registrados"
-            value={totalProducts}
-            icon={<ClipboardDocumentListIcon className="size-6" />}
-            subtitle="Catálogo total cargado"
-            tone="default"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="rounded-2xl border border-base-content/10 bg-base-100 p-5 xl:col-span-2">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold">Resumen operativo</h2>
-                <p className="text-sm text-base-content/60">
-                  Estado actual del inventario y actividad diaria
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl bg-base-200 p-4">
-                <div className="text-xs uppercase tracking-wide text-base-content/50">
-                  Stock total
-                </div>
-                <div className="mt-2 text-2xl font-semibold">{stockTotal}</div>
-              </div>
-
-              <div className="rounded-xl bg-base-200 p-4">
-                <div className="text-xs uppercase tracking-wide text-base-content/50">
-                  Teléfonos
-                </div>
-                <div className="mt-2 text-2xl font-semibold">{stockPhonesTotal}</div>
-                <div className="mt-1 text-xs text-base-content/50">
-                  Disponibles: {stockPhonesAvailable}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-base-200 p-4">
-                <div className="text-xs uppercase tracking-wide text-base-content/50">
-                  Accesorios
-                </div>
-                <div className="mt-2 text-2xl font-semibold">{stockAccessoriesTotal}</div>
-                <div className="mt-1 text-xs text-base-content/50">
-                  Disponibles: {stockAccessoriesAvailable}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-base-200 p-4">
-                <div className="text-xs uppercase tracking-wide text-base-content/50">
-                  Ventas hoy
-                </div>
-                <div className="mt-2 text-2xl font-semibold">{salesToday.length}</div>
-                <div className="mt-1 text-xs text-base-content/50">
-                  Costo asociado: {usd(salesTodayCost)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-base-content/10 bg-base-100 p-5">
-            <h2 className="font-semibold">Métricas del sistema</h2>
-            <p className="mt-1 text-sm text-base-content/60">
-              Conteos generales del entorno operativo
-            </p>
-
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="flex items-center justify-between rounded-xl bg-base-200 px-4 py-3">
-                <span>Proveedores</span>
-                <span className="font-semibold">{totalSuppliers}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-base-200 px-4 py-3">
-                <span>Compras</span>
-                <span className="font-semibold">{totalPurchases}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-base-200 px-4 py-3">
-                <span>Ventas</span>
-                <span className="font-semibold">{totalSales}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-base-200 px-4 py-3">
-                <span>Cost Profiles</span>
-                <span className="font-semibold">{totalCostProfiles}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-base-200 px-4 py-3">
-                <span>Pedidos mayoristas</span>
-                <span className="font-semibold">{totalWholesaleOrders}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <div className="rounded-2xl border border-base-content/10 bg-base-100 p-5">
-            <h2 className="font-semibold">Stock crítico</h2>
-            <p className="mt-1 text-sm text-base-content/60">
-              Productos con disponibilidad baja
-            </p>
-
-            <div className="mt-4 overflow-hidden rounded-xl border border-base-content/10">
-              <table className="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Modelo</th>
-                    <th>Tipo</th>
-                    <th className="text-right">Disponible</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {criticalStockProducts.length > 0 ? (
-                    criticalStockProducts.map((product) => (
-                      <tr key={product.id}>
-                        <td>{product.modelName}</td>
-                        <td>{product.type}</td>
-                        <td className="text-right font-semibold text-warning">
-                          {product.stockAvailable}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="text-center text-base-content/50">
-                        Sin alertas de stock crítico.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-base-content/10 bg-base-100 p-5">
-            <h2 className="font-semibold">Aging de inventario</h2>
-            <p className="mt-1 text-sm text-base-content/60">
-              Productos con más de 30 días en inventario
-            </p>
-
-            <div className="mt-4 overflow-hidden rounded-xl border border-base-content/10">
-              <table className="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Modelo</th>
-                    <th>Tipo</th>
-                    <th>Fecha alta</th>
-                    <th className="text-right">Disponible</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {oldProducts.length > 0 ? (
-                    oldProducts.map((product) => (
-                      <tr key={product.id}>
-                        <td className="font-medium text-error">{product.modelName}</td>
-                        <td>{product.type}</td>
-                        <td>{product.createdAt.toLocaleDateString('es-AR')}</td>
-                        <td className="text-right">{product.stockAvailable}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="text-center text-base-content/50">
-                        No hay productos venciendo el umbral de aging.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {isAdmin ? (
-          <div className="rounded-2xl border border-base-content/10 bg-base-100 p-5">
-            <h2 className="font-semibold">Ranking simple de rotación / exposición</h2>
-            <p className="mt-1 text-sm text-base-content/60">
-              Base provisional hasta sumar BI real por sell-through y períodos comparados
-            </p>
-
-            <div className="mt-4 overflow-hidden rounded-xl border border-base-content/10">
-              <table className="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Modelo</th>
-                    <th>Tipo</th>
-                    <th className="text-right">Stock</th>
-                    <th className="text-right">Disponible</th>
-                    <th className="text-right">Costo</th>
-                    <th className="text-right">Venta</th>
-                    <th className="text-right">Margen unitario</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productsForRotation.map((product) => {
-                    const cost = Number(product.costPrice)
-                    const sale = Number(product.salePrice)
-                    const margin = sale - cost
-
-                    return (
-                      <tr key={product.id}>
-                        <td>{product.modelName}</td>
-                        <td>{product.type}</td>
-                        <td className="text-right">{product.stock}</td>
-                        <td className="text-right">{product.stockAvailable}</td>
-                        <td className="text-right">{usd(cost)}</td>
-                        <td className="text-right">{usd(sale)}</td>
-                        <td className={`text-right font-medium ${margin >= 0 ? 'text-success' : 'text-error'}`}>
-                          {usd(margin)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      <DashboardOverviewClient data={data} />
     </DashboardLayout>
   )
 }

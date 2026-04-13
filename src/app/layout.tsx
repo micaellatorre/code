@@ -2,6 +2,21 @@ import './globals.css'
 // import type { Metadata } from "next"
 import { AuthSessionProvider } from "@/components/auth-session-provider"
 
+const themeInitScript = `
+(function() {
+  try {
+    const stored = localStorage.getItem("theme");
+    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const theme = stored === "dark" || stored === "light"
+      ? stored
+      : (systemDark ? "dark" : "light");
+
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+  } catch (e) {}
+})();
+`
+
 export const metadata = {
   title: 'GP Importaciones',
   description: 'Administración de stock y ventas de celulares y accesorios',
@@ -25,7 +40,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" data-theme="light">
+    <html lang="es" data-theme="light" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       {/*
         DaisyUI aplica la temática a través del atributo `data-theme` en el
         elemento html. Aquí establecemos el tema por defecto a "light". El
