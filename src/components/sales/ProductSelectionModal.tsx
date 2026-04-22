@@ -95,6 +95,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
   const [isLoading, setIsLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<ProductType | 'ALL'>('ALL')
+  const [orderBy, setOrderBy] = useState<'alpha_asc' | 'alpha_desc' | 'created_desc' | 'created_asc' | 'updated_desc' | 'updated_asc'>('alpha_asc')
   const [selection, setSelection] = useState<Record<string, SelectionDraft>>({})
 
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -110,10 +111,11 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     if (q.trim()) params.set('q', q.trim())
     if (type !== 'ALL') params.set('type', type)
     if (cursor) params.set('cursor', cursor)
+    params.set('orderBy', orderBy)
     return `/api/products?${params.toString()}`
   }
 
-  const fetchProducts = async (q: string, type: ProductType | 'ALL') => {
+  const fetchProducts = useCallback(async (q: string, type: ProductType | 'ALL') => {
     setIsLoading(true)
     const seq = ++requestSeq.current
 
@@ -135,7 +137,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     } finally {
       if (seq === requestSeq.current) setIsLoading(false)
     }
-  }
+  }, [orderBy])
 
   const fetchMore = async () => {
     if (!nextCursor) return
@@ -167,10 +169,10 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     }
   }
 
-  const debouncedFetch = useCallback(debounce(fetchProducts, 300), [])
+  const debouncedFetch = useMemo(() => debounce(fetchProducts, 300), [fetchProducts])
   useEffect(() => {
     debouncedFetch(query, typeFilter)
-  }, [query, typeFilter, debouncedFetch])
+  }, [query, typeFilter, orderBy, debouncedFetch])
 
   const availableStock = useMemo(() => {
     const stockMap = new Map<string, number>()
@@ -241,6 +243,21 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
             <button onClick={() => setTypeFilter('PHONE')} className={`btn btn-sm join-item ${typeFilter === 'PHONE' ? 'btn-active' : ''}`}>Teléfonos</button>
             <button onClick={() => setTypeFilter('ACCESSORY')} className={`btn btn-sm join-item ${typeFilter === 'ACCESSORY' ? 'btn-active' : ''}`}>Accesorios</button>
           </div>
+          <div className="flex flex-col items-start gap-1">
+            <label className="text-xs font-medium text-base-content/60">Ordenar por</label>
+            <select
+              className="select select-bordered select-sm"
+              value={orderBy}
+              onChange={(e) => setOrderBy(e.target.value as any)}
+            >
+              <option value="alpha_asc">Alfabético A-Z</option>
+              <option value="alpha_desc">Alfabético Z-A</option>
+              <option value="created_desc">Más nuevos creados</option>
+              <option value="created_asc">Más viejos creados</option>
+              <option value="updated_desc">Más nuevos modificados</option>
+              <option value="updated_asc">Más viejos modificados</option>
+            </select>
+          </div>
         </div>
 
         <div className="overflow-x-auto h-96">
@@ -254,6 +271,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                     <th></th>
                     <th>Producto</th>
                     <th>Stock Disp.</th>
+                    <th>% Batería</th>
+                    <th>IMEI</th>
                     <th>Cantidad</th>
                   </tr>
                 </thead>
@@ -281,6 +300,20 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                           </div>
                         </td>
                         <td><span className="badge badge-ghost">{currentStock}</span></td>
+                        <td>{p.batteryPct != null ? `${p.batteryPct}%` : 'N/A'}</td>
+                        <td>
+                          {p.imei ? (
+                            <div className="text-xs">
+                              <span className="opacity-40">
+                                {/* last 5th to 7th digits */}
+                                  {p.imei.length > 6 ? `${p.imei.slice(-6, -4)}` : 'IMEI'}
+                              </span>
+                              <span className="font-bold underline">{p.imei.slice(-4)}</span>
+                            </div>
+                          ) : (
+                            'N/A'
+                          )}
+                        </td>
                         <td>
                           {isSelected && (
                             <input

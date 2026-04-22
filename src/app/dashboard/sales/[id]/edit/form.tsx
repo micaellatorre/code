@@ -201,13 +201,6 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
         <div className="lg:col-span-2 flex flex-col gap-6">
           <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} />
           <SaleMetaSection meta={meta} setMeta={setMeta} />
-
-          <div className="alert alert-info text-sm">
-            Para actualizar renglones y pagos desde esta pantalla, extendé el
-            endpoint <code>/api/sales/[id]</code> para aceptar <code>items</code> y{" "}
-            <code>payments</code>. Por ahora, se guardan solo comprador, fecha, origen y notas.
-          </div>
-
           <SaleItemsSection items={items} setItems={setItems} />
           <PaymentsSection payments={payments} setPayments={setPayments} total={totals.total} />
         </div>
