@@ -40,6 +40,7 @@ type ApiProduct = {
   stock: number
   stockAvailable: number
   notes: string | null
+  origin: string | null
   createdAt: string | null
   updatedAt: string | null
 }
@@ -79,6 +80,7 @@ function apiToPrismaProduct(p: ApiProduct): Product {
     stockAvailable: p.stockAvailable ?? 0,
 
     notes: p.notes,
+    origin: p.origin,
 
     createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
     updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),

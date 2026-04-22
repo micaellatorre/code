@@ -133,10 +133,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
     }
 
-    const allowed = ["modelName", "brand", "condition", "color", "status", "state", "imei", "notes", "location"] as const
+    const allowed = ["modelName", "brand", "condition", "color", "status", "state", "imei", "notes", "location", "origin"] as const
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
-        if (["brand", "imei", "color", "notes", "location"].includes(key) && body[key] === "") {
+        if (["brand", "imei", "color", "notes", "location", "origin"].includes(key) && body[key] === "") {
           updateData[key] = null
         } else {
           updateData[key] = body[key]

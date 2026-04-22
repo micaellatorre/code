@@ -73,6 +73,7 @@ model Product {
   stock          Int           @default(1) // stock actual
   stockAvailable Int           @default(1) // stock disponible para venta
   location       String? // opcional, para saber dónde está el producto, después se puede usar para filtrar por ubicación y agregar un modelo Sede con datos de ubiacion, contacto, direccion, etc.
+  origin         String? // "Proveedor Alex", "Compra en ML", "Trade-in Apple", "Plan Canje", etc.
   notes          String?
 
   saleItems    SaleItem[]

@@ -11,6 +11,8 @@ export default function NewProductForm() {
   const router = useRouter()
   const [form, setForm] = useState({
     modelName: '',
+    location: '',
+    origin: '',
     brand: '',
     imei: '',
     capacityGB: '',
@@ -35,6 +37,8 @@ export default function NewProductForm() {
     setIsSubmitting(true)
     const payload: any = {
       modelName: form.modelName,
+      location: form.location || null,
+      origin: form.origin || null,
       brand: form.brand || null,
       imei: form.imei || null,
       capacityGB: form.capacityGB ? Number(form.capacityGB) : null,
@@ -84,8 +88,19 @@ export default function NewProductForm() {
             </select>
           </div>
           <div className="form-control">
+            <label className="label"><span className="label-text">Ubicación</span></label>
+            <input type="text" name="location" value={form.location} onChange={handleChange} required className="input input-bordered" />
+            <span className="label-text-alt mt-1 text-base-content/50 italic">Ubicación física del producto</span>
+          </div>
+          <div className="form-control">
+            <label className="label"><span className="label-text">Origen</span></label>
+            <input type="text" name="origin" value={form.origin} onChange={handleChange} required className="input input-bordered" />
+              <span className="label-text-alt mt-1 text-base-content/50 italic">Ej: "Alex", "MercadoLibre", "Cambio Apple", "Plan Canje", etc.</span>
+          </div>
+          <div className="form-control">
             <label className="label"><span className="label-text">Modelo</span></label>
             <input type="text" name="modelName" value={form.modelName} onChange={handleChange} required className="input input-bordered" />
+            <span className="label-text-alt mt-1 text-base-content/50 italic">Ej: "iPhone 15 Pro", "Funda 14 Pro Max"</span>
           </div>
           <div className="form-control">
             <label className="label"><span className="label-text">IMEI</span></label>
@@ -103,6 +118,8 @@ export default function NewProductForm() {
               <option value="2048">2048 GB (2 TB)</option>
             </select>
           </div>
+        </fieldset>
+        <fieldset className="lg:col-span-1 p-4 space-y-2">
           <div className="form-control">
             <label className="label"><span className="label-text">Condición</span></label>
             <select name="condition" value={form.condition} onChange={handleChange} className="select select-bordered">
@@ -118,8 +135,6 @@ export default function NewProductForm() {
             <label className="label"><span className="label-text">Color</span></label>
             <input type="text" name="color" value={form.color} onChange={handleChange} className="input input-bordered" />
           </div>
-        </fieldset>
-        <fieldset className="lg:col-span-1 p-4 space-y-2">
           <div className="form-control">
             <label className="label"><span className="label-text">% Batería</span></label>
             <input type="number" name="batteryPct" value={form.batteryPct} onChange={handleChange} className="input input-bordered" />

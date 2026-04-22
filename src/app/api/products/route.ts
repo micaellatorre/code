@@ -1,9 +1,8 @@
 // app/api/products/route.ts
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
-import { Prisma } from "../../../../prisma/generated/client";
-
 import { NextResponse } from "next/server"
+import type { Prisma } from "@prisma/client"
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
@@ -52,6 +51,7 @@ const PRODUCT_SELECT = {
   batteryPct: true,
   purchaseDate: true,
   location: true,
+  origin: true,
   costPrice: true,
   salePrice: true,
   shippingCost: true,
@@ -98,8 +98,8 @@ export async function GET(request: Request) {
     const where: NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"] = { tenantId }
 
     // Cast string params to the correct Prisma enum types rather than `any`
-    if (stateParam) where.state = stateParam as Prisma.EnumProductStateFilter["equals"]
-    if (typeParam) where.type = typeParam as Prisma.EnumProductTypeFilter["equals"]
+    if (stateParam) where.state = stateParam as any
+    if (typeParam) where.type = typeParam as any
 
     if (q) {
       where.OR = [
@@ -147,6 +147,7 @@ export async function GET(request: Request) {
       color: p.color ?? null,
       batteryPct: p.batteryPct ?? null,
       location: p.location ?? null,
+      origin: p.origin ?? null,
 
       purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
 

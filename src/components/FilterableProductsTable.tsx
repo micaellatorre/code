@@ -45,6 +45,7 @@ type SerializedProduct = {
   stockAvailable: number
   notes: string | null
   location: string | null
+  origin: string | null
   createdAt: string | null
   updatedAt: string | null
 }
@@ -152,9 +153,12 @@ export default function FilterableProductsTable() {
   const [isTableExpanded, setIsTableExpanded] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
-  const [showCostColumn, setShowCostColumn] = useState(true)
-  const visibleCostColumn = canSeeCosts && showCostColumn
-  const generalColumnCount = 6 + (visibleCostColumn ? 1 : 0) + (canSeeSalePrice ? 1 : 0) + (canSeeCosts ? 1 : 0)
+  const [showSensitiveColumns, setShowSensitiveColumns] = useState(true)
+  const visibleOriginColumn = showSensitiveColumns
+  const visibleLocationColumn = showSensitiveColumns
+  const visibleImeiColumn = showSensitiveColumns
+  const visibleCostColumn = canSeeCosts && showSensitiveColumns
+  const generalColumnCount = 6 + (visibleCostColumn ? 1 : 0) + (canSeeSalePrice ? 1 : 0) + 1
 
   // editing state
   const [editingFields, setEditingFields] = useState<Record<string, Record<string, string>>>({})
@@ -172,10 +176,6 @@ export default function FilterableProductsTable() {
   useEffect(() => {
     setCursor(null)
   }, [search, typeFilter, stateFilter])
-
-  useEffect(() => {
-    if (activeRole && !canSeeCosts) setShowCostColumn(false)
-  }, [activeRole, canSeeCosts])
 
   const apiUrl = useMemo(() => {
     const sp = new URLSearchParams()
@@ -425,7 +425,9 @@ export default function FilterableProductsTable() {
           p.id === productId
             ? {
               ...p,
-              [fieldName]: updated[fieldName] ?? (p as any)[fieldName],
+              [fieldName]: Object.prototype.hasOwnProperty.call(updated, fieldName)
+                ? updated[fieldName]
+                : (p as any)[fieldName],
               ...(fieldName === "stock" && updated.stockAvailable !== undefined
                 ? { stockAvailable: updated.stockAvailable }
                 : {}),
@@ -483,7 +485,7 @@ export default function FilterableProductsTable() {
     } else if (fieldName === "createdAt") {
       if (processedValue === null || processedValue === "") processedValue = null
       else processedValue = fromArgDateInputValue(processedValue).toISOString()
-    } else if (["imei", "color", "brand", "notes", "location"].includes(fieldName)) {
+    } else if (["imei", "color", "brand", "notes", "location", "origin"].includes(fieldName)) {
       processedValue = processedValue === "" ? null : processedValue
     }
 
@@ -688,6 +690,24 @@ export default function FilterableProductsTable() {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
+  function renderSensitiveColumnsToggle() {
+    const label = showSensitiveColumns ? "Ocultar columnas sensibles" : "Mostrar columnas sensibles"
+
+    return (
+      <th className="text-right">
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs"
+          onClick={() => setShowSensitiveColumns((prev) => !prev)}
+          title={label}
+          aria-label={label}
+        >
+          {showSensitiveColumns ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
+        </button>
+      </th>
+    )
+  }
+
   function ProductRow({ p }: { p: SerializedProduct }) {
     return (
       <tr key={p.id}>
@@ -730,6 +750,108 @@ export default function FilterableProductsTable() {
           )}
         </td>
 
+        {visibleOriginColumn ? (
+          <td>
+            {canEditField("origin") && isEditing(p.id, "origin") ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  type="text"
+                  value={getEditingValue(p.id, "origin")}
+                  onChange={(e) => updateEditingValue(p.id, "origin", e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEditField(p.id, "origin")
+                    if (e.key === "Escape") cancelEditField(p.id, "origin")
+                  }}
+                  onBlur={() => commitEditField(p.id, "origin")}
+                  className="input input-xs w-full min-w-[100px]"
+                  disabled={savingField?.productId === p.id && savingField?.fieldName === "origin"}
+                />
+                <div className="flex flex-col join join-horizontal border border-base-content/10">
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "origin")}>
+                    <CheckIcon className="h-[1em]" />
+                  </button>
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "origin")}>
+                    <XMarkIcon className="h-[1em]" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <span {...editableCellProps(p.id, "origin", p.origin)}>
+                {p.origin || "-"}
+              </span>
+            )}
+          </td>
+        ) : null}
+
+        {visibleLocationColumn ? (
+          <td>
+            {canEditField("location") && isEditing(p.id, "location") ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  type="text"
+                  value={getEditingValue(p.id, "location")}
+                  onChange={(e) => updateEditingValue(p.id, "location", e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEditField(p.id, "location")
+                    if (e.key === "Escape") cancelEditField(p.id, "location")
+                  }}
+                  onBlur={() => commitEditField(p.id, "location")}
+                  className="input input-xs w-full min-w-[100px]"
+                  disabled={savingField?.productId === p.id && savingField?.fieldName === "location"}
+                />
+                <div className="flex flex-col join join-horizontal border border-base-content/10">
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "location")}>
+                    <CheckIcon className="h-[1em]" />
+                  </button>
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "location")}>
+                    <XMarkIcon className="h-[1em]" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <span {...editableCellProps(p.id, "location", p.location)}>
+                {p.location || "-"}
+              </span>
+            )}
+          </td>
+        ) : null}
+
+        {visibleImeiColumn ? (
+          <td>
+            {canEditField("imei") && isEditing(p.id, "imei") ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  type="text"
+                  value={getEditingValue(p.id, "imei")}
+                  onChange={(e) => updateEditingValue(p.id, "imei", e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEditField(p.id, "imei")
+                    if (e.key === "Escape") cancelEditField(p.id, "imei")
+                  }}
+                  onBlur={() => commitEditField(p.id, "imei")}
+                  className="input input-xs w-full min-w-[100px]"
+                  disabled={savingField?.productId === p.id && savingField?.fieldName === "imei"}
+                />
+                <div className="flex flex-col join join-horizontal border border-base-content/10">
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "imei")}>
+                    <CheckIcon className="h-[1em]" />
+                  </button>
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "imei")}>
+                    <XMarkIcon className="h-[1em]" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <span {...editableCellProps(p.id, "imei", p.imei)}>
+                {p.imei || "-"}
+              </span>
+            )}
+          </td>
+        ) : null}
+
         <td>
           {canEditField("modelName") && isEditing(p.id, "modelName") ? (
             <div className="flex items-center gap-2">
@@ -764,70 +886,6 @@ export default function FilterableProductsTable() {
               ) : (
                 p.modelName
               )}
-            </span>
-          )}
-        </td>
-
-        <td>
-          {canEditField("location") && isEditing(p.id, "location") ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                type="text"
-                value={getEditingValue(p.id, "location")}
-                onChange={(e) => updateEditingValue(p.id, "location", e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitEditField(p.id, "location")
-                  if (e.key === "Escape") cancelEditField(p.id, "location")
-                }}
-                onBlur={() => commitEditField(p.id, "location")}
-                className="input input-xs w-full min-w-[100px]"
-                disabled={savingField?.productId === p.id && savingField?.fieldName === "location"}
-              />
-              <div className="flex flex-col join join-horizontal border border-base-content/10">
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "location")}>
-                  <CheckIcon className="h-[1em]" />
-                </button>
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "location")}>
-                  <XMarkIcon className="h-[1em]" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <span {...editableCellProps(p.id, "location", p.location)}>
-              {p.location || "-"}
-            </span>
-          )}
-        </td>
-
-        <td>
-          {canEditField("imei") && isEditing(p.id, "imei") ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                type="text"
-                value={getEditingValue(p.id, "imei")}
-                onChange={(e) => updateEditingValue(p.id, "imei", e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitEditField(p.id, "imei")
-                  if (e.key === "Escape") cancelEditField(p.id, "imei")
-                }}
-                onBlur={() => commitEditField(p.id, "imei")}
-                className="input input-xs w-full min-w-[100px]"
-                disabled={savingField?.productId === p.id && savingField?.fieldName === "imei"}
-              />
-              <div className="flex flex-col join join-horizontal border border-base-content/10">
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "imei")}>
-                  <CheckIcon className="h-[1em]" />
-                </button>
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "imei")}>
-                  <XMarkIcon className="h-[1em]" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <span {...editableCellProps(p.id, "imei", p.imei)}>
-              {p.imei || "-"}
             </span>
           )}
         </td>
@@ -1234,7 +1292,7 @@ export default function FilterableProductsTable() {
           ) : null}
         </td>
         ) : null}
-        {canSeeCosts ? <td></td> : null}
+        <td></td>
       </tr>
     )
   }
@@ -1644,9 +1702,10 @@ export default function FilterableProductsTable() {
             <thead>
               <tr>
                 <th>Agregado</th>
+                {visibleOriginColumn ? <th>Origen</th> : null}
+                {visibleLocationColumn ? <th>Ubicación</th> : null}
+                {visibleImeiColumn ? <th>IMEI</th> : null}
                 <th>Modelo</th>
-                <th>Ubicación</th>
-                <th>IMEI</th>
                 <th>Bateria %</th>
                 <th>Color</th>
                 <th>Capacidad (GB)</th>
@@ -1657,19 +1716,7 @@ export default function FilterableProductsTable() {
                 <th>Stock</th>
                 <th>Estado</th>
                 {hasProductActions ? <th>Acciones</th> : null}
-                {canSeeCosts ? (
-                <th className="text-right">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs"
-                    onClick={() => setShowCostColumn((prev) => !prev)}
-                    title={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
-                    aria-label={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
-                  >
-                    {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
-                  </button>
-                </th>
-                ) : null}
+                {renderSensitiveColumnsToggle()}
               </tr>
             </thead>
             <tbody key="filtered-products" className="h-full">
@@ -1690,19 +1737,7 @@ export default function FilterableProductsTable() {
                 {visibleCostColumn ? <th>Costo (USD)</th> : null}
                 {canSeeSalePrice ? <th>Precio Venta (USD)</th> : null}
                 <th className="text-right">Último agregado</th>
-                {canSeeCosts ? (
-                <th className="text-right">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs"
-                    onClick={() => setShowCostColumn((prev) => !prev)}
-                    title={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
-                    aria-label={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
-                  >
-                    {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
-                  </button>
-                </th>
-                ) : null}
+                {renderSensitiveColumnsToggle()}
               </tr>
             </thead>
             <tbody className="h-full">
@@ -1752,7 +1787,7 @@ export default function FilterableProductsTable() {
                       </td>
                       ) : null}
                       <td className="text-right text-xs text-base-content/60">{last}</td>
-                      {canSeeCosts ? <td></td> : null}
+                      <td></td>
                     </tr>
 
                     {isOpen ? (
@@ -1773,8 +1808,9 @@ export default function FilterableProductsTable() {
                                 <thead>
                                   <tr>
                                     <th>Agregado</th>
+                                    {visibleLocationColumn ? <th>Ubicación</th> : null}
+                                    {visibleImeiColumn ? <th>IMEI</th> : null}
                                     <th>Modelo</th>
-                                    <th>IMEI</th>
                                     <th>Bateria %</th>
                                     <th>Color</th>
                                     <th>Capacidad (GB)</th>
@@ -1785,19 +1821,7 @@ export default function FilterableProductsTable() {
                                     <th>Stock</th>
                                     <th>Estado</th>
                                     {hasProductActions ? <th>Acciones</th> : null}
-                                    {canSeeCosts ? (
-                                    <th className="text-right">
-                                      <button
-                                        type="button"
-                                        className="btn btn-ghost btn-xs"
-                                        onClick={() => setShowCostColumn((prev) => !prev)}
-                                        title={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
-                                        aria-label={showCostColumn ? "Ocultar columna de costo" : "Mostrar columna de costo"}
-                                      >
-                                        {showCostColumn ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
-                                      </button>
-                                    </th>
-                                    ) : null}
+                                    {renderSensitiveColumnsToggle()}
                                   </tr>
                                 </thead>
                                 <tbody>
