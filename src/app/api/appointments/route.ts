@@ -13,6 +13,13 @@ export async function GET() {
 
   const appointments = await prisma.appointment.findMany({
     include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       buyer: true,
       interests: { include: { product: true } },
     },
@@ -61,14 +68,15 @@ export async function POST(request: Request) {
   try {
     const txResult = await prisma.$transaction(
       async (tx) => {
-        const tenantId = process.env.DEFAULT_TENANT_ID;
-        if (!tenantId) {
-          throw new Error("DEFAULT_TENANT_ID no configurado");
+        const userId = auth.session?.user?.id || null;
+
+        if (!userId) {
+          throw new Error("Usuario no autenticado");
         }
 
         const appointment = await tx.appointment.create({
           data: {
-            tenantId,
+            userId: userId,
             buyerId,
             scheduledAt: new Date(scheduledAt),
             durationMinutes: durationMinutes

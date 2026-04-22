@@ -1,26 +1,23 @@
+import Link from "next/link"
+import DashboardLayout from "@/components/DashboardLayout"
+import Breadcrumbs from "@/components/Breadcrumbs"
+import prisma from "@/lib/prisma"
+import type { Metadata } from "next"
+import FilterableAppointmentsTable from "@/components/appointments/FilterableAppointmentsTable"
+import { requireRolePage } from "@/lib/auth/auth"
 
-// /appointments/page.tsx
-import Link from 'next/link';
-import DashboardLayout from '@/components/DashboardLayout';
-import Breadcrumbs from '@/components/Breadcrumbs';
-import prisma from '@/lib/prisma';
-import type { Metadata } from 'next';
-import FilterableAppointmentsTable from '@/components/appointments/FilterableAppointmentsTable';
-import { requireRolePage } from '@/lib/auth/auth';
-
-// SEO
 export const metadata: Metadata = {
-  title: 'Citas',
-  description: 'Listado y gestión de citas',
+  title: "Citas",
+  description: "Listado y gestión de citas",
 }
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic"
 
 export default async function AppointmentsPage() {
-  await requireRolePage(['ADMIN', 'VENDEDOR'])
+  await requireRolePage(["ADMIN", "VENDEDOR"])
 
   const appointments = await prisma.appointment.findMany({
-    orderBy: { scheduledAt: 'desc' },
+    orderBy: { scheduledAt: "desc" },
     include: {
       buyer: { select: { name: true, surname: true, phone: true, instagram: true } },
       interests: {
@@ -32,8 +29,15 @@ export default async function AppointmentsPage() {
           },
         },
       },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
-  });
+  })
 
   const serialized = appointments.map((a) => ({
     id: a.id,
@@ -42,19 +46,29 @@ export default async function AppointmentsPage() {
     status: a.status,
     outcome: a.outcome,
     noSaleReason: a.noSaleReason,
-    buyer: a.buyer ? {
-        name: `${a.buyer.name} ${a.buyer.surname || ''}`.trim(),
-        phone: a.buyer.phone,
-        instagram: a.buyer.instagram,
-    } : null,
-    interests: a.interests.map(i => i.product.modelName).join(', '),
+    buyer: a.buyer
+      ? {
+          name: `${a.buyer.name} ${a.buyer.surname || ""}`.trim(),
+          phone: a.buyer.phone,
+          instagram: a.buyer.instagram,
+        }
+      : null,
+    interests: a.interests.map((i) => i.product.modelName).join(", "),
     resultNotes: a.resultNotes,
-  }));
+    createdBy: a.user?.name || a.user?.email || "-",
+    createdByUser: a.user
+      ? {
+          id: a.user.id,
+          name: a.user.name,
+          email: a.user.email ?? "",
+        }
+      : null,
+  }))
 
   return (
-    <DashboardLayout >
-      <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Citas' }]} />
-      <div className="flex justify-end mb-4">
+    <DashboardLayout>
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Citas" }]} />
+      <div className="mb-4 flex justify-end">
         <Link href="/dashboard/appointments/new" className="btn btn-primary">
           + Nueva Cita
         </Link>
