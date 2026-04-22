@@ -2,7 +2,7 @@
 import prisma from "@/lib/prisma";
 import { requireRoleApi } from "@/lib/auth/auth";
 import { NextResponse } from "next/server";
-import { Prisma, SaleItemKind, ProductState } from "../../../../prisma/generated/client";
+import { Prisma, SaleItemKind, ProductState } from "@prisma/client";
 
 // GET: lista de ventas con items, payments y buyer
 export async function GET() {
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 
   try {
     const txResult = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
+      async (tx) => {
         const tenantId = process.env.DEFAULT_TENANT_ID as string | undefined;
         if (!tenantId) {
           const err = new Error("DEFAULT_TENANT_ID no configurado") as ApiError;

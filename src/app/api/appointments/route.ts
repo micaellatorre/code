@@ -1,6 +1,5 @@
 // app/api/appointments/route.ts
 import prisma from "@/lib/prisma";
-import { Prisma } from "../../../../prisma/generated/client";
 import { NextResponse } from "next/server";
 import { requireRoleApi } from "@/lib/auth/auth";
 
@@ -61,7 +60,7 @@ export async function POST(request: Request) {
 
   try {
     const txResult = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
+      async (tx) => {
         const tenantId = process.env.DEFAULT_TENANT_ID;
         if (!tenantId) {
           throw new Error("DEFAULT_TENANT_ID no configurado");

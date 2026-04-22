@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { Prisma } from '../../../../../prisma/generated/client'
+import type { Prisma } from '@prisma/client'
 import { requireRoleApi } from '@/lib/auth/auth'
 
 // GET /api/sales/search?q=term
