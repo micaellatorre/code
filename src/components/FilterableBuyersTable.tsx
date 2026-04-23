@@ -464,7 +464,7 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
             <tbody>
               {displayed.map((b, idx) => (
                 <tr key={b.id ?? `buyer-${idx}`}>
-                  <td>{b.id ? <span className="text-base-content/50 uppercase">`#{b.id.slice(-4)}`</span> : "-"}</td>
+                  <td>{b.id ? <span className="text-base-content/50 uppercase">{b.id.slice(-4)}</span> : "-"}</td>
                   <td>{b.name}</td>
                   <td>{b.surname}</td>
                   <td>{b.phone}</td>

@@ -52,7 +52,7 @@ export default function PaymentsSection({ payments, setPayments, total }: Paymen
     };
 
     return (
-        <div className="card bg-base-100 shadow-md p-4">
+        <div className="card bg-base-100 border border-base-content/50 p-4">
             <div className="flex justify-between items-center">
                 <h2 className="font-bold text-lg">4. Medio(s) de Pago</h2>
                 <div className="text-right">

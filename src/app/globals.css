@@ -12,7 +12,7 @@ body {
 
 /* Card base style */
 .cp-card {
-  @apply bg-base-100 rounded-xl shadow-md p-6 transition-shadow duration-200 hover:shadow-lg;
+  @apply bg-base-100 rounded-xl border border-base-content/50 p-6 transition-shadow duration-200 hover:shadow-lg;
 }
 
 /* Button base style */

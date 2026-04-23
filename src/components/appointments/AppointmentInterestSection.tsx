@@ -49,11 +49,11 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
     }
 
     return (
-        <div className="card bg-base-100 shadow-md p-4 mt-6">
+        <div className="card bg-base-100 border border-base-content/50 p-4">
             <h2 className="font-bold text-lg">Productos de Interés</h2>
             
             {items.length === 0 ? (
-                <div className="text-center p-8 border-2 border-dashed border-base-300 rounded-box mt-4">
+                <div className="text-center p-8 border border-base-content/50 border-dashed border-base-300 rounded-box mt-4">
                     <p className="text-base-content/70">Aún no hay productos de interés.</p>
                     <button onClick={() => setIsModalOpen(true)} className="btn btn-primary btn-sm mt-4">Agregar Productos</button>
                 </div>

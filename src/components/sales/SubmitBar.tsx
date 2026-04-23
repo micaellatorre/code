@@ -12,7 +12,7 @@ interface SubmitBarProps {
 
 export default function SubmitBar({ disabled, error, onSubmit, isSubmitting }: SubmitBarProps) {
     return (
-        <div className="card bg-base-100 shadow-md">
+        <div className="card bg-base-100 border border-base-content/50">
             <div className="card-body">
                 {error && (
                     <div role="alert" className="alert alert-error">

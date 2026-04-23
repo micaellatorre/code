@@ -47,7 +47,7 @@ export default function TotalsBar({ items, payments }: TotalsBarProps) {
     }, [items, payments]);
 
     return (
-        <div className="card bg-base-100 shadow-md">
+        <div className="card bg-base-100 border border-base-content/50">
             <div className="card-body">
                 <h2 className="card-title">Resumen de la Venta</h2>
                 <div className="space-y-2 mt-4 text-sm">

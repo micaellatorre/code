@@ -136,8 +136,8 @@ export default function NewSaleForm() {
           { label: 'Nueva Venta' },
         ]}
       />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
-        <div className="lg:col-span-2 flex flex-col gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        <div className="lg:col-span-2 flex flex-col gap-4">
             <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} />
             <SaleMetaSection meta={meta} setMeta={setMeta} />
             <SaleItemsSection items={items} setItems={setItems} />
@@ -145,7 +145,7 @@ export default function NewSaleForm() {
         </div>
 
         <div className="lg:col-span-1">
-            <div className="sticky top-4 flex flex-col gap-6">
+            <div className="sticky top-4 flex flex-col gap-4">
                 <TotalsBar items={items} payments={payments} />
                 <SubmitBar 
                     disabled={isSubmitting || totals.remaining !== '0.00' || items.length === 0}

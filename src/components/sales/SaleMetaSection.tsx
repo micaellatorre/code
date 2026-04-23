@@ -31,7 +31,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
     }
 
     return (
-        <div className="card bg-base-100 shadow-md p-4">
+        <div className="card bg-base-100 border border-base-content/50 p-4">
             <h2 className="font-bold text-lg">2. Datos de la Venta</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                 <div className="form-control">

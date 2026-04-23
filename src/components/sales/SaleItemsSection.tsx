@@ -43,11 +43,11 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
     }
 
     return (
-        <div className="card bg-base-100 shadow-md p-4">
+        <div className="card bg-base-100 border border-base-content/50 p-4">
             <h2 className="font-bold text-lg">3. Items de Venta</h2>
             
             {items.length === 0 ? (
-                <div className="text-center p-8 border-2 border-dashed border-base-300 rounded-box mt-4">
+                <div className="text-center p-8 border border-base-content/50 border-dashed border-base-300 rounded-box mt-4">
                     <p className="text-base-content/70">Aún no agregaste productos.</p>
                     <button onClick={() => setIsModalOpen(true)} className="btn btn-primary btn-sm mt-4">Agregar Ítem</button>
                 </div>
@@ -57,6 +57,8 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
                         <table className="table w-full">
                             <thead>
                                 <tr>
+                                    <th></th>
+                                    <th>IMEI</th>
                                     <th>Producto</th>
                                     <th>Cantidad</th>
                                     <th>Precio Unit.</th>
@@ -68,6 +70,7 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
                             <tbody>
                                 {items.map(item => (
                                     <tr key={item._id}>
+                                        <td>{item.product.imei ? item.product.imei.slice(-4) : 'N/A'}</td>
                                         <td>{item.product.modelName}</td>
                                         <td>
                                             <input 

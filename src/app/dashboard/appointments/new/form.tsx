@@ -11,13 +11,13 @@ import { fromArgDateTimeInputValue, toArgDateTimeInputValue } from '@/lib/timezo
 
 export default function NewAppointmentForm() {
   const router = useRouter();
-  
+
   const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
   const [scheduledAt, setScheduledAt] = useState(new Date());
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<AppointmentInterestDraft[]>([]);
-  
+
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -26,9 +26,9 @@ export default function NewAppointmentForm() {
     setError(null);
 
     if (!selectedBuyer) {
-        setError('Debe seleccionar un cliente.');
-        setIsSubmitting(false);
-        return;
+      setError('Debe seleccionar un cliente.');
+      setIsSubmitting(false);
+      return;
     }
 
     const payload = {
@@ -72,56 +72,58 @@ export default function NewAppointmentForm() {
           { label: 'Nueva Cita' },
         ]}
       />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
-        
-        <div className="lg:col-span-2 flex flex-col gap-6">
-            <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} />
-            
-            <div className="card bg-base-100 shadow-md p-4">
-                <h2 className="font-bold text-lg">Detalles de la Cita</h2>
-                <div className="form-control mt-4">
-                    <label className="label"><span className="label-text">Fecha y Hora</span></label>
-                    <input 
-                        type="datetime-local"
-                        value={toArgDateTimeInputValue(scheduledAt)}
-                        onChange={e => setScheduledAt(fromArgDateTimeInputValue(e.target.value))}
-                        className="input input-bordered"
-                    />
-                </div>
-                <div className="form-control mt-4">
-                    <label className="label"><span className="label-text">Duración (minutos)</span></label>
-                    <input 
-                        type="number"
-                        value={durationMinutes}
-                        onChange={e => setDurationMinutes(parseInt(e.target.value))}
-                        className="input input-bordered"
-                    />
-                </div>
-                <div className="form-control mt-4">
-                    <label className="label"><span className="label-text">Notas</span></label>
-                    <textarea
-                        value={notes}
-                        onChange={e => setNotes(e.target.value)}
-                        className="textarea textarea-bordered"
-                        rows={4}
-                    ></textarea>
-                </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} />
+
+          <div className="card bg-base-100 border border-base-content/50 p-4">
+            <h2 className="font-bold text-lg">Detalles de la Cita</h2>
+            <div className='flex flex-row w-full gap-4 mt-2'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Fecha y Hora</span></label>
+                <input
+                  type="datetime-local"
+                  value={toArgDateTimeInputValue(scheduledAt)}
+                  onChange={e => setScheduledAt(fromArgDateTimeInputValue(e.target.value))}
+                  className="input input-bordered"
+                />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Duración (minutos)</span></label>
+                <input
+                  type="number"
+                  value={durationMinutes}
+                  onChange={e => setDurationMinutes(parseInt(e.target.value))}
+                  className="input input-bordered"
+                />
+              </div>
             </div>
-            
-            <AppointmentInterestSection items={items} setItems={setItems} />
+            <div className="form-control mt-4">
+              <label className="label"><span className="label-text">Notas</span></label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                className="textarea textarea-bordered"
+                rows={4}
+              ></textarea>
+            </div>
+          </div>
+
+          <AppointmentInterestSection items={items} setItems={setItems} />
         </div>
 
-        <div className="card bg-base-100 shadow-md max-h-fit">
-            <div className="card-body">
-                {error && <div className="alert alert-error">{error}</div>}
-                <button
-                    onClick={handleSubmit}
-                    className="btn btn-primary w-full"
-                    disabled={isSubmitting}
-                >
-                    {isSubmitting ? 'Creando...' : 'Crear Cita'}
-                </button>
-            </div>
+        <div className="card bg-base-100 border border-base-content/50 max-h-fit">
+          <div className="card-body">
+            {error && <div className="alert alert-error">{error}</div>}
+            <button
+              onClick={handleSubmit}
+              className="btn btn-primary w-full"
+              disabled={!selectedBuyer || isSubmitting}
+            >
+              {isSubmitting ? 'Creando...' : 'Crear Cita'}
+            </button>
+          </div>
         </div>
       </div>
     </DashboardLayout>

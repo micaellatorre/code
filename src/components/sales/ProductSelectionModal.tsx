@@ -269,10 +269,10 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                 <thead>
                   <tr>
                     <th></th>
+                    <th>IMEI</th>
                     <th>Producto</th>
                     <th>Stock Disp.</th>
                     <th>% Batería</th>
-                    <th>IMEI</th>
                     <th>Cantidad</th>
                   </tr>
                 </thead>
@@ -294,6 +294,13 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                           />
                         </td>
                         <td>
+                          {p.imei ? (
+                            <span className="textp-base-content/40">{p.imei.slice(-4)}</span>
+                          ) : (
+                            'N/A'
+                          )}
+                        </td>
+                        <td>
                           <div className="font-bold">{p.modelName}</div>
                           <div className="text-xs opacity-70">
                             {p.color || ''} {p.capacityGB ? `${p.capacityGB}GB` : ''}
@@ -301,19 +308,6 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                         </td>
                         <td><span className="badge badge-ghost">{currentStock}</span></td>
                         <td>{p.batteryPct != null ? `${p.batteryPct}%` : 'N/A'}</td>
-                        <td>
-                          {p.imei ? (
-                            <div className="text-xs">
-                              <span className="opacity-40">
-                                {/* last 5th to 7th digits */}
-                                  {p.imei.length > 6 ? `${p.imei.slice(-6, -4)}` : 'IMEI'}
-                              </span>
-                              <span className="font-bold underline">{p.imei.slice(-4)}</span>
-                            </div>
-                          ) : (
-                            'N/A'
-                          )}
-                        </td>
                         <td>
                           {isSelected && (
                             <input

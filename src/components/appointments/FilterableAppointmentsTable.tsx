@@ -243,7 +243,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
   }
 
   return (
-    <div className="card bg-base-100 shadow-md">
+    <div className="card bg-base-100 border border-base-content/50">
       <div className="card-body">
         <h2 className="card-title">Listado de Citas</h2>
 

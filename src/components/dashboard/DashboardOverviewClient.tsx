@@ -140,7 +140,7 @@ function RevenueTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
 
   return (
-    <div className="rounded-lg border border-base-content/10 bg-base-100 px-3 py-2 text-sm shadow-md">
+    <div className="rounded-lg border border-base-content/10 bg-base-100 px-3 py-2 text-sm border border-base-content/50">
       <p className="mb-2 font-semibold text-base-content">{String(label ?? "")}</p>
       <div className="space-y-1">
         {payload.map((item) => (
@@ -158,7 +158,7 @@ function UnitsTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
 
   return (
-    <div className="rounded-lg border border-base-content/10 bg-base-100 px-3 py-2 text-sm shadow-md">
+    <div className="rounded-lg border border-base-content/10 bg-base-100 px-3 py-2 text-sm border border-base-content/50">
       <p className="mb-2 font-semibold text-base-content">{String(label ?? "")}</p>
       <div className="space-y-1">
         {payload.map((item) => (

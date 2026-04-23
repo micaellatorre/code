@@ -113,48 +113,58 @@ export default function EditBuyerForm({ id }: EditBuyerFormProps) {
           { label: `Editar: ${buyer.name} ${buyer.surname || ''}` },
         ]}
       />
-      <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6 p-4">
-        <fieldset className="card lg:col-span-1 bg-base-100 shadow-md p-4 space-y-2">
-          <h2 className="font-bold text-lg mb-1">1. Información Personal</h2>
-          <div className="form-control">
-            <label className="label"><span className="label-text">Nombre</span></label>
-            <input type="text" name="name" value={form.name} onChange={handleChange} required className="input input-bordered" />
-          </div>
-          <div className="form-control">
-            <label className="label"><span className="label-text">Apellido</span></label>
-            <input type="text" name="surname" value={form.surname} onChange={handleChange} className="input input-bordered" />
-          </div>
-          <div className="form-control">
-            <label className="label"><span className="label-text">DNI</span></label>
-            <input type="text" name="dni" value={form.dni} onChange={handleChange} className="input input-bordered" />
-          </div>
-          <div className="form-control">
-            <label className="label"><span className="label-text">Fecha de Nacimiento</span></label>
-            <input type="date" name="dob" value={form.dob} onChange={handleChange} className="input input-bordered" />
-          </div>
-        </fieldset>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        <div className='lg:col-span-2 flex flex-col gap-4'>
+          <fieldset className="card lg:col-span-1 bg-base-100 border border-base-content/50 p-4 space-y-2">
+            <h2 className="font-bold text-lg mb-1">1. Información Personal</h2>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Nombre</span></label>
+                <input type="text" name="name" value={form.name} onChange={handleChange} required className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Apellido</span></label>
+                <input type="text" name="surname" value={form.surname} onChange={handleChange} className="input input-bordered" />
+              </div>
+            </div>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">DNI</span></label>
+                <input type="text" name="dni" value={form.dni} onChange={handleChange} className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Fecha de Nacimiento</span></label>
+                <input type="date" name="dob" value={form.dob} onChange={handleChange} className="input input-bordered" />
+              </div>
+            </div>
+          </fieldset>
 
-        <fieldset className="card lg:col-span-1 bg-base-100 shadow-md p-4 space-y-2">
-          <h2 className="font-bold text-lg mb-1">2. Información de Contacto y Facturación</h2>
-          <div className="form-control">
-            <label className="label"><span className="label-text">Teléfono</span></label>
-            <input type="text" name="phone" value={form.phone} onChange={handleChange} className="input input-bordered" />
-          </div>
-          <div className="form-control">
-            <label className="label"><span className="label-text">Instagram</span></label>
-            <input type="text" name="instagram" value={form.instagram} onChange={handleChange} className="input input-bordered" />
-          </div>
-          <div className="form-control">
-            <label className="label"><span className="label-text">Email</span></label>
-            <input type="email" name="email" value={form.email} onChange={handleChange} className="input input-bordered" />
-          </div>
-          <div className="form-control">
-            <label className="label"><span className="label-text">CUIT</span></label>
-            <input type="text" name="cuit" value={form.cuit} onChange={handleChange} className="input input-bordered" />
-          </div>
-        </fieldset>
+          <fieldset className="card lg:col-span-1 bg-base-100 border border-base-content/50 p-4 space-y-2">
+            <h2 className="font-bold text-lg mb-1">2. Información de Contacto y Facturación</h2>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Teléfono</span></label>
+                <input type="text" name="phone" value={form.phone} onChange={handleChange} className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Instagram</span></label>
+                <input type="text" name="instagram" value={form.instagram} onChange={handleChange} className="input input-bordered" />
+              </div>
+            </div>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Email</span></label>
+                <input type="email" name="email" value={form.email} onChange={handleChange} className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">CUIT</span></label>
+                <input type="text" name="cuit" value={form.cuit} onChange={handleChange} className="input input-bordered" />
+              </div>
+            </div>
+          </fieldset>
+        </div>
 
-        <div className="card bg-base-100 shadow-md max-h-fit">
+        <div className="card bg-base-100 border border-base-content/50 max-h-fit">
           <div className="card-body">
             <div className="card-actions">
               <button

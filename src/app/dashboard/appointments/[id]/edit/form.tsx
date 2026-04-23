@@ -130,11 +130,11 @@ export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
           { label: 'Editar Cita' },
         ]}
       />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
-        <div className="lg:col-span-2 flex flex-col gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        <div className="lg:col-span-2 flex flex-col gap-4">
             {selectedBuyer && <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={() => {}} />}
             
-            <div className="card bg-base-100 shadow-md p-4">
+            <div className="card bg-base-100 border border-base-content/50 p-4">
                 <h2 className="font-bold text-lg">Detalles de la Cita</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div className="form-control">
@@ -186,7 +186,7 @@ export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
 
         <div className="lg:col-span-1">
             <div className="sticky top-4 flex flex-col gap-6">
-                <div className="card bg-base-100 shadow-md">
+                <div className="card bg-base-100 border border-base-content/50">
                     <div className="card-body">
                         <h2 className="card-title">Actualizar Cita</h2>
                         {error && <div className="alert alert-error text-sm">{error}</div>}
