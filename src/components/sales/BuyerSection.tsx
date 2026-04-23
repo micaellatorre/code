@@ -109,7 +109,7 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                 <ul className="menu bg-base-200 rounded-box mt-2">
                     {results.map(buyer => (
                         <li key={buyer.id} onClick={() => { setSelectedBuyer(buyer); setQuery(''); }}>
-                            <a>{buyer.name} {buyer.surname} - {buyer.dni}</a>
+                            <a>{buyer.name} {buyer.surname} - {buyer.instagram}</a>
                         </li>
                     ))}
                 </ul>
@@ -118,6 +118,11 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
             {!isLoading && query.length > 2 && results.length === 0 && !showNewBuyerForm && (
                 <div className="text-center p-4">
                     <p>No se encontraron clientes.</p>
+                </div>
+            )}
+
+            {!isLoading && !showNewBuyerForm && (
+                <div className="text-center p-4">
                     <button onClick={() => { setShowNewBuyerForm(true); setNewBuyer({ name: query }); }} className="btn btn-primary btn-sm mt-2">Agregar Nuevo Cliente</button>
                 </div>
             )}

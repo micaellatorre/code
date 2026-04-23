@@ -7,68 +7,172 @@ type Ctx = {
   params: Promise<{ id: string }>
 }
 
-export async function PATCH(request: NextRequest, { params }: Ctx) {
-  const auth = await requireRoleApi(["ADMIN"])
+export async function GET(_request: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
 
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status })
   }
 
-  const adminTenantId = auth.session.user.tenantId
-  if (!adminTenantId) {
-    return NextResponse.json({ error: "Tenant no disponible para el usuario autenticado" }, { status: 403 })
-  }
-
   try {
     const { id } = await params
-    const body = (await request.json().catch(() => null)) as { userId?: string | null } | null
-    const userId = body?.userId?.trim()
 
     if (!id) {
       return NextResponse.json({ error: "Appointment ID is required" }, { status: 400 })
     }
 
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 })
-    }
-
     const appointment = await prisma.appointment.findUnique({
       where: { id },
-      select: { id: true },
+      include: {
+        buyer: true,
+        interests: {
+          include: {
+            product: true,
+          },
+          orderBy: {
+            priority: 'asc' as const,
+          },
+        },
+      },
     })
 
     if (!appointment) {
       return NextResponse.json({ error: "Appointment not found" }, { status: 404 })
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, tenantId: true, name: true, email: true },
-    })
+    return NextResponse.json(appointment, { status: 200 })
+  } catch (error: any) {
+    console.error("Error fetching appointment:", error)
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  }
+}
 
-    if (!targetUser) {
-      return NextResponse.json({ error: "Usuario destino no encontrado" }, { status: 404 })
+export async function PATCH(request: NextRequest, { params }: Ctx) {
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+
+  if (!auth.ok) {
+    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+  }
+
+  try {
+    const { id } = await params
+    const body = await request.json()
+
+    if (!id) {
+      return NextResponse.json({ error: "Appointment ID is required" }, { status: 400 })
     }
 
-    if (targetUser.tenantId !== adminTenantId) {
-      return NextResponse.json({ error: "No puedes asignar usuarios fuera de tu tenant" }, { status: 403 })
-    }
+    // Check if this is a user assignment request
+    if (body.userId) {
+      // User assignment logic (original functionality)
+      const adminTenantId = auth.session.user.tenantId
+      if (!adminTenantId) {
+        return NextResponse.json({ error: "Tenant no disponible para el usuario autenticado" }, { status: 403 })
+      }
 
-    const updatedAppointment = await prisma.appointment.update({
-      where: { id },
-      data: { userId: targetUser.id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+      const userId = body.userId.trim()
+
+      const appointment = await prisma.appointment.findUnique({
+        where: { id },
+        select: { id: true },
+      })
+
+      if (!appointment) {
+        return NextResponse.json({ error: "Appointment not found" }, { status: 404 })
+      }
+
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, tenantId: true, name: true, email: true },
+      })
+
+      if (!targetUser) {
+        return NextResponse.json({ error: "Usuario destino no encontrado" }, { status: 404 })
+      }
+
+      if (targetUser.tenantId !== adminTenantId) {
+        return NextResponse.json({ error: "No puedes asignar usuarios fuera de tu tenant" }, { status: 403 })
+      }
+
+      const updatedAppointment = await prisma.appointment.update({
+        where: { id },
+        data: { userId: targetUser.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-      },
-    })
+      })
 
-    return NextResponse.json(updatedAppointment, { status: 200 })
+      return NextResponse.json(updatedAppointment, { status: 200 })
+    } else {
+      // Appointment details update logic
+      const {
+        scheduledAt,
+        durationMinutes,
+        status,
+        outcome,
+        noSaleReason,
+        noSaleReasonOther,
+        resultNotes,
+        interests,
+      } = body
+
+      // Validate required fields
+      if (!scheduledAt || !status || !outcome) {
+        return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+      }
+
+      // Check if appointment exists
+      const existingAppointment = await prisma.appointment.findUnique({
+        where: { id },
+        select: { id: true },
+      })
+
+      if (!existingAppointment) {
+        return NextResponse.json({ error: "Appointment not found" }, { status: 404 })
+      }
+
+      // Update appointment
+      const updatedAppointment = await prisma.appointment.update({
+        where: { id },
+        data: {
+          scheduledAt: new Date(scheduledAt),
+          durationMinutes,
+          status,
+          outcome,
+          noSaleReason: outcome === 'NO_SE_CONCRETO' ? noSaleReason : null,
+          noSaleReasonOther: outcome === 'NO_SE_CONCRETO' && noSaleReason === 'OTRO' ? noSaleReasonOther : null,
+          resultNotes,
+        },
+      })
+
+      // Update interests if provided
+      if (interests && Array.isArray(interests)) {
+        // Delete existing interests
+        await prisma.appointmentInterest.deleteMany({
+          where: { appointmentId: id },
+        })
+
+        // Create new interests
+        if (interests.length > 0) {
+          await prisma.appointmentInterest.createMany({
+            data: interests.map((interest: any, index: number) => ({
+              appointmentId: id,
+              productId: interest.productId,
+              notes: interest.notes,
+              priority: interest.priority || index + 1,
+            })),
+          })
+        }
+      }
+
+      return NextResponse.json(updatedAppointment, { status: 200 })
+    }
   } catch (error: any) {
     console.error("Error updating appointment:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
