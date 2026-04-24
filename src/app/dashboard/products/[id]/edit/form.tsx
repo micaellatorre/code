@@ -14,6 +14,8 @@ export default function EditProductForm({ id }: EditProductFormProps) {
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
     modelName: '',
+    location: '',
+    origin: '',
     brand: '',
     imei: '',
     capacityGB: '',
@@ -35,6 +37,8 @@ export default function EditProductForm({ id }: EditProductFormProps) {
         const data = await res.json()
         setForm({
           modelName: data.modelName ?? '',
+          location: data.location ?? '',
+          origin: data.origin ?? '',
           brand: data.brand ?? '',
           imei: data.imei ?? '',
           capacityGB: data.capacityGB ?? '',
@@ -63,6 +67,8 @@ export default function EditProductForm({ id }: EditProductFormProps) {
     setIsSubmitting(true)
     const payload: any = {
       modelName: form.modelName,
+      location: form.location || null,
+      origin: form.origin || null,
       brand: form.brand || null,
       imei: form.imei || null,
       capacityGB: form.capacityGB ? Number(form.capacityGB) : null,
@@ -118,84 +124,103 @@ export default function EditProductForm({ id }: EditProductFormProps) {
           { label: 'Editar Producto' },
         ]}
       />
-      <div className="max-w-xl mx-auto">
-        <h2 className="text-2xl font-bold mb-4">Editar Producto</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset className="border border-base-300 p-4 rounded-box">
-            <legend className="text-lg font-medium mb-2">Datos del producto</legend>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Tipo</span></label>
-              <select name="type" value={form.type} onChange={handleChange} className="select select-bordered">
-                <option value="PHONE">Teléfono</option>
-                <option value="ACCESSORY">Accesorio</option>
-              </select>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        <div className='lg:col-span-2 flex flex-col gap-4'>
+          <fieldset className="card bg-base-100 border border-base-content/50 lg:col-span-1 p-4 space-y-2">
+            <h2 className="text-lg font-bold mb-1">1. Datos del producto</h2>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Tipo</span></label>
+                <select name="type" value={form.type} onChange={handleChange} className="select select-bordered">
+                  <option value="PHONE">Teléfono</option>
+                  <option value="ACCESSORY">Accesorio</option>
+                </select>
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Ubicación</span></label>
+                <input type="text" name="location" value={form.location} onChange={handleChange} required className="input input-bordered" />
+              </div>
             </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Modelo</span></label>
-              <input type="text" name="modelName" value={form.modelName} onChange={handleChange} required className="input input-bordered" />
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Origen</span></label>
+                <input type="text" name="origin" value={form.origin} onChange={handleChange} required className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Modelo</span></label>
+                <input type="text" name="modelName" value={form.modelName} onChange={handleChange} required className="input input-bordered" />
+              </div>
             </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">IMEI</span></label>
-              <input type="text" name="imei" value={form.imei} onChange={handleChange} className="input input-bordered" />
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">IMEI</span></label>
+                <input type="text" name="imei" value={form.imei} onChange={handleChange} className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Capacidad (GB)</span></label>
+                <select name="capacityGB" value={form.capacityGB} onChange={handleChange} className="select select-bordered">
+                  <option value="">Seleccionar</option>
+                  <option value="64">64 GB</option>
+                  <option value="128">128 GB</option>
+                  <option value="256">256 GB</option>
+                  <option value="512">512 GB</option>
+                  <option value="1024">1024 GB (1 TB)</option>
+                  <option value="2048">2048 GB (2 TB)</option>
+                </select>
+              </div>
             </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Capacidad (GB)</span></label>
-              <select name="capacityGB" value={form.capacityGB} onChange={handleChange} className="select select-bordered">
-                <option value="">Seleccionar</option>
-                <option value="64">64 GB</option>
-                <option value="128">128 GB</option>
-                <option value="256">256 GB</option>
-                <option value="512">512 GB</option>
-                <option value="1024">1024 GB (1 TB)</option>
-                <option value="2048">2048 GB (2 TB)</option>
-              </select>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Condición</span></label>
+                <select name="condition" value={form.condition} onChange={handleChange} className="select select-bordered">
+                  <option value="">Seleccionar</option>
+                  <option value="A_PLUS">A+</option>
+                  <option value="OEM">OEM</option>
+                  <option value="ASIS">ASIS</option>
+                  <option value="ASIS_PLUS">ASIS+</option>
+                  <option value="SEALED">Sellado</option>
+                </select>
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Color</span></label>
+                <input type="text" name="color" value={form.color} onChange={handleChange} className="input input-bordered" />
+              </div>
             </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Condición</span></label>
-              <select name="condition" value={form.condition} onChange={handleChange} className="select select-bordered">
-                <option value="">Seleccionar</option>
-                <option value="A_PLUS">A+</option>
-                <option value="OEM">OEM</option>
-                <option value="ASIS">ASIS</option>
-                <option value="ASIS_PLUS">ASIS+</option>
-                <option value="SEALED">Sellado</option>
-              </select>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">% Batería</span></label>
+                <input type="number" name="batteryPct" value={form.batteryPct} onChange={handleChange} className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Costo (USD)</span></label>
+                <input type="number" step="0.01" name="costPrice" value={form.costPrice} onChange={handleChange} required className="input input-bordered" />
+              </div>
             </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Color</span></label>
-              <input type="text" name="color" value={form.color} onChange={handleChange} className="input input-bordered" />
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Precio de venta (USD)</span></label>
+                <input type="number" step="0.01" name="salePrice" value={form.salePrice} onChange={handleChange} required className="input input-bordered" />
+              </div>
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Costo de envío (USD)</span></label>
+                <input type="number" step="0.01" name="shippingCost" value={form.shippingCost} onChange={handleChange} className="input input-bordered" />
+              </div>
             </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">% Batería</span></label>
-              <input type="number" name="batteryPct" value={form.batteryPct} onChange={handleChange} className="input input-bordered" />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Costo (USD)</span></label>
-              <input type="number" step="0.01" name="costPrice" value={form.costPrice} onChange={handleChange} required className="input input-bordered" />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Precio de venta (USD)</span></label>
-              <input type="number" step="0.01" name="salePrice" value={form.salePrice} onChange={handleChange} required className="input input-bordered" />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Costo de envío (USD)</span></label>
-              <input type="number" step="0.01" name="shippingCost" value={form.shippingCost} onChange={handleChange} className="input input-bordered" />
-            </div>
-            <div className="form-control">
+            <div className="form-control w-full">
               <label className="label"><span className="label-text">Notas</span></label>
               <textarea className="textarea textarea-bordered" name="notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}></textarea>
             </div>
           </fieldset>
-          <div className="relative flex flex-col gap-4 w-full">
-            <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
-              {isSubmitting ? <>Guardando<span className="loading loading-bars loading-xs"></span></> : 'Guardar'}
-            </button>
-            <button type="button" onClick={handleDelete} className="btn btn-error w-full">
-              Eliminar
-            </button>
-          </div>
-        </form>
-      </div>
+        </div>
+        <div className="card bg-base-100 border border-base-content/50 max-h-fit p-4 flex flex-col gap-2">
+          <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
+            {isSubmitting ? <>Guardando<span className="loading loading-bars loading-xs"></span></> : 'Guardar'}
+          </button>
+          <button type="button" onClick={handleDelete} className="btn btn-error w-full">
+            Eliminar
+          </button>
+        </div>
+      </form>
     </DashboardLayout>
   )
 }

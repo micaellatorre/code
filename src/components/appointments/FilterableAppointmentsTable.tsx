@@ -243,9 +243,14 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
   }
 
   return (
-    <div className="card bg-base-100 border border-base-content/50">
+    <div className="card bg-base-100">
       <div className="card-body">
-        <h2 className="card-title">Listado de Citas</h2>
+        <div className="flex flex-row justify-between p-0">
+          <h2 className="card-title">Listado de Citas</h2>
+          <Link href="/dashboard/appointments/new" className="btn btn-primary">
+            Nueva Cita
+          </Link>
+        </div>
 
         <div className="my-4 flex flex-wrap gap-4 rounded-box bg-base-200 p-2">
           <input

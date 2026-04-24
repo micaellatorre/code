@@ -68,11 +68,6 @@ export default async function AppointmentsPage() {
   return (
     <DashboardLayout>
       <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Citas" }]} />
-      <div className="mb-4 flex justify-end">
-        <Link href="/dashboard/appointments/new" className="btn btn-primary">
-          + Nueva Cita
-        </Link>
-      </div>
       <div className="flex flex-col gap-4">
         <FilterableAppointmentsTable initial={serialized} />
       </div>
