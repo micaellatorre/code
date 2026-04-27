@@ -645,9 +645,9 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
             placeholder="Buscar ventas por cliente, id o modelo..."
             onSearch={setSearchQuery}
           />
-          
+
           <DateRangePicker
-            className="relative z-[90] sm:w-72"
+            className="relative z-[90] sm:w-72 w-auto flex-grow"
             value={dateRangeValue}
             onValueChange={handleRangeChange}
             enableClear
@@ -673,56 +673,6 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
             <FunnelIcon className="w-5 h-5 mr-1" />
             Filtros
           </button>
-
-          {(startDate || endDate || minTotal || maxTotal || minProfit || maxProfit) && (
-            <div className="flex items-center gap-2">
-              {(startDate || endDate) && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Fecha: {startDate ? `desde ${startDate}` : ''}{startDate && endDate ? ' ' : ''}{endDate ? `hasta ${endDate}` : ''}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => {
-                      setStartDate('');
-                      setEndDate('');
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {canSeeTotal && (minTotal || maxTotal) && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Total: {minTotal ? `Min $${minTotal}` : ''}{minTotal && maxTotal ? ' - ' : ''}{maxTotal ? `Max $${maxTotal}` : ''}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => {
-                      setMinTotal('');
-                      setMaxTotal('');
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {canSeeProfit && (minProfit || maxProfit) && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Ganancia: {minProfit ? `Min $${minProfit}` : ''}{minProfit && maxProfit ? ' - ' : ''}{maxProfit ? `Max $${maxProfit}` : ''}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => {
-                      setMinProfit('');
-                      setMaxProfit('');
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-            </div>
-          )}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -732,7 +682,55 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
           </button>
         </div>
       </div>
-
+        {(startDate || endDate || minTotal || maxTotal || minProfit || maxProfit) && (
+          <div className="flex items-center gap-2">
+            {(startDate || endDate) && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Fecha: {startDate ? `desde ${startDate}` : ''}{startDate && endDate ? ' ' : ''}{endDate ? `hasta ${endDate}` : ''}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs btn-circle ml-1"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {canSeeTotal && (minTotal || maxTotal) && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Total: {minTotal ? `Min $${minTotal}` : ''}{minTotal && maxTotal ? ' - ' : ''}{maxTotal ? `Max $${maxTotal}` : ''}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs btn-circle ml-1"
+                  onClick={() => {
+                    setMinTotal('');
+                    setMaxTotal('');
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {canSeeProfit && (minProfit || maxProfit) && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Ganancia: {minProfit ? `Min $${minProfit}` : ''}{minProfit && maxProfit ? ' - ' : ''}{maxProfit ? `Max $${maxProfit}` : ''}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs btn-circle ml-1"
+                  onClick={() => {
+                    setMinProfit('');
+                    setMaxProfit('');
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+          </div>
+        )}
       {/* Drawer de filtros */}
       {drawerOpen && (
         <div className="fixed inset-0 z-[100] pointer-events-none">
