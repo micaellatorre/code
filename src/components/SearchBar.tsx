@@ -52,7 +52,7 @@ export default function SearchBar({ onSearch, placeholder = 'Buscar...', search 
     <>
       <input
         type="text"
-        className="input input-bordered w-full max-w-xs"
+        className="input input-bordered flex-grow input-sm"
         placeholder={placeholder}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}

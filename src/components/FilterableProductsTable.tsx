@@ -1086,41 +1086,41 @@ export default function FilterableProductsTable() {
         ) : null}
 
         {canSeeSalePrice ? (
-        <td>
-          {canEditField("salePrice") && isEditing(p.id, "salePrice") ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-base-content/50">$ </span>
-              <input
-                autoFocus
-                type="number"
-                step="0.01"
-                min={0}
-                value={getEditingValue(p.id, "salePrice")}
-                onChange={(e) => updateEditingValue(p.id, "salePrice", e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitEditField(p.id, "salePrice")
-                  if (e.key === "Escape") cancelEditField(p.id, "salePrice")
-                }}
-                onBlur={() => commitEditField(p.id, "salePrice")}
-                className="input input-xs w-24"
-                disabled={savingField?.productId === p.id && savingField?.fieldName === "salePrice"}
-              />
-              <div className="flex flex-col join join-horizontal border border-base-content/10">
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "salePrice")}>
-                  <CheckIcon className="h-[1em]" />
-                </button>
-                <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "salePrice")}>
-                  <XMarkIcon className="h-[1em]" />
-                </button>
+          <td>
+            {canEditField("salePrice") && isEditing(p.id, "salePrice") ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-base-content/50">$ </span>
+                <input
+                  autoFocus
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={getEditingValue(p.id, "salePrice")}
+                  onChange={(e) => updateEditingValue(p.id, "salePrice", e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEditField(p.id, "salePrice")
+                    if (e.key === "Escape") cancelEditField(p.id, "salePrice")
+                  }}
+                  onBlur={() => commitEditField(p.id, "salePrice")}
+                  className="input input-xs w-24"
+                  disabled={savingField?.productId === p.id && savingField?.fieldName === "salePrice"}
+                />
+                <div className="flex flex-col join join-horizontal border border-base-content/10">
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "salePrice")}>
+                    <CheckIcon className="h-[1em]" />
+                  </button>
+                  <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "salePrice")}>
+                    <XMarkIcon className="h-[1em]" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <span {...editableCellProps(p.id, "salePrice", p.salePrice)}>
-              <span className="text-xs text-base-content/50">$ </span>
-              {formatDecimal((p as any).salePrice)}
-            </span>
-          )}
-        </td>
+            ) : (
+              <span {...editableCellProps(p.id, "salePrice", p.salePrice)}>
+                <span className="text-xs text-base-content/50">$ </span>
+                {formatDecimal((p as any).salePrice)}
+              </span>
+            )}
+          </td>
         ) : null}
 
         <td>
@@ -1193,31 +1193,31 @@ export default function FilterableProductsTable() {
           ) : (
             <div className="flex items-center gap-2">
               {canEditStock ? (
-              <div className="flex flex-row btn-group gap-1 items-center">
-                <button
-                  className="btn btn-ghost btn-xs"
-                  aria-label="decrement stock"
-                  disabled={savingField?.productId === p.id && savingField?.fieldName === "stock"}
-                  onClick={() => changeStockBy(p.id, -1)}
-                >
-                  ▼
-                </button>
-                <span
-                  className="cursor-pointer hover:bg-base-200 rounded px-1"
-                  onClick={() => startEditStock(p.id, p.stock)}
-                  title="Click para editar"
-                >
-                  {p.stock}
-                </span>
-                <button
-                  className="btn btn-ghost btn-xs"
-                  aria-label="increment stock"
-                  disabled={savingField?.productId === p.id && savingField?.fieldName === "stock"}
-                  onClick={() => changeStockBy(p.id, 1)}
-                >
-                  ▲
-                </button>
-              </div>
+                <div className="flex flex-row btn-group gap-1 items-center">
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    aria-label="decrement stock"
+                    disabled={savingField?.productId === p.id && savingField?.fieldName === "stock"}
+                    onClick={() => changeStockBy(p.id, -1)}
+                  >
+                    ▼
+                  </button>
+                  <span
+                    className="cursor-pointer hover:bg-base-200 rounded px-1"
+                    onClick={() => startEditStock(p.id, p.stock)}
+                    title="Click para editar"
+                  >
+                    {p.stock}
+                  </span>
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    aria-label="increment stock"
+                    disabled={savingField?.productId === p.id && savingField?.fieldName === "stock"}
+                    onClick={() => changeStockBy(p.id, 1)}
+                  >
+                    ▲
+                  </button>
+                </div>
               ) : (
                 <span>{p.stock}</span>
               )}
@@ -1227,70 +1227,70 @@ export default function FilterableProductsTable() {
 
         <td>
           {canEditState ? (
-          <div className="dropdown dropdown-start relative">
-            <div
-              tabIndex={0}
-              role="button"
-              className="flex flex-row flex-nowrap gap-2 items-center cursor-pointer btn btn-xs btn-ghost py-2"
-            >
-              <span className={`badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
-              <ChevronDownIcon className="h-4 w-4" />
+            <div className="dropdown dropdown-start relative">
+              <div
+                tabIndex={0}
+                role="button"
+                className="flex flex-row flex-nowrap gap-2 items-center cursor-pointer btn btn-xs btn-ghost py-2"
+              >
+                <span className={`badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
+                <ChevronDownIcon className="h-4 w-4" />
+              </div>
+              <ul tabIndex={-1} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
+                {stateOptions.map((s) => (
+                  <li key={s} className="py-2 flex flex-row items-center gap-2">
+                    <button
+                      className={`w-full text-left btn btn-ghost btn-xs justify-start ${stateColorMap[s] ?? ""}`}
+                      disabled={savingStateId === p.id}
+                      onClick={() => changeState(p.id, s)}
+                    >
+                      {s}
+                      <div className={`w-2 h-2 rounded-full border ${stateColorMap[s] ?? ""}`}></div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul tabIndex={-1} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
-              {stateOptions.map((s) => (
-                <li key={s} className="py-2 flex flex-row items-center gap-2">
-                  <button
-                    className={`w-full text-left btn btn-ghost btn-xs justify-start ${stateColorMap[s] ?? ""}`}
-                    disabled={savingStateId === p.id}
-                    onClick={() => changeState(p.id, s)}
-                  >
-                    {s}
-                    <div className={`w-2 h-2 rounded-full border ${stateColorMap[s] ?? ""}`}></div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
           ) : (
             <span className={`badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
           )}
         </td>
 
         {hasProductActions ? (
-        <td className="flex items-center gap-2">
-          {canEditProducts ? (
-          <Link href={`/dashboard/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
-            <PencilIcon className="size-[1.2em]" />
-          </Link>
-          ) : null}
+          <td className="flex items-center gap-2">
+            {canEditProducts ? (
+              <Link href={`/dashboard/products/${p.id}/edit`} className="btn btn-xs btn-square btn-soft">
+                <PencilIcon className="size-[1.2em]" />
+              </Link>
+            ) : null}
 
-          {canDuplicateProducts ? (
-          <button
-            className="btn btn-xs btn-square btn-soft"
-            onClick={() => duplicateProduct(p.id)}
-            disabled={duplicatingId === p.id}
-            title="Duplicar producto"
-          >
-            {duplicatingId === p.id ? (
-              <span className="loading loading-bars loading-xs"></span>
-            ) : (
-              <DocumentDuplicateIcon className="size-[1.2em]" />
-            )}
-          </button>
-          ) : null}
+            {canDuplicateProducts ? (
+              <button
+                className="btn btn-xs btn-square btn-soft"
+                onClick={() => duplicateProduct(p.id)}
+                disabled={duplicatingId === p.id}
+                title="Duplicar producto"
+              >
+                {duplicatingId === p.id ? (
+                  <span className="loading loading-bars loading-xs"></span>
+                ) : (
+                  <DocumentDuplicateIcon className="size-[1.2em]" />
+                )}
+              </button>
+            ) : null}
 
-          {canDeleteProducts ? (
-          <button
-            className="btn btn-xs btn-square btn-soft btn-error"
-            onClick={() => deleteProduct(p.id)}
-            disabled={deletingId === p.id}
-            aria-disabled={deletingId === p.id}
-            title="Eliminar producto"
-          >
-            {deletingId === p.id ? <span className="loading loading-bars loading-xs"></span> : <TrashIcon className="size-[1.2em]" />}
-          </button>
-          ) : null}
-        </td>
+            {canDeleteProducts ? (
+              <button
+                className="btn btn-xs btn-square btn-soft btn-error"
+                onClick={() => deleteProduct(p.id)}
+                disabled={deletingId === p.id}
+                aria-disabled={deletingId === p.id}
+                title="Eliminar producto"
+              >
+                {deletingId === p.id ? <span className="loading loading-bars loading-xs"></span> : <TrashIcon className="size-[1.2em]" />}
+              </button>
+            ) : null}
+          </td>
         ) : null}
         <td></td>
       </tr>
@@ -1306,86 +1306,90 @@ export default function FilterableProductsTable() {
         <div className="flex flex-row items-center justify-between gap-2">
           <h2 className="text-2xl font-bold">
             Productos
+          </h2>
+
+          <div className="flex flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
             {viewMode === "DETAIL" ? (
-              <>
-                <span className="ml-4 text-sm text-base-content/60">- Resultados {filteredProducts.length}</span>
+              <div className="flex flex-row items-center gap-1">
+                <span className="ml-1 text-sm text-base-content/60">Resultados {filteredProducts.length}</span>
                 <span className="ml-1 text-sm text-base-content/30">de</span>
                 <span className="ml-1 text-sm text-base-content/30">{totalProducts}</span>
-              </>
+              </div>
             ) : (
-              <>
-                <span className="ml-4 text-sm text-base-content/60">- Grupos {groupedCounts.groups}</span>
+              <div className="flex flex-row items-center gap-1">
+                <span className="ml-1 text-sm text-base-content/60">Grupos {groupedCounts.groups}</span>
                 <span className="ml-1 text-sm text-base-content/30">| Items {groupedCounts.instances}</span>
                 <span className="ml-1 text-sm text-base-content/30">| Stock {groupedCounts.totalStock}</span>
                 <span className="ml-1 text-sm text-base-content/30">| Disp. {groupedCounts.totalAvail}</span>
-              </>
+              </div>
             )}
-          </h2>
 
-          <div className="ml-2 flex items-center gap-2">
-            <div className="join border-[0.1em] border-base-content/10">
-              <button
-                type="button"
-                className={`join-item btn btn-sm ${viewMode === "DETAIL" ? "btn-active" : ""}`}
-                onClick={() => setViewMode("DETAIL")}
-                title="Detalle de Stock"
-              >
-                Detalle
-              </button>
-              <div className="divider divider-horizontal mx-[-4px]"></div>
-              <button
-                type="button"
-                className={`join-item btn btn-sm ${viewMode === "GENERAL" ? "btn-active" : ""}`}
-                onClick={() => setViewMode("GENERAL")}
-                title="Stock General"
-              >
-                General
-              </button>
+            <div className="divider divider-horizontal mx-0" />
+            <div className="ml-2 flex items-center gap-2">
+              <div className="join border-[0.1em] border-base-content/10">
+                <button
+                  type="button"
+                  className={`join-item btn btn-sm ${viewMode === "DETAIL" ? "btn-active" : ""}`}
+                  onClick={() => setViewMode("DETAIL")}
+                  title="Detalle de Stock"
+                >
+                  Detalle
+                </button>
+                <div className="divider divider-horizontal mx-[-4px]"></div>
+                <button
+                  type="button"
+                  className={`join-item btn btn-sm ${viewMode === "GENERAL" ? "btn-active" : ""}`}
+                  onClick={() => setViewMode("GENERAL")}
+                  title="Stock General"
+                >
+                  General
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="ml-2 flex items-center gap-2">
-            <div className="join border-[0.1em] border-base-content/10 ">
-              <button
-                type="button"
-                className={`join-item btn btn-sm ${typeFilter === "PHONE" ? "btn-active" : ""}`}
-                onClick={() => setTypeFilter(typeFilter === "PHONE" ? "" : "PHONE")}
-              >
-                Teléfonos
-              </button>
-              <div className="divider divider-horizontal mx-[-4px]"></div>
-              <button
-                type="button"
-                className={`join-item btn btn-sm ${typeFilter === "ACCESSORY" ? "btn-active" : ""}`}
-                onClick={() => setTypeFilter(typeFilter === "ACCESSORY" ? "" : "ACCESSORY")}
-              >
-                Accesorios
-              </button>
+            <div className="ml-2 flex items-center gap-2">
+              <div className="join border-[0.1em] border-base-content/10 ">
+                <button
+                  type="button"
+                  className={`join-item btn btn-sm ${typeFilter === "PHONE" ? "btn-active" : ""}`}
+                  onClick={() => setTypeFilter(typeFilter === "PHONE" ? "" : "PHONE")}
+                >
+                  Teléfonos
+                </button>
+                <div className="divider divider-horizontal mx-[-4px]"></div>
+                <button
+                  type="button"
+                  className={`join-item btn btn-sm ${typeFilter === "ACCESSORY" ? "btn-active" : ""}`}
+                  onClick={() => setTypeFilter(typeFilter === "ACCESSORY" ? "" : "ACCESSORY")}
+                >
+                  Accesorios
+                </button>
+              </div>
+              {typeFilter ? (
+                <button className="btn btn-ghost btn-xs" onClick={() => setTypeFilter("")}>
+                  ✕
+                </button>
+              ) : null}
             </div>
-            {typeFilter ? (
-              <button className="btn btn-ghost btn-xs" onClick={() => setTypeFilter("")}>
-                ✕
-              </button>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
-            onClick={() => setIsTableExpanded(!isTableExpanded)}
-            title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
-          >
-            {isTableExpanded ? "Comprimir" : "Expandir "} Tabla
-            {isTableExpanded ? <ArrowsPointingInIcon className="size-6" /> : <ArrowsPointingOutIcon className="size-6" />}
-          </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
+              onClick={() => setIsTableExpanded(!isTableExpanded)}
+              title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
+            >
+              {isTableExpanded ? "Comprimir" : "Expandir "} Tabla
+              {isTableExpanded ? <ArrowsPointingInIcon className="size-6" /> : <ArrowsPointingOutIcon className="size-6" />}
+            </button>
 
-          <button
-            type="button"
-            className="btn btn-sm btn-ghost border border-base-content/10"
-            onClick={() => mutate()}
-            title="Refrescar"
-          >
-            {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Refrescar"}
-          </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost border border-base-content/10"
+              onClick={() => mutate()}
+              title="Refrescar"
+            >
+              {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Refrescar"}
+            </button>
+          </div>
         </div>
 
         {canCreateProducts ? (
@@ -1404,40 +1408,34 @@ export default function FilterableProductsTable() {
       ) : null}
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
-        <div className="flex items-center gap-2 flex-1">
+        <div className="flex flex-grow flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
           <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} search={search} />
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setDrawerOpen(true)}>
             <FunnelIcon className="w-5 h-5" />
             Filtros
           </button>
-          <div className="flex flex-col items-start gap-1 mx-4 relative mt-2">
-            <span className="text-xs font-medium text-base-content/30 whitespace-nowrap absolute -top-5">Ordenar por:</span>
-            <select
-              className="select select-bordered select-sm"
-              value={orderBy}
-              onChange={(e) => setOrderBy(e.target.value)}>
-              <option value="alpha_asc">Alfabético A-Z</option>
-              <option value="alpha_desc">Alfabético Z-A</option>
-              <option value="created_desc">Más Nuevos Creados</option>
-              <option value="created_asc">Más Viejos Creados</option>
-              <option value="updated_desc">Más Nuevos Modificados</option>
-              <option value="updated_asc">Más Viejos Modificados</option>
-            </select>
-          </div>
-          <div className="flex flex-col items-start gap-1 mx-4 relative mt-2">
-            <span className="text-xs font-medium text-base-content/30 whitespace-nowrap absolute -top-5">Estado:</span>
-            <select
-              className="select select-bordered select-sm"
-              value={stateFilter}
-              onChange={(e) => setStateFilter(e.target.value)}>
-              <option value="">Todos los estados</option>
-              {stateOptions.map((s) => (
-                <option key={s} value={s}>
-                  {stateLabelMap[s] ?? s}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            className="select select-bordered select-sm"
+            value={orderBy}
+            onChange={(e) => setOrderBy(e.target.value)}>
+            <option value="alpha_asc">Alfabético A-Z</option>
+            <option value="alpha_desc">Alfabético Z-A</option>
+            <option value="created_desc">Más Nuevos Creados</option>
+            <option value="created_asc">Más Viejos Creados</option>
+            <option value="updated_desc">Más Nuevos Modificados</option>
+            <option value="updated_asc">Más Viejos Modificados</option>
+          </select>
+          <select
+            className="select select-bordered select-sm"
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value)}>
+            <option value="">Todos los estados</option>
+            {stateOptions.map((s) => (
+              <option key={s} value={s}>
+                {stateLabelMap[s] ?? s}
+              </option>
+            ))}
+          </select>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => clearFilters()}>
             Limpiar
           </button>
@@ -1453,69 +1451,69 @@ export default function FilterableProductsTable() {
             </button>
           ) : null}
         </div>
-        <div className="flex items-center gap-4">
-          {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) && (
-            <div className="flex items-center gap-2">
-              {brandFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Marca: {brandFilter}
-                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setBrandFilter("")}>
-                    ✕
-                  </button>
-                </span>
-              )}
-              {conditionFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Condición: {conditionLabelMap[conditionFilter]}
-                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setConditionFilter("")}>
-                    ✕
-                  </button>
-                </span>
-              )}
-              {colorFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Color: {colorFilter}
-                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setColorFilter("")}>
-                    ✕
-                  </button>
-                </span>
-              )}
-              {capacityFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Capacidad: {capacityFilter} GB
-                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setCapacityFilter("")}>
-                    ✕
-                  </button>
-                </span>
-              )}
-              {stateFilter && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Estado: {stateLabelMap[stateFilter]}
-                  <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setStateFilter("")}>
-                    ✕
-                  </button>
-                </span>
-              )}
-              {(batteryMin || batteryMax) && (
-                <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                  Batería: {batteryMin ? `Min ${batteryMin}%` : ""}
-                  {batteryMin && batteryMax ? " - " : ""}
-                  {batteryMax ? `Max ${batteryMax}%` : ""}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs btn-circle ml-1"
-                    onClick={() => {
-                      setBatteryMin("")
-                      setBatteryMax("")
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) && (
+          <div className="flex items-center gap-2">
+            {brandFilter && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Marca: {brandFilter}
+                <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setBrandFilter("")}>
+                  ✕
+                </button>
+              </span>
+            )}
+            {conditionFilter && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Condición: {conditionLabelMap[conditionFilter]}
+                <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setConditionFilter("")}>
+                  ✕
+                </button>
+              </span>
+            )}
+            {colorFilter && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Color: {colorFilter}
+                <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setColorFilter("")}>
+                  ✕
+                </button>
+              </span>
+            )}
+            {capacityFilter && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Capacidad: {capacityFilter} GB
+                <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setCapacityFilter("")}>
+                  ✕
+                </button>
+              </span>
+            )}
+            {stateFilter && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Estado: {stateLabelMap[stateFilter]}
+                <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setStateFilter("")}>
+                  ✕
+                </button>
+              </span>
+            )}
+            {(batteryMin || batteryMax) && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Batería: {batteryMin ? `Min ${batteryMin}%` : ""}
+                {batteryMin && batteryMax ? " - " : ""}
+                {batteryMax ? `Max ${batteryMax}%` : ""}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs btn-circle ml-1"
+                  onClick={() => {
+                    setBatteryMin("")
+                    setBatteryMax("")
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Drawer for filters */}
@@ -1551,9 +1549,9 @@ export default function FilterableProductsTable() {
                       ))}
                   </select>
                   {conditionFilter && (
-                      <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setConditionFilter("")}>
-                        <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
-                        ✕
+                    <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setConditionFilter("")}>
+                      <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                      ✕
                     </button>
                   )}
                 </div>
@@ -1618,10 +1616,10 @@ export default function FilterableProductsTable() {
                     ))}
                   </select>
                   {colorFilter && (
-                      <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setColorFilter("")}>
-                        <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
-                        ✕
-                      </button>
+                    <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setColorFilter("")}>
+                      <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                      ✕
+                    </button>
                   )}
                 </div>
 
@@ -1638,9 +1636,9 @@ export default function FilterableProductsTable() {
                     ))}
                   </select>
                   {capacityFilter && (
-                      <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setCapacityFilter("")}>
-                        <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
-                        ✕
+                    <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setCapacityFilter("")}>
+                      <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                      ✕
                     </button>
                   )}
                 </div>
@@ -1781,10 +1779,10 @@ export default function FilterableProductsTable() {
                         </td>
                       ) : null}
                       {canSeeSalePrice ? (
-                      <td>
-                        <span className="text-xs text-base-content/50">$ </span>
-                        {saleLabel}
-                      </td>
+                        <td>
+                          <span className="text-xs text-base-content/50">$ </span>
+                          {saleLabel}
+                        </td>
                       ) : null}
                       <td className="text-right text-xs text-base-content/60">{last}</td>
                       <td></td>

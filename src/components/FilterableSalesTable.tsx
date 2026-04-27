@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import SearchBar from "@/components/SearchBar";
+import { DateRangePicker, DateRangePickerItem, type DateRangePickerValue } from "@tremor/react";
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, CheckIcon, XMarkIcon, PencilIcon, TrashIcon, ArrowTrendingDownIcon, CurrencyDollarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/solid'
 import { formatInTimeZone } from 'date-fns-tz'
 import { startOfDay, endOfDay } from 'date-fns'
+import { es } from "date-fns/locale"
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
 import type { Role } from "@/lib/auth/roles";
 
@@ -34,6 +36,18 @@ type SerializedSale = {
 
 // ====== Utils ======
 const toStr = (v: any) => (v == null ? null : String(v));
+
+function toDateParam(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function fromDateParam(value: string) {
+  return value ? new Date(`${value}T00:00:00`) : undefined;
+}
 
 // Normaliza tanto root como items para mantener shape estable
 function normalizeSales(input: any[]): SerializedSale[] {
@@ -135,6 +149,47 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   const [minProfit, setMinProfit] = useState<string>("");
   const [maxProfit, setMaxProfit] = useState<string>("");
 
+  const dateRangeValue = useMemo<DateRangePickerValue>(
+    () => ({
+      from: fromDateParam(startDate),
+      to: fromDateParam(endDate),
+    }),
+    [endDate, startDate],
+  );
+
+  const rangePresets = useMemo(() => {
+    const today = new Date();
+    const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const currentYearStart = new Date(today.getFullYear(), 0, 1);
+
+    return [
+      {
+        key: "last-7-days",
+        label: "Ultimos 7 dias",
+        from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6),
+        to: today,
+      },
+      {
+        key: "last-30-days",
+        label: "Ultimos 30 dias",
+        from: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29),
+        to: today,
+      },
+      {
+        key: "current-month",
+        label: "Mes actual",
+        from: currentMonthStart,
+        to: today,
+      },
+      {
+        key: "ytd",
+        label: "Ano transcurrido",
+        from: currentYearStart,
+        to: today,
+      },
+    ];
+  }, []);
+
   useEffect(() => {
     if (!activeRole) return;
     if (!canSeeTotal) {
@@ -155,6 +210,11 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
     setMaxTotal("");
     setMinProfit("");
     setMaxProfit("");
+  }
+
+  function handleRangeChange(value: DateRangePickerValue) {
+    setStartDate(value.from ? toDateParam(value.from) : "");
+    setEndDate(value.to ? toDateParam(value.to) : "");
   }
 
   // Inline edit por campo (mismo patrón que Products)
@@ -507,62 +567,66 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
-        <div className="flex flex-row items-center justify-between gap-2">
-          <h2 className="text-2xl font-bold">
-            Ventas
-            <span className="ml-4 text-sm text-base-content/60">
-              - Resultados {displayed.length}
-            </span>
-            <span className="ml-1 text-sm text-base-content/30">de</span>
-            <span className="ml-1 text-sm text-base-content/30">
-              {items.length}
-            </span>
-          </h2>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
-            onClick={() => setIsTableExpanded(!isTableExpanded)}
-            title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
-          >
-            {isTableExpanded ? 'Comprimir' : 'Expandir '} Tabla
-            {isTableExpanded ? (
-              <ArrowsPointingInIcon className="size-6" />
-            ) : (
-              <ArrowsPointingOutIcon className="size-6" />
-            )}
-          </button>
-          {canSeeFinancialStats ? (
-          <div className="stats bg-base-100/50">
-            <div className="stat px-4 py-2 text-error">
-              <div className="stat-figure text-error">
-                <ArrowTrendingDownIcon className="w-6 h-6" />
-              </div>
-              <div className="stat-title text-xs">Total Costos</div>
-              <div className="stat-value text-base">
-                ${displayed.reduce((acc, s) => acc + (s.costTotal ? parseFloat(s.costTotal) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-
-            <div className="stat px-4 py-2">
-              <div className="stat-figure text-warning">
-                <CurrencyDollarIcon className="w-6 h-6" />
-              </div>
-              <div className="stat-title text-xs">Total Ventas</div>
-              <div className="stat-value text-base text-warning">
-                ${displayed.reduce((acc, s) => acc + (s.total ? parseFloat(s.total) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-
-            <div className="stat px-4 py-2">
-              <div className="stat-figure text-success">
-                <ArrowTrendingUpIcon className="w-6 h-6" />
-              </div>
-              <div className="stat-title text-xs">Total Ganancias</div>
-              <div className="stat-value text-base text-success">
-                ${displayed.reduce((acc, s) => acc + (s.profit ? parseFloat(s.profit) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-row items-center justify-between gap-2">
+            <h2 className="text-2xl font-bold">
+              Ventas
+            </h2>
+            <div className="flex flex-grow flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
+              <span className="ml-1 text-sm text-base-content/60">
+                Resultados {displayed.length}
+              </span>
+              <span className="text-sm text-base-content/30">de</span>
+              <span className="text-sm text-base-content/30">
+                {items.length}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
+                onClick={() => setIsTableExpanded(!isTableExpanded)}
+                title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
+              >
+                {isTableExpanded ? 'Comprimir' : 'Expandir '} Tabla
+                {isTableExpanded ? (
+                  <ArrowsPointingInIcon className="size-6" />
+                ) : (
+                  <ArrowsPointingOutIcon className="size-6" />
+                )}
+              </button>
             </div>
           </div>
+          {canSeeFinancialStats ? (
+            <div className="stats rounded-box bg-base-200 p-1">
+              <div className="stat px-4 py-2 text-error">
+                <div className="stat-figure text-error">
+                  <ArrowTrendingDownIcon className="w-6 h-6" />
+                </div>
+                <div className="stat-title text-xs">Total Costos</div>
+                <div className="stat-value text-base">
+                  ${displayed.reduce((acc, s) => acc + (s.costTotal ? parseFloat(s.costTotal) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              <div className="stat px-4 py-2">
+                <div className="stat-figure text-warning">
+                  <CurrencyDollarIcon className="w-6 h-6" />
+                </div>
+                <div className="stat-title text-xs">Total Ventas</div>
+                <div className="stat-value text-base text-warning">
+                  ${displayed.reduce((acc, s) => acc + (s.total ? parseFloat(s.total) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              <div className="stat px-4 py-2">
+                <div className="stat-figure text-success">
+                  <ArrowTrendingUpIcon className="w-6 h-6" />
+                </div>
+                <div className="stat-title text-xs">Total Ganancias</div>
+                <div className="stat-value text-base text-success">
+                  ${displayed.reduce((acc, s) => acc + (s.profit ? parseFloat(s.profit) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
           ) : null}
         </div>
         {canCreateSales ? (
@@ -575,12 +639,31 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
       </div>
 
       {/* Header: búsqueda, filtros */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 w-full">
+      <div className="relative z-[80] flex items-center justify-between">
+        <div className="flex flex-grow flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
           <SearchBar
             placeholder="Buscar ventas por cliente, id o modelo..."
             onSearch={setSearchQuery}
           />
+          
+          <DateRangePicker
+            className="relative z-[90] sm:w-72"
+            value={dateRangeValue}
+            onValueChange={handleRangeChange}
+            enableClear
+            displayFormat="dd/MM/yyyy"
+            enableYearNavigation
+            weekStartsOn={1}
+            locale={es}
+            selectPlaceholder="Seleccionar"
+            color="blue"
+          >
+            {rangePresets.map((preset) => (
+              <DateRangePickerItem key={preset.key} value={preset.key} from={preset.from} to={preset.to}>
+                {preset.label}
+              </DateRangePickerItem>
+            ))}
+          </DateRangePicker>
           <button
             type="button"
             className="btn btn-outline btn-sm"
@@ -590,7 +673,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
             <FunnelIcon className="w-5 h-5 mr-1" />
             Filtros
           </button>
-          
+
           {(startDate || endDate || minTotal || maxTotal || minProfit || maxProfit) && (
             <div className="flex items-center gap-2">
               {(startDate || endDate) && (
@@ -672,28 +755,6 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
               </div>
 
               <div className="flex flex-col gap-4">
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Desde (fecha)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="input input-bordered"
-                  />
-                </div>
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Hasta (fecha)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="input input-bordered"
-                  />
-                </div>
                 {canSeeTotal ? (
                   <>
                     <div className="form-control">
@@ -776,9 +837,9 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
       />
 
       {/* Tabla */}
-      <div className="relative overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
+      <div className="relative z-0 overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
         {loading && (
-          <div className="absolute inset-0 bg-base-100/70 backdrop-blur-[1px] z-10 flex items-center justify-center text-sm text-base-content/60">
+          <div className="absolute inset-0 bg-base-100/70 backdrop-blur-[1px] flex items-center justify-center text-sm text-base-content/60">
             Buscando…
           </div>
         )}
@@ -900,8 +961,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                             className: "cursor-pointer hover:bg-base-200 rounded px-1",
                             title: "Click para editar",
                             onClick: () => {
-                          startEditField(s.id, "buyer.name", s.buyer?.name ?? "");
-                          startEditField(s.id, "buyer.surname", s.buyer?.surname ?? "");
+                              startEditField(s.id, "buyer.name", s.buyer?.name ?? "");
+                              startEditField(s.id, "buyer.surname", s.buyer?.surname ?? "");
                             },
                           }
                           : {
@@ -952,107 +1013,107 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
                   {/* Costo */}
                   {canSeeCosts ? (
-                  <td>
-                    {canEditField("costTotal") && isEditing(s.id, "costTotal") ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          className="input input-xs w-20"
-                          type="number"
-                          step="0.01"
-                          value={getEditingValue(s.id, "costTotal")}
-                          onChange={(e) => updateEditingValue(s.id, "costTotal", e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEditField(s.id, "costTotal");
-                            if (e.key === "Escape") cancelEditField(s.id, "costTotal");
-                          }}
-                          onBlur={() => commitEditField(s.id, "costTotal")}
-                        />
-                        <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'costTotal')}>
-                            <CheckIcon className="h-[1em]" />
-                          </button>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'costTotal')}>
-                            <XMarkIcon className="h-[1em]" />
-                          </button>
+                    <td>
+                      {canEditField("costTotal") && isEditing(s.id, "costTotal") ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="input input-xs w-20"
+                            type="number"
+                            step="0.01"
+                            value={getEditingValue(s.id, "costTotal")}
+                            onChange={(e) => updateEditingValue(s.id, "costTotal", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitEditField(s.id, "costTotal");
+                              if (e.key === "Escape") cancelEditField(s.id, "costTotal");
+                            }}
+                            onBlur={() => commitEditField(s.id, "costTotal")}
+                          />
+                          <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'costTotal')}>
+                              <CheckIcon className="h-[1em]" />
+                            </button>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'costTotal')}>
+                              <XMarkIcon className="h-[1em]" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <span {...editableCellProps(s.id, "costTotal", s.costTotal)}>
-                        $ {s.costTotal ? Number(s.costTotal).toFixed(2) : "-"}
-                      </span>
-                    )}
-                  </td>
+                      ) : (
+                        <span {...editableCellProps(s.id, "costTotal", s.costTotal)}>
+                          $ {s.costTotal ? Number(s.costTotal).toFixed(2) : "-"}
+                        </span>
+                      )}
+                    </td>
                   ) : null}
 
                   {/* Total (editable decimal) */}
                   {canSeeTotal ? (
-                  <td>
-                    {canEditField("total") && isEditing(s.id, "total") ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          className="input input-xs w-20"
-                          type="number"
-                          step="0.01"
-                          value={getEditingValue(s.id, "total")}
-                          onChange={(e) => updateEditingValue(s.id, "total", e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEditField(s.id, "total");
-                            if (e.key === "Escape") cancelEditField(s.id, "total");
-                          }}
-                          onBlur={() => commitEditField(s.id, "total")}
-                          disabled={savingField?.saleId === s.id && savingField?.fieldName === "total"}
-                        />
-                        <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'total')}>
-                            <CheckIcon className="h-[1em]" />
-                          </button>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'total')}>
-                            <XMarkIcon className="h-[1em]" />
-                          </button>
+                    <td>
+                      {canEditField("total") && isEditing(s.id, "total") ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="input input-xs w-20"
+                            type="number"
+                            step="0.01"
+                            value={getEditingValue(s.id, "total")}
+                            onChange={(e) => updateEditingValue(s.id, "total", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitEditField(s.id, "total");
+                              if (e.key === "Escape") cancelEditField(s.id, "total");
+                            }}
+                            onBlur={() => commitEditField(s.id, "total")}
+                            disabled={savingField?.saleId === s.id && savingField?.fieldName === "total"}
+                          />
+                          <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'total')}>
+                              <CheckIcon className="h-[1em]" />
+                            </button>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'total')}>
+                              <XMarkIcon className="h-[1em]" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <span {...editableCellProps(s.id, "total", s.total)}>
-                        $ {s.total ? Number(s.total).toFixed(2) : "-"}
-                      </span>
-                    )}
-                  </td>
+                      ) : (
+                        <span {...editableCellProps(s.id, "total", s.total)}>
+                          $ {s.total ? Number(s.total).toFixed(2) : "-"}
+                        </span>
+                      )}
+                    </td>
                   ) : null}
 
                   {/* Ganancia (editable decimal) */}
                   {canSeeProfit ? (
-                  <td>
-                    {canEditField("profit") && isEditing(s.id, "profit") ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          className="input input-xs w-20"
-                          type="number"
-                          step="0.01"
-                          value={getEditingValue(s.id, "profit")}
-                          onChange={(e) =>
-                            updateEditingValue(s.id, "profit", e.target.value)
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEditField(s.id, "profit");
-                            if (e.key === "Escape") cancelEditField(s.id, "profit");
-                          }}
-                          onBlur={() => commitEditField(s.id, "profit")}
-                        />
-                        <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'profit')}>
-                            <CheckIcon className="h-[1em]" />
-                          </button>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'profit')}>
-                            <XMarkIcon className="h-[1em]" />
-                          </button>
+                    <td>
+                      {canEditField("profit") && isEditing(s.id, "profit") ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="input input-xs w-20"
+                            type="number"
+                            step="0.01"
+                            value={getEditingValue(s.id, "profit")}
+                            onChange={(e) =>
+                              updateEditingValue(s.id, "profit", e.target.value)
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitEditField(s.id, "profit");
+                              if (e.key === "Escape") cancelEditField(s.id, "profit");
+                            }}
+                            onBlur={() => commitEditField(s.id, "profit")}
+                          />
+                          <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'profit')}>
+                              <CheckIcon className="h-[1em]" />
+                            </button>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'profit')}>
+                              <XMarkIcon className="h-[1em]" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <span {...editableCellProps(s.id, "profit", s.profit)}>
-                        $ {s.profit ? Number(s.profit).toFixed(2) : "-"}
-                      </span>
-                    )}
-                  </td>
+                      ) : (
+                        <span {...editableCellProps(s.id, "profit", s.profit)}>
+                          $ {s.profit ? Number(s.profit).toFixed(2) : "-"}
+                        </span>
+                      )}
+                    </td>
                   ) : null}
 
                   {/* Origen (editable select) */}
@@ -1097,36 +1158,36 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
                   {/* Acciones */}
                   {hasSaleActions ? (
-                  <td>
-                    <div className="flex items-center gap-2">
-                      {canEditSales ? (
-                      <Link
-                        href={`/dashboard/sales/${s.id}/edit`}
-                        className="btn btn-xs btn-square btn-soft"
-                      >
-                        <PencilIcon className="size-[1.2em]" />
-                      </Link>
-                      ) : null}
-                      {canDeleteSales ? (
-                      <button
-                        className="btn btn-xs btn-square btn-soft btn-error"
-                        onClick={() => deleteSale(s.id)}
-                        disabled={deletingId === s.id}
-                        title="Eliminar"
-                      >
-                        {deletingId === s.id ?
-                          <>
-                            <span className="loading loading-bars loading-xs"></span>
-                          </>
-                          :
-                          <>
-                            <TrashIcon className="size-[1.2em]" />
-                          </>
-                        }
-                      </button>
-                      ) : null}
-                    </div>
-                  </td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {canEditSales ? (
+                          <Link
+                            href={`/dashboard/sales/${s.id}/edit`}
+                            className="btn btn-xs btn-square btn-soft"
+                          >
+                            <PencilIcon className="size-[1.2em]" />
+                          </Link>
+                        ) : null}
+                        {canDeleteSales ? (
+                          <button
+                            className="btn btn-xs btn-square btn-soft btn-error"
+                            onClick={() => deleteSale(s.id)}
+                            disabled={deletingId === s.id}
+                            title="Eliminar"
+                          >
+                            {deletingId === s.id ?
+                              <>
+                                <span className="loading loading-bars loading-xs"></span>
+                              </>
+                              :
+                              <>
+                                <TrashIcon className="size-[1.2em]" />
+                              </>
+                            }
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
                   ) : null}
                 </tr>
               ))}

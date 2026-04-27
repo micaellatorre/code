@@ -19,7 +19,7 @@ export default async function AppointmentsPage() {
   const appointments = await prisma.appointment.findMany({
     orderBy: { scheduledAt: "desc" },
     include: {
-      buyer: { select: { name: true, surname: true, phone: true, instagram: true } },
+      buyer: { select: { name: true, surname: true, phone: true, instagram: true, id: true } },
       interests: {
         include: {
           product: {
@@ -48,6 +48,7 @@ export default async function AppointmentsPage() {
     noSaleReason: a.noSaleReason,
     buyer: a.buyer
       ? {
+          id: a.buyer.id,
           name: `${a.buyer.name} ${a.buyer.surname || ""}`.trim(),
           phone: a.buyer.phone,
           instagram: a.buyer.instagram,
