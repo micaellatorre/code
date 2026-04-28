@@ -37,3 +37,12 @@ body {
 .cp-vspace {
   @apply my-6;
 }
+
+[id^="headlessui-popover-panel-"], 
+[id^="headlessui-listbox-options-"] {
+  z-index: 9999 !important;
+}
+ 
+[id^="headlessui-listbox-button-"] {
+  height: stretch !important;
+}

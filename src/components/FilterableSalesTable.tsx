@@ -565,24 +565,26 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
   // ====== Render ======
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2 sm:gap-4">
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex flex-row items-center justify-between gap-2">
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold hidden sm:block">
               Ventas
             </h2>
             <div className="flex flex-grow flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
-              <span className="ml-1 text-sm text-base-content/60">
-                Resultados {displayed.length}
-              </span>
-              <span className="text-sm text-base-content/30">de</span>
-              <span className="text-sm text-base-content/30">
-                {items.length}
-              </span>
+              <div className="flex flex-row gap-1">
+                <span className="ml-1 text-sm text-base-content/60">
+                  Resultados {displayed.length}
+                </span>
+                <span className="text-sm text-base-content/30">de</span>
+                <span className="text-sm text-base-content/30">
+                  {items.length}
+                </span>
+              </div>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
+                className="btn btn-ghost btn-xs sm:btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
                 onClick={() => setIsTableExpanded(!isTableExpanded)}
                 title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
               >
@@ -596,33 +598,33 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
             </div>
           </div>
           {canSeeFinancialStats ? (
-            <div className="stats rounded-box bg-base-200 p-1">
-              <div className="stat px-4 py-2 text-error">
+            <div className="stats rounded-box bg-base-200 p-2">
+              <div className="stat px-1 sm:px-4 py-2 text-error">
                 <div className="stat-figure text-error">
-                  <ArrowTrendingDownIcon className="w-6 h-6" />
+                  <ArrowTrendingDownIcon className="size-6 hidden sm:block" />
                 </div>
                 <div className="stat-title text-xs">Total Costos</div>
-                <div className="stat-value text-base">
+                <div className="stat-value text-xs sm:text-base">
                   ${displayed.reduce((acc, s) => acc + (s.costTotal ? parseFloat(s.costTotal) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
 
-              <div className="stat px-4 py-2">
+              <div className="stat sm:px-4 py-2 pr-0 pl-2">
                 <div className="stat-figure text-warning">
-                  <CurrencyDollarIcon className="w-6 h-6" />
+                  <CurrencyDollarIcon className="size-6 hidden sm:block" />
                 </div>
                 <div className="stat-title text-xs">Total Ventas</div>
-                <div className="stat-value text-base text-warning">
+                <div className="stat-value text-xs sm:text-base text-warning">
                   ${displayed.reduce((acc, s) => acc + (s.total ? parseFloat(s.total) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
 
-              <div className="stat px-4 py-2">
+              <div className="stat sm:px-4 py-2 pr-0 pl-2">
                 <div className="stat-figure text-success">
-                  <ArrowTrendingUpIcon className="w-6 h-6" />
+                  <ArrowTrendingUpIcon className="size-6 hidden sm:block" />
                 </div>
                 <div className="stat-title text-xs">Total Ganancias</div>
-                <div className="stat-value text-base text-success">
+                <div className="stat-value text-xs sm:text-base text-success">
                   ${displayed.reduce((acc, s) => acc + (s.profit ? parseFloat(s.profit) : 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
@@ -630,7 +632,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
           ) : null}
         </div>
         {canCreateSales ? (
-          <div className="flex items-center gap-2">
+          <div className="items-center gap-2 hidden sm:flex">
             <Link href="/dashboard/sales/new" className="btn btn-primary">
               Nueva Venta
             </Link>
@@ -640,14 +642,14 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
       {/* Header: búsqueda, filtros */}
       <div className="relative z-[80] flex items-center justify-between">
-        <div className="flex flex-grow flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
+        <div className="flex flex-grow flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2 items-center">
           <SearchBar
             placeholder="Buscar ventas por cliente, id o modelo..."
             onSearch={setSearchQuery}
           />
 
           <DateRangePicker
-            className="relative z-[90] sm:w-72 w-auto flex-grow"
+            className="relative z-[90] w-64 flex-grow text-xs sm:text-sm"
             value={dateRangeValue}
             onValueChange={handleRangeChange}
             enableClear
@@ -666,71 +668,71 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
           </DateRangePicker>
           <button
             type="button"
-            className="btn btn-outline btn-sm"
+            className="btn btn-outline btn-xs sm:btn-sm"
             onClick={() => setDrawerOpen(true)}
             title="Abrir filtros"
           >
-            <FunnelIcon className="w-5 h-5 mr-1" />
+            <FunnelIcon className="size-5 sm:size-6 mr-1" />
             Filtros
           </button>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="btn btn-ghost btn-xs sm:btn-sm"
             onClick={clearFilters}
           >
             Limpiar
           </button>
         </div>
       </div>
-        {(startDate || endDate || minTotal || maxTotal || minProfit || maxProfit) && (
-          <div className="flex items-center gap-2">
-            {(startDate || endDate) && (
-              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                Fecha: {startDate ? `desde ${startDate}` : ''}{startDate && endDate ? ' ' : ''}{endDate ? `hasta ${endDate}` : ''}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs btn-circle ml-1"
-                  onClick={() => {
-                    setStartDate('');
-                    setEndDate('');
-                  }}
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-            {canSeeTotal && (minTotal || maxTotal) && (
-              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                Total: {minTotal ? `Min $${minTotal}` : ''}{minTotal && maxTotal ? ' - ' : ''}{maxTotal ? `Max $${maxTotal}` : ''}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs btn-circle ml-1"
-                  onClick={() => {
-                    setMinTotal('');
-                    setMaxTotal('');
-                  }}
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-            {canSeeProfit && (minProfit || maxProfit) && (
-              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
-                Ganancia: {minProfit ? `Min $${minProfit}` : ''}{minProfit && maxProfit ? ' - ' : ''}{maxProfit ? `Max $${maxProfit}` : ''}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs btn-circle ml-1"
-                  onClick={() => {
-                    setMinProfit('');
-                    setMaxProfit('');
-                  }}
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-          </div>
-        )}
+      {(startDate || endDate || minTotal || maxTotal || minProfit || maxProfit) && (
+        <div className="flex items-center gap-2">
+          {(startDate || endDate) && (
+            <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+              Fecha: {startDate ? `desde ${startDate}` : ''}{startDate && endDate ? ' ' : ''}{endDate ? `hasta ${endDate}` : ''}
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle ml-1"
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {canSeeTotal && (minTotal || maxTotal) && (
+            <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+              Total: {minTotal ? `Min $${minTotal}` : ''}{minTotal && maxTotal ? ' - ' : ''}{maxTotal ? `Max $${maxTotal}` : ''}
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle ml-1"
+                onClick={() => {
+                  setMinTotal('');
+                  setMaxTotal('');
+                }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          {canSeeProfit && (minProfit || maxProfit) && (
+            <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+              Ganancia: {minProfit ? `Min $${minProfit}` : ''}{minProfit && maxProfit ? ' - ' : ''}{maxProfit ? `Max $${maxProfit}` : ''}
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs btn-circle ml-1"
+                onClick={() => {
+                  setMinProfit('');
+                  setMaxProfit('');
+                }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
+        </div>
+      )}
       {/* Drawer de filtros */}
       {drawerOpen && (
         <div className="fixed inset-0 z-[100] pointer-events-none">
@@ -752,7 +754,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                 </button>
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2 sm:gap-4">
                 {canSeeTotal ? (
                   <>
                     <div className="form-control">

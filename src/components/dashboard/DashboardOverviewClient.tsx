@@ -415,8 +415,8 @@ export default function DashboardOverviewClient({ data }: DashboardOverviewClien
 
   return (
     <div className="min-h-screen bg-base-200 px-4 py-6 text-base-content sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:gap-6">
+        <div className="flex flex-col gap-2 sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-semibold text-base-content">Overview</h1>
@@ -432,9 +432,9 @@ export default function DashboardOverviewClient({ data }: DashboardOverviewClien
             </div>
           </div>
 
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center min-w-fit">
+          <div className="flex flex-col justify-between gap-2 sm:gap-4 sm:flex-row sm:items-center">
             <DateRangePicker
-              className="sm:w-72"
+              className="relative z-[90] flex-grow text-xs sm:text-sm"
               value={toDateRangeValue(data)}
               onValueChange={handleRangeChange}
               enableClear={false}
@@ -452,7 +452,7 @@ export default function DashboardOverviewClient({ data }: DashboardOverviewClien
               ))}
             </DateRangePicker>
             <Select
-              className="sm:w-64 ml-10"
+              className="sm:w-64"
               value={data.compare}
               onValueChange={(value) => updateUrl({ compare: value as CompareMode })}
             >
@@ -547,8 +547,8 @@ export default function DashboardOverviewClient({ data }: DashboardOverviewClien
 
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    {visibleWidgets.systemStats ? <DashboardSystemStats data={data.systemStats} /> : null}
-                    {visibleWidgets.topProducts ? (
+          {visibleWidgets.systemStats ? <DashboardSystemStats data={data.systemStats} /> : null}
+          {visibleWidgets.topProducts ? (
             <DashboardSection
               title="Top productos vendidos"
               subtitle={`Ranking por ${filters.topProductsMetric === "units" ? "unidades" : "utilidad"} - ${productTypeLabel(filters.topProductsType)}.`}

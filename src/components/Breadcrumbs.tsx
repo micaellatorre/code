@@ -19,7 +19,7 @@ export interface BreadcrumbItem {
 export default function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
   if (!items || items.length === 0) return null
   return (
-    <div className="breadcrumbs text-sm mb-2">
+    <div className="breadcrumbs text-sm sm:mb-2">
       <ul>
         {items.map((item, index) => (
           <li key={index}>

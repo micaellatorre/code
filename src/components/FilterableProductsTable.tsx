@@ -1299,37 +1299,35 @@ export default function FilterableProductsTable() {
 
   const hasNext = !!data?.nextCursor
 
-  // --- UI ---
   return (
-    <div className="flex flex-col gap-4 !h-full flex-1 relative">
+    <div className="flex flex-col gap-2 sm:gap-4 !h-full flex-1 relative">
       <div className="flex justify-between items-center">
-        <div className="flex flex-row items-center justify-between gap-2">
-          <h2 className="text-2xl font-bold">
+        <div className="flex flex-wrap flex-row items-center justify-between gap-2">
+          <h2 className="text-2xl font-bold hidden sm:block">
             Productos
           </h2>
-
-          <div className="flex flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
+          <div className="flex flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2 items-center">
             {viewMode === "DETAIL" ? (
               <div className="flex flex-row items-center gap-1">
                 <span className="ml-1 text-sm text-base-content/60">Resultados {filteredProducts.length}</span>
-                <span className="ml-1 text-sm text-base-content/30">de</span>
-                <span className="ml-1 text-sm text-base-content/30">{totalProducts}</span>
+                <span className="text-sm text-base-content/30">de</span>
+                <span className="text-sm text-base-content/30">{totalProducts}</span>
               </div>
             ) : (
               <div className="flex flex-row items-center gap-1">
                 <span className="ml-1 text-sm text-base-content/60">Grupos {groupedCounts.groups}</span>
-                <span className="ml-1 text-sm text-base-content/30">| Items {groupedCounts.instances}</span>
-                <span className="ml-1 text-sm text-base-content/30">| Stock {groupedCounts.totalStock}</span>
-                <span className="ml-1 text-sm text-base-content/30">| Disp. {groupedCounts.totalAvail}</span>
+                <span className="text-sm text-base-content/30">| Items {groupedCounts.instances}</span>
+                <span className="text-sm text-base-content/30">| Stock {groupedCounts.totalStock}</span>
+                <span className="text-sm text-base-content/30">| Disp. {groupedCounts.totalAvail}</span>
               </div>
             )}
 
-            <div className="divider divider-horizontal mx-0" />
-            <div className="ml-2 flex items-center gap-2">
+            <div className="divider divider-horizontal mx-0 hidden sm:block" />
+            <div className="sm:ml-2 flex items-center gap-2">
               <div className="join border-[0.1em] border-base-content/10">
                 <button
                   type="button"
-                  className={`join-item btn btn-sm ${viewMode === "DETAIL" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm ${viewMode === "DETAIL" ? "btn-active" : ""}`}
                   onClick={() => setViewMode("DETAIL")}
                   title="Detalle de Stock"
                 >
@@ -1338,7 +1336,7 @@ export default function FilterableProductsTable() {
                 <div className="divider divider-horizontal mx-[-4px]"></div>
                 <button
                   type="button"
-                  className={`join-item btn btn-sm ${viewMode === "GENERAL" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm ${viewMode === "GENERAL" ? "btn-active" : ""}`}
                   onClick={() => setViewMode("GENERAL")}
                   title="Stock General"
                 >
@@ -1347,11 +1345,11 @@ export default function FilterableProductsTable() {
               </div>
             </div>
 
-            <div className="ml-2 flex items-center gap-2">
+            <div className="sm:ml-2 flex items-center gap-2">
               <div className="join border-[0.1em] border-base-content/10 ">
                 <button
                   type="button"
-                  className={`join-item btn btn-sm ${typeFilter === "PHONE" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm ${typeFilter === "PHONE" ? "btn-active" : ""}`}
                   onClick={() => setTypeFilter(typeFilter === "PHONE" ? "" : "PHONE")}
                 >
                   Teléfonos
@@ -1359,7 +1357,7 @@ export default function FilterableProductsTable() {
                 <div className="divider divider-horizontal mx-[-4px]"></div>
                 <button
                   type="button"
-                  className={`join-item btn btn-sm ${typeFilter === "ACCESSORY" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm ${typeFilter === "ACCESSORY" ? "btn-active" : ""}`}
                   onClick={() => setTypeFilter(typeFilter === "ACCESSORY" ? "" : "ACCESSORY")}
                 >
                   Accesorios
@@ -1373,27 +1371,34 @@ export default function FilterableProductsTable() {
             </div>
             <button
               type="button"
-              className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
+              className="btn btn-ghost btn-xs sm:btn-sm btn-outline border border-base-content/10 flex items-center"
               onClick={() => setIsTableExpanded(!isTableExpanded)}
               title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
             >
               {isTableExpanded ? "Comprimir" : "Expandir "} Tabla
-              {isTableExpanded ? <ArrowsPointingInIcon className="size-6" /> : <ArrowsPointingOutIcon className="size-6" />}
+              {isTableExpanded ? <ArrowsPointingInIcon className="size-5 sm:size-6" /> : <ArrowsPointingOutIcon className="size-5 sm:size-6" />}
             </button>
 
             <button
               type="button"
-              className="btn btn-sm btn-ghost border border-base-content/10"
+              className="btn btn-xs sm:btn-sm btn-ghost border border-base-content/10"
               onClick={() => mutate()}
               title="Refrescar"
             >
               {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Refrescar"}
             </button>
+            {canCreateProducts ? (
+              <div className="flex items-center sm:hidden">
+                <Link href="/dashboard/products/new" className="btn btn-primary btn-sm">
+                  Nuevo Producto
+                </Link>
+              </div>
+            ) : null}
           </div>
         </div>
 
         {canCreateProducts ? (
-          <div className="flex items-center gap-2">
+          <div className="sm:flex items-center hidden">
             <Link href="/dashboard/products/new" className="btn btn-primary">
               Nuevo Producto
             </Link>
@@ -1408,14 +1413,14 @@ export default function FilterableProductsTable() {
       ) : null}
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
-        <div className="flex flex-grow flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
+        <div className="flex flex-grow flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2 items-center">
           <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} search={search} />
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => setDrawerOpen(true)}>
-            <FunnelIcon className="w-5 h-5" />
+          <button type="button" className="btn btn-outline btn-xs sm:btn-sm" onClick={() => setDrawerOpen(true)}>
+            <FunnelIcon className="size-5 sm:size-6" />
             Filtros
           </button>
           <select
-            className="select select-bordered select-sm"
+            className="select select-bordered select-xs sm:select-sm"
             value={orderBy}
             onChange={(e) => setOrderBy(e.target.value)}>
             <option value="alpha_asc">Alfabético A-Z</option>
@@ -1426,7 +1431,7 @@ export default function FilterableProductsTable() {
             <option value="updated_asc">Más Viejos Modificados</option>
           </select>
           <select
-            className="select select-bordered select-sm"
+            className="select select-bordered select-xs sm:select-sm"
             value={stateFilter}
             onChange={(e) => setStateFilter(e.target.value)}>
             <option value="">Todos los estados</option>
@@ -1436,7 +1441,7 @@ export default function FilterableProductsTable() {
               </option>
             ))}
           </select>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => clearFilters()}>
+          <button type="button" className="btn btn-ghost btn-xs sm:btn-sm" onClick={() => clearFilters()}>
             Limpiar
           </button>
           {hasNext ? (

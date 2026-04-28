@@ -154,7 +154,6 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
       return matchesQuery && matchesStatus && matchesOutcome
     })
   }, [appointments, searchQuery, statusFilter, outcomeFilter])
-  console.log("Filtered appointments:", filteredAppointments)
   function formatDate(iso: string) {
     const date = new Date(iso)
     if (Number.isNaN(date.getTime())) return "Fecha inválida"
@@ -248,11 +247,11 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
   return (
     <div className="card bg-base-100">
       <div className="flex flex-row items-center gap-2">
-        <div className="flex items-center gap-4 w-full">
-          <h2 className="text-2xl font-bold">
+        <div className="flex flex-wrap items-center gap-4 w-full">
+          <h2 className="text-2xl font-bold hidden sm:block">
             Citas
           </h2>
-          <div className="flex flex-wrap gap-4 rounded-box bg-base-200 p-2 items-center">
+          <div className="flex flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2 items-center">
             <div className="flex flex-row items-center gap-1">
               <span className="ml-1 text-sm text-base-content/60">
                 Resultados {filteredAppointments.length}
@@ -262,10 +261,10 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                 {appointments.length}
               </span>
             </div>
-            <div className="divider divider-horizontal mx-0" />
+            <div className="divider divider-horizontal mx-0 hidden sm:block" />
             <button
               type="button"
-              className="btn btn-ghost btn-sm btn-outline border border-base-content/10 h-[2.4em] flex items-center"
+              className="btn btn-ghost btn-outline border border-base-content/10 h-[2.4em] flex items-center btn-xs sm:btn-sm"
               onClick={() => setIsTableExpanded(!isTableExpanded)}
               title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
             >
@@ -276,16 +275,19 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                 <ArrowsPointingOutIcon className="size-6" />
               )}
             </button>
+            <Link href="/dashboard/appointments/new" className="btn btn-primary btn-sm sm:hidden">
+              Nueva Cita
+            </Link>
           </div>
         </div>
 
-        <Link href="/dashboard/appointments/new" className="btn btn-primary">
+        <Link href="/dashboard/appointments/new" className="btn btn-primary hidden sm:inline-flex">
           Nueva Cita
         </Link>
       </div>
 
       {/* Filtros de búsqueda */}
-      <div className="my-4 flex flex-wrap gap-4 rounded-box bg-base-200 p-2">
+      <div className="my-2 sm:my-4 flex flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2">
         <input
           type="text"
           placeholder="Buscar por cliente, contacto o interés..."
@@ -294,7 +296,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
           className="input input-bordered input-sm flex-grow"
         />
         <select
-          className="select select-bordered select-sm"
+          className="select select-bordered select-xs sm:select-sm"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as AppointmentStatus | "ALL")}
         >
@@ -306,7 +308,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
           ))}
         </select>
         <select
-          className="select select-bordered select-sm"
+          className="select select-bordered select-xs sm:select-sm"
           value={outcomeFilter}
           onChange={(e) => setOutcomeFilter(e.target.value as AppointmentOutcome | "ALL")}
         >

@@ -124,14 +124,14 @@ export default function DashboardLayout({
         aria-label="Cerrar menú lateral"
         onClick={closeSidebar}
         className={[
-          "fixed inset-0 z-40 bg-black/30 transition-opacity duration-300",
+          "fixed inset-0 z-[150] bg-black/30 transition-opacity duration-300",
           mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
         ].join(" ")}
       />
 
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-50 m-2 flex flex-col rounded-xl bg-base-200/95 backdrop-blur shadow-2xl transition-all duration-300",
+          "fixed inset-y-0 left-0 z-[190] m-2 flex flex-col rounded-xl bg-base-200/95 backdrop-blur shadow-2xl transition-all duration-300",
           sidebarWidth,
           mobileOpen ? "translate-x-0" : "-translate-x-[120%]",
         ].join(" ")}

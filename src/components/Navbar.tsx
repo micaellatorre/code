@@ -37,7 +37,7 @@ export default function Navbar({
   }, [error])
 
   return (
-    <header className="sticky top-0 z-30 bg-base-100/85 backdrop-blur">
+    <header className="sticky top-0 z-[70] bg-base-100/85 backdrop-blur">
       <div className="navbar min-h-16 px-3 sm:px-4">
         <div className="flex flex-1 items-center gap-2">
           <button
@@ -64,7 +64,7 @@ export default function Navbar({
           </svg>
           <span
             className={[
-              "overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 max-w-[100px] opacity-100 ml-2",
+              "overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 max-w-[100px] opacity-100 ml-2 hidden sm:inline-block",
             ].join(" ")}
           >
             Importaciones
@@ -118,19 +118,19 @@ export default function Navbar({
         </div>
       </div>
 
-      <div className="xl:hidden px-3 sm:px-4 pb-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="xl:hidden px-2 pb-2">
+        <div className="flex flex-wrap items-center gap-1">
           <a
-            className="flex items-center gap-2 text-blue-500 hover:text-blue-700 transition-colors text-sm"
+            className="flex items-center gap-1 text-blue-500 hover:text-blue-700 transition-colors text-xs"
             href="https://www.finanzasargy.com"
             target="_blank"
             rel="noopener noreferrer"
           >
             FinanzasArgy
-            <ArrowTopRightOnSquareIcon className="size-4" />
+            <ArrowTopRightOnSquareIcon className="size-3" />
           </a>
 
-          <div className="px-3 py-1 rounded-full bg-base-content/5 text-blue-700 text-xs sm:text-sm font-medium">
+          <div className="px-1 py-1 rounded-box bg-base-content/5 text-blue-700 text-xs font-medium">
             Dólar Blue:{" "}
             <span className="font-semibold text-base-content">
               {isLoading ? "..." : error ? "Error" : dolarBlueVenta ? `$${dolarBlueVenta}` : "—"}
@@ -138,7 +138,7 @@ export default function Navbar({
             <span className="text-[10px] sm:text-xs text-base-content/60"> vta</span>
           </div>
 
-          <div className="px-3 py-1 rounded-full bg-base-content/5 text-emerald-700 text-xs sm:text-sm font-medium">
+          <div className="px-1 py-1 rounded-box bg-base-content/5 text-emerald-700 text-xs font-medium">
             Dólar Cripto:{" "}
             <span className="font-semibold text-base-content">
               {isLoading ? "..." : error ? "Error" : dolarCriptoVenta ? `$${dolarCriptoVenta}` : "—"}
