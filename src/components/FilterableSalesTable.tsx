@@ -13,6 +13,12 @@ import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/
 import type { Role } from "@/lib/auth/roles";
 
 // ====== Tipos ======
+type SaleUserSummary = {
+  id: string;
+  name: string | null;
+  email: string;
+};
+
 type SerializedSale = {
   id: string;
   tenantId: string;
@@ -32,10 +38,24 @@ type SerializedSale = {
     name: string;
     surname: string | null;
   } | null;
+  createdBy: string;
+  createdByUser: SaleUserSummary | null;
+};
+
+type UserSearchResult = {
+  id: string;
+  name: string | null;
+  email: string;
+  role: Role;
 };
 
 // ====== Utils ======
 const toStr = (v: any) => (v == null ? null : String(v));
+
+function displayUser(user: SaleUserSummary | null) {
+  if (!user) return "-";
+  return user.name?.trim() || user.email;
+}
 
 function toDateParam(date: Date) {
   const year = date.getFullYear();
@@ -60,6 +80,8 @@ function normalizeSales(input: any[]): SerializedSale[] {
     profit: toStr(s?.profit),
     costTotal: toStr(s?.costTotal),
     createdAt: s?.createdAt ?? null,
+    createdByUser: s?.createdByUser ?? s?.user ?? null,
+    createdBy: s?.createdBy ?? displayUser(s?.createdByUser ?? s?.user ?? null),
     items: Array.isArray(s?.items)
       ? s.items.map((it: any) => {
         const p = it?.product ?? {};
@@ -140,6 +162,12 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [editingCreatedById, setEditingCreatedById] = useState<string | null>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [debouncedUserSearchQuery, setDebouncedUserSearchQuery] = useState("");
+  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [isSavingCreatedBy, setIsSavingCreatedBy] = useState(false);
 
   // Filtros
   const [startDate, setStartDate] = useState<string>("");
@@ -202,6 +230,73 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
     }
   }, [activeRole, canSeeProfit, canSeeTotal]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedUserSearchQuery(userSearchQuery.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [userSearchQuery]);
+
+  useEffect(() => {
+    if (!editingCreatedById || !isAdmin) {
+      setUserSearchResults([]);
+      setIsSearchingUsers(false);
+      return;
+    }
+
+    let ignore = false;
+    const ctrl = new AbortController();
+
+    async function run() {
+      setIsSearchingUsers(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("q", debouncedUserSearchQuery);
+        const response = await fetch(`/api/users/search?${params.toString()}`, {
+          method: "GET",
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        const body = (await response.json()) as { results?: UserSearchResult[] };
+        if (!ignore) {
+          setUserSearchResults(Array.isArray(body.results) ? body.results : []);
+        }
+      } catch (error: any) {
+        if (!ignore && error?.name !== "AbortError") {
+          console.error("Failed to search users", error);
+          setUserSearchResults([]);
+        }
+      } finally {
+        if (!ignore) {
+          setIsSearchingUsers(false);
+        }
+      }
+    }
+
+    void run();
+
+    return () => {
+      ignore = true;
+      ctrl.abort();
+    };
+  }, [debouncedUserSearchQuery, editingCreatedById, isAdmin]);
+
+  useEffect(() => {
+    if (!editingCreatedById) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (editorRef.current && !editorRef.current.contains(event.target as Node) && !isSavingCreatedBy) {
+        closeCreatedByEditor();
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [editingCreatedById, isSavingCreatedBy]);
+
   function clearFilters() {
     setSearchQuery("");
     setStartDate("");
@@ -231,6 +326,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
   // Abort de fetch para evitar race
   const abortRef = useRef<AbortController | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const ctrlAbort = (ref: React.MutableRefObject<AbortController | null>) => {
     if (ref.current) {
       ref.current.abort();
@@ -311,6 +407,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
         const hayTexto =
           (s.id ?? "").toLowerCase().includes(q) ||
           (s.customerName ?? "").toLowerCase().includes(q) ||
+          (s.createdBy ?? "").toLowerCase().includes(q) ||
+          (s.createdByUser?.email ?? "").toLowerCase().includes(q) ||
           (s.buyer?.name ?? "").toLowerCase().includes(q) ||
           (s.buyer?.surname ?? "").toLowerCase().includes(q) ||
           (Array.isArray(s.items) &&
@@ -370,6 +468,64 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
     }
 
     return canEditSales;
+  }
+
+  function openCreatedByEditor(sale: SerializedSale) {
+    if (!isAdmin || isSavingCreatedBy) return;
+    setEditingCreatedById(sale.id);
+    setUserSearchQuery("");
+    setDebouncedUserSearchQuery("");
+    setUserSearchResults([]);
+  }
+
+  function closeCreatedByEditor() {
+    setEditingCreatedById(null);
+    setUserSearchQuery("");
+    setDebouncedUserSearchQuery("");
+    setUserSearchResults([]);
+  }
+
+  async function handleSelectCreatedBy(saleId: string, user: UserSearchResult) {
+    if (!isAdmin) return;
+
+    setIsSavingCreatedBy(true);
+    try {
+      const response = await fetch(`/api/sales/${saleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const body = await response.json();
+      const updated = normalizeSales([body.sale])[0];
+      const nextUser = updated?.createdByUser ?? {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      };
+
+      setItems((prev) =>
+        prev.map((sale) =>
+          sale.id === saleId
+            ? {
+              ...(updated ?? sale),
+              createdByUser: nextUser,
+              createdBy: displayUser(nextUser),
+            }
+            : sale
+        )
+      );
+
+      closeCreatedByEditor();
+    } catch (error) {
+      console.error("Failed to update sale user", error);
+    } finally {
+      setIsSavingCreatedBy(false);
+    }
   }
 
   function editableCellProps(saleId: string, fieldName: string, currentValue: any) {
@@ -858,6 +1014,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
             <thead>
               <tr>
                 <th>Fecha</th>
+                <th>Vendido por</th>
                 <th>Cliente</th>
                 <th>Modelo</th>
                 <th>Items</th>
@@ -869,7 +1026,10 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
               </tr>
             </thead>
             <tbody>
-              {displayed.map((s, idx) => (
+              {displayed.map((s, idx) => {
+                const isEditingCreatedBy = editingCreatedById === s.id;
+
+                return (
                 <tr key={s.id ?? `sale-${idx}`}>
                   {/* Fecha (click para editar) */}
                   <td>
@@ -908,6 +1068,66 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                           </span>
                         </div>
                       </span>
+                    )}
+                  </td>
+
+                  <td className="align-top">
+                    {!isAdmin ? (
+                      s.createdBy || "-"
+                    ) : isEditingCreatedBy ? (
+                      <div ref={editorRef} className="relative min-w-[18rem]">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={userSearchQuery}
+                          onChange={(e) => setUserSearchQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape" && !isSavingCreatedBy) {
+                              closeCreatedByEditor()
+                            }
+                          }}
+                          placeholder="Buscar usuario..."
+                          disabled={isSavingCreatedBy}
+                          className="input input-bordered input-sm w-full"
+                        />
+                        <div className="absolute z-20 mt-1 w-full rounded-box border border-base-300 bg-base-100 shadow-lg">
+                          {isSavingCreatedBy ? (
+                            <div className="px-3 py-2 text-sm text-base-content/70">Guardando...</div>
+                          ) : isSearchingUsers ? (
+                            <div className="px-3 py-2 text-sm text-base-content/70">Buscando...</div>
+                          ) : userSearchResults.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-base-content/70">Sin resultados</div>
+                          ) : (
+                            <ul className="max-h-60 overflow-y-auto py-1">
+                              {userSearchResults.map((user) => (
+                                <li key={user.id}>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                    onClick={() => handleSelectCreatedBy(s.id, user)}
+                                    disabled={isSavingCreatedBy}
+                                  >
+                                    <span className="flex min-w-0 flex-col">
+                                      <span className="truncate text-sm font-medium">{user.name?.trim() || user.email}</span>
+                                      <span className="truncate text-xs text-base-content/60">{user.email}</span>
+                                    </span>
+                                    <span className="badge badge-outline badge-sm shrink-0">{user.role}</span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="cursor-pointer rounded px-1 text-left hover:bg-base-200"
+                        onClick={() => openCreatedByEditor(s)}
+                        title="Click para reasignar"
+                      >
+                        {s.createdBy || "-"}
+                      </button>
                     )}
                   </td>
 
@@ -1190,7 +1410,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                     </td>
                   ) : null}
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         )}

@@ -17,6 +17,7 @@ export async function GET() {
       items: { include: { product: true } },
       payments: true,
       buyer: true,
+      user: { select: { id: true, name: true, email: true } },
     },
     orderBy: { date: "desc" },
   });
@@ -183,6 +184,7 @@ export async function POST(request: Request) {
         const sale = await tx.sale.create({
           data: {
             tenantId: tenant.id,
+            userId: auth.session.user.id,
             date: date ? new Date(date) : new Date(),
             buyerId: buyerId || null,
             customerName: buyerId ? undefined : customerName || "Consumidor Final",
@@ -274,6 +276,7 @@ export async function POST(request: Request) {
       where: { id: newSaleId },
       include: {
         buyer: true,
+        user: { select: { id: true, name: true, email: true } },
         payments: true,
         items: { include: { product: true } },
       },

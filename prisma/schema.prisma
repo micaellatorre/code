@@ -23,10 +23,11 @@ model User {
   tenantId    String?
   tenant      Tenant?   @relation(fields: [tenantId], references: [id])
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
   lastLoginAt DateTime?
 
   appointments Appointment[]
+  sales        Sale[]
 }
 
 /// Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
@@ -120,6 +121,9 @@ model Sale {
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   date         DateTime @default(now())
   customerName String? // libre si no hay Buyer (legacy)
@@ -320,9 +324,9 @@ model PurchaseItem {
 
 /// Cita presencial / turno con un Buyer para ver productos.
 model Appointment {
-  id       String @id @default(cuid())
-  userId   String?
-  user     User?  @relation(fields: [userId], references: [id])
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   /// Buyer asociado a la cita (opcional, se puede cargar sólo nombre suelto si querés en el futuro)
   buyerId String?

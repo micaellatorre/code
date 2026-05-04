@@ -29,6 +29,7 @@ export default async function SalesPage() {
     orderBy: { date: 'desc' },
     take: 200,
     include: {
+      user: { select: { id: true, name: true, email: true } },
       buyer: { select: { name: true, surname: true } },
       payments: { select: { method: true }, orderBy: { paidAt: 'asc' } },
       items: {
@@ -64,6 +65,14 @@ export default async function SalesPage() {
     profit: toStr(s.profit),
     costTotal: toStr(s.costTotal),
     createdAt: s.createdAt ? s.createdAt.toISOString() : null,
+    createdBy: s.user?.name || s.user?.email || '-',
+    createdByUser: s.user
+      ? {
+        id: s.user.id,
+        name: s.user.name,
+        email: s.user.email ?? '',
+      }
+      : null,
     buyer: s.buyer ? { name: s.buyer.name, surname: s.buyer.surname } : null,
     items: s.items.map((item) => ({
       id: item.id,
