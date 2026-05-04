@@ -1213,14 +1213,15 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         >
                           {s.items.map((item: any, idx: number) => {
                             const k =
-                              item?.id ??
-                              item?.product?.id ??
-                              `${item?.product?.modelName ?? "item"}-${idx}`;
+                            item?.id ??
+                            item?.product?.id ??
+                            `${item?.product?.modelName ?? "item"}-${idx}`;
+                            console.log('item', item)
                             return (
                               <li key={String(k)}>
-                                <span>
+                                <Link href={`/dashboard/products/${item?.productId}/edit`} className="btn btn-xs btn-ghost" target="_blank" rel="noopener noreferrer">
                                   {item?.product?.modelName ?? "-"} ({item?.units ?? 0})
-                                </span>
+                                </Link>
                               </li>
                             );
                           })}
