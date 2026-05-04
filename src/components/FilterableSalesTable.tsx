@@ -1030,388 +1030,430 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                 const isEditingCreatedBy = editingCreatedById === s.id;
 
                 return (
-                <tr key={s.id ?? `sale-${idx}`}>
-                  {/* Fecha (click para editar) */}
-                  <td>
-                    {canEditField("date") && isEditing(s.id, "date") ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          autoFocus
-                          type="date"
-                          className="input input-xs w-36"
-                          value={
-                            getEditingValue(s.id, "date") ||
-                            (s.date ? new Date(s.date).toISOString().slice(0, 10) : "")
-                          }
-                          onChange={(e) => updateEditingValue(s.id, "date", e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEditField(s.id, "date");
-                            if (e.key === "Escape") cancelEditField(s.id, "date");
-                          }}
-                          onBlur={() => commitEditField(s.id, "date")}
-                          disabled={savingField?.saleId === s.id && savingField?.fieldName === "date"}
-                        />
-                        <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'date')}>
-                            <CheckIcon className="h-[1em]" />
-                          </button>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'date')}>
-                            <XMarkIcon className="h-[1em]" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span {...editableCellProps(s.id, "date", s.date ? new Date(s.date).toISOString().split('T')[0] : '')}>
-                        <div className='tooltip tooltip-right' data-tip={s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy HH:mm') : ''}>
-                          <span className="underline decoration-dotted cursor-help">
-                            {s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy') : '-'}
-                          </span>
-                        </div>
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="align-top">
-                    {!isAdmin ? (
-                      s.createdBy || "-"
-                    ) : isEditingCreatedBy ? (
-                      <div ref={editorRef} className="relative min-w-[18rem]">
-                        <input
-                          type="text"
-                          autoFocus
-                          value={userSearchQuery}
-                          onChange={(e) => setUserSearchQuery(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape" && !isSavingCreatedBy) {
-                              closeCreatedByEditor()
+                  <tr key={s.id ?? `sale-${idx}`}>
+                    {/* Fecha (click para editar) */}
+                    <td>
+                      {canEditField("date") && isEditing(s.id, "date") ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            autoFocus
+                            type="date"
+                            className="input input-xs w-36"
+                            value={
+                              getEditingValue(s.id, "date") ||
+                              (s.date ? new Date(s.date).toISOString().slice(0, 10) : "")
                             }
-                          }}
-                          placeholder="Buscar usuario..."
-                          disabled={isSavingCreatedBy}
-                          className="input input-bordered input-sm w-full"
-                        />
-                        <div className="absolute z-20 mt-1 w-full rounded-box border border-base-300 bg-base-100 shadow-lg">
-                          {isSavingCreatedBy ? (
-                            <div className="px-3 py-2 text-sm text-base-content/70">Guardando...</div>
-                          ) : isSearchingUsers ? (
-                            <div className="px-3 py-2 text-sm text-base-content/70">Buscando...</div>
-                          ) : userSearchResults.length === 0 ? (
-                            <div className="px-3 py-2 text-sm text-base-content/70">Sin resultados</div>
-                          ) : (
-                            <ul className="max-h-60 overflow-y-auto py-1">
-                              {userSearchResults.map((user) => (
-                                <li key={user.id}>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
-                                    onClick={() => handleSelectCreatedBy(s.id, user)}
-                                    disabled={isSavingCreatedBy}
+                            onChange={(e) => updateEditingValue(s.id, "date", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitEditField(s.id, "date");
+                              if (e.key === "Escape") cancelEditField(s.id, "date");
+                            }}
+                            onBlur={() => commitEditField(s.id, "date")}
+                            disabled={savingField?.saleId === s.id && savingField?.fieldName === "date"}
+                          />
+                          <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'date')}>
+                              <CheckIcon className="h-[1em]" />
+                            </button>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'date')}>
+                              <XMarkIcon className="h-[1em]" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span {...editableCellProps(s.id, "date", s.date ? new Date(s.date).toISOString().split('T')[0] : '')}>
+                          <div className='tooltip tooltip-right' data-tip={s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy HH:mm') : ''}>
+                            <span className="underline decoration-dotted cursor-help">
+                              {s.date ? formatInTimeZone(new Date(s.date), AR_TIME_ZONE, 'dd/MM/yyyy') : '-'}
+                            </span>
+                          </div>
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="align-top">
+                      {!isAdmin ? (
+                        s.createdBy || "-"
+                      ) : isEditingCreatedBy ? (
+                        <div ref={editorRef} className="relative min-w-[18rem]">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={userSearchQuery}
+                            onChange={(e) => setUserSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape" && !isSavingCreatedBy) {
+                                closeCreatedByEditor()
+                              }
+                            }}
+                            placeholder="Buscar usuario..."
+                            disabled={isSavingCreatedBy}
+                            className="input input-bordered input-sm w-full"
+                          />
+                          <div className="absolute z-20 mt-1 w-full rounded-box border border-base-300 bg-base-100 shadow-lg">
+                            {isSavingCreatedBy ? (
+                              <div className="px-3 py-2 text-sm text-base-content/70">Guardando...</div>
+                            ) : isSearchingUsers ? (
+                              <div className="px-3 py-2 text-sm text-base-content/70">Buscando...</div>
+                            ) : userSearchResults.length === 0 ? (
+                              <div className="px-3 py-2 text-sm text-base-content/70">Sin resultados</div>
+                            ) : (
+                              <ul className="max-h-60 overflow-y-auto py-1">
+                                {userSearchResults.map((user) => (
+                                  <li key={user.id}>
+                                    <button
+                                      type="button"
+                                      className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                      onClick={() => handleSelectCreatedBy(s.id, user)}
+                                      disabled={isSavingCreatedBy}
+                                    >
+                                      <span className="flex min-w-0 flex-col">
+                                        <span className="truncate text-sm font-medium">{user.name?.trim() || user.email}</span>
+                                        <span className="truncate text-xs text-base-content/60">{user.email}</span>
+                                      </span>
+                                      <span className="badge badge-outline badge-sm shrink-0">{user.role}</span>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="cursor-pointer rounded px-1 text-left hover:bg-base-200"
+                          onClick={() => openCreatedByEditor(s)}
+                          title="Click para reasignar"
+                        >
+                          {s.createdBy || "-"}
+                        </button>
+                      )}
+                    </td>
+
+                    {/* Cliente (buyer.name + buyer.surname) */}
+                    <td>
+                      {canEditField("buyer.name") && (isEditing(s.id, "buyer.name") || isEditing(s.id, "buyer.surname")) ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="input input-xs w-24"
+                            placeholder="Nombre"
+                            value={getEditingValue(s.id, "buyer.name")}
+                            onChange={(e) => updateEditingValue(s.id, "buyer.name", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitEditField(s.id, "buyer.name"); // unifica
+                              if (e.key === "Escape") {
+                                cancelEditField(s.id, "buyer.name");
+                                cancelEditField(s.id, "buyer.surname");
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <input
+                            className="input input-xs w-24"
+                            placeholder="Apellido"
+                            value={getEditingValue(s.id, "buyer.surname")}
+                            onChange={(e) => updateEditingValue(s.id, "buyer.surname", e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") commitEditField(s.id, "buyer.name");
+                              if (e.key === "Escape") {
+                                cancelEditField(s.id, "buyer.name");
+                                cancelEditField(s.id, "buyer.surname");
+                              }
+                            }}
+                          />
+                          <div className="join join-horizontal">
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, "buyer.name")}>
+                              <CheckIcon className="h-[1em]" />
+                            </button>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => {
+                              cancelEditField(s.id, "buyer.name");
+                              cancelEditField(s.id, "buyer.surname");
+                            }}>
+                              <XMarkIcon className="h-[1em]" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span
+                          {...(canEditField("buyer.name")
+                            ? {
+                              className: "cursor-pointer hover:bg-base-200 rounded px-1",
+                              title: "Click para editar",
+                              onClick: () => {
+                                startEditField(s.id, "buyer.name", s.buyer?.name ?? "");
+                                startEditField(s.id, "buyer.surname", s.buyer?.surname ?? "");
+                              },
+                            }
+                            : {
+                              className: "rounded px-1",
+                            })}
+                        >
+                          {s.buyer
+                            ? `${s.buyer.name ?? ''} ${s.buyer.surname ?? ''}`.trim() || '-'
+                            : (s.customerName || '-')}
+                        </span>
+                      )}
+                    </td>
+
+
+                    {/* Modelo principal */}
+                    <td>{getMainModel(s.items)}</td>
+
+                    {/* Items (dropdown) */}
+                    <td>
+                      {Array.isArray(s.items) && s.items.length > 0 ? (
+                        <div className="dropdown dropdown-hover">
+                          <div tabIndex={0} role="button" className="btn btn-xs m-1">
+                            {s.items.length} items
+                          </div>
+                          <ul
+                            tabIndex={-1}
+                            className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-60"
+                          >
+                            {s.items.map((item: any, idx: number) => {
+                              const k =
+                                item?.id ??
+                                item?.product?.id ??
+                                `${item?.product?.modelName ?? "item"}-${idx}`;
+                              // console.log('item', item)
+                              return (
+                                <li key={String(k)}>
+                                  <Link
+                                    href={`/dashboard/products/${item?.productId}/edit`}
+                                    className="btn btn-xs btn-ghost gap-1 flex flex-row justify-between"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                   >
-                                    <span className="flex min-w-0 flex-col">
-                                      <span className="truncate text-sm font-medium">{user.name?.trim() || user.email}</span>
-                                      <span className="truncate text-xs text-base-content/60">{user.email}</span>
+                                    {String(item?.product?.type ?? "").toUpperCase() === "PHONE" ? (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-4"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
+                                        />
+                                      </svg>
+                                    ) : (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-4"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"
+                                        />
+                                      </svg>
+                                    )}
+                                    <span className="text-left truncate w-full max-w-[10rem]">
+                                      {item?.product?.modelName ?? "-"}
                                     </span>
-                                    <span className="badge badge-outline badge-sm shrink-0">{user.role}</span>
-                                  </button>
+                                    <span>
+                                      ({item?.units ?? 0})
+                                    </span>
+                                  </Link>
                                 </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded px-1 text-left hover:bg-base-200"
-                        onClick={() => openCreatedByEditor(s)}
-                        title="Click para reasignar"
-                      >
-                        {s.createdBy || "-"}
-                      </button>
-                    )}
-                  </td>
-
-                  {/* Cliente (buyer.name + buyer.surname) */}
-                  <td>
-                    {canEditField("buyer.name") && (isEditing(s.id, "buyer.name") || isEditing(s.id, "buyer.surname")) ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          className="input input-xs w-24"
-                          placeholder="Nombre"
-                          value={getEditingValue(s.id, "buyer.name")}
-                          onChange={(e) => updateEditingValue(s.id, "buyer.name", e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEditField(s.id, "buyer.name"); // unifica
-                            if (e.key === "Escape") {
-                              cancelEditField(s.id, "buyer.name");
-                              cancelEditField(s.id, "buyer.surname");
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <input
-                          className="input input-xs w-24"
-                          placeholder="Apellido"
-                          value={getEditingValue(s.id, "buyer.surname")}
-                          onChange={(e) => updateEditingValue(s.id, "buyer.surname", e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEditField(s.id, "buyer.name");
-                            if (e.key === "Escape") {
-                              cancelEditField(s.id, "buyer.name");
-                              cancelEditField(s.id, "buyer.surname");
-                            }
-                          }}
-                        />
-                        <div className="join join-horizontal">
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, "buyer.name")}>
-                            <CheckIcon className="h-[1em]" />
-                          </button>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => {
-                            cancelEditField(s.id, "buyer.name");
-                            cancelEditField(s.id, "buyer.surname");
-                          }}>
-                            <XMarkIcon className="h-[1em]" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span
-                        {...(canEditField("buyer.name")
-                          ? {
-                            className: "cursor-pointer hover:bg-base-200 rounded px-1",
-                            title: "Click para editar",
-                            onClick: () => {
-                              startEditField(s.id, "buyer.name", s.buyer?.name ?? "");
-                              startEditField(s.id, "buyer.surname", s.buyer?.surname ?? "");
-                            },
-                          }
-                          : {
-                            className: "rounded px-1",
-                          })}
-                      >
-                        {s.buyer
-                          ? `${s.buyer.name ?? ''} ${s.buyer.surname ?? ''}`.trim() || '-'
-                          : (s.customerName || '-')}
-                      </span>
-                    )}
-                  </td>
-
-
-                  {/* Modelo principal */}
-                  <td>{getMainModel(s.items)}</td>
-
-                  {/* Items (dropdown) */}
-                  <td>
-                    {Array.isArray(s.items) && s.items.length > 0 ? (
-                      <div className="dropdown dropdown-hover">
-                        <div tabIndex={0} role="button" className="btn btn-xs m-1">
-                          {s.items.length} items
-                        </div>
-                        <ul
-                          tabIndex={-1}
-                          className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-60"
-                        >
-                          {s.items.map((item: any, idx: number) => {
-                            const k =
-                            item?.id ??
-                            item?.product?.id ??
-                            `${item?.product?.modelName ?? "item"}-${idx}`;
-                            console.log('item', item)
-                            return (
-                              <li key={String(k)}>
-                                <Link href={`/dashboard/products/${item?.productId}/edit`} className="btn btn-xs btn-ghost" target="_blank" rel="noopener noreferrer">
-                                  {item?.product?.modelName ?? "-"} ({item?.units ?? 0})
-                                </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-
-                  {/* Costo */}
-                  {canSeeCosts ? (
-                    <td>
-                      {canEditField("costTotal") && isEditing(s.id, "costTotal") ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            className="input input-xs w-20"
-                            type="number"
-                            step="0.01"
-                            value={getEditingValue(s.id, "costTotal")}
-                            onChange={(e) => updateEditingValue(s.id, "costTotal", e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") commitEditField(s.id, "costTotal");
-                              if (e.key === "Escape") cancelEditField(s.id, "costTotal");
-                            }}
-                            onBlur={() => commitEditField(s.id, "costTotal")}
-                          />
-                          <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'costTotal')}>
-                              <CheckIcon className="h-[1em]" />
-                            </button>
-                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'costTotal')}>
-                              <XMarkIcon className="h-[1em]" />
-                            </button>
-                          </div>
+                              );
+                            })}
+                          </ul>
                         </div>
                       ) : (
-                        <span {...editableCellProps(s.id, "costTotal", s.costTotal)}>
-                          $ {s.costTotal ? Number(s.costTotal).toFixed(2) : "-"}
-                        </span>
+                        "-"
                       )}
                     </td>
-                  ) : null}
 
-                  {/* Total (editable decimal) */}
-                  {canSeeTotal ? (
-                    <td>
-                      {canEditField("total") && isEditing(s.id, "total") ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            className="input input-xs w-20"
-                            type="number"
-                            step="0.01"
-                            value={getEditingValue(s.id, "total")}
-                            onChange={(e) => updateEditingValue(s.id, "total", e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") commitEditField(s.id, "total");
-                              if (e.key === "Escape") cancelEditField(s.id, "total");
-                            }}
-                            onBlur={() => commitEditField(s.id, "total")}
-                            disabled={savingField?.saleId === s.id && savingField?.fieldName === "total"}
-                          />
-                          <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'total')}>
-                              <CheckIcon className="h-[1em]" />
-                            </button>
-                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'total')}>
-                              <XMarkIcon className="h-[1em]" />
-                            </button>
+                    {/* Costo */}
+                    {canSeeCosts ? (
+                      <td>
+                        {canEditField("costTotal") && isEditing(s.id, "costTotal") ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="input input-xs w-20"
+                              type="number"
+                              step="0.01"
+                              value={getEditingValue(s.id, "costTotal")}
+                              onChange={(e) => updateEditingValue(s.id, "costTotal", e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") commitEditField(s.id, "costTotal");
+                                if (e.key === "Escape") cancelEditField(s.id, "costTotal");
+                              }}
+                              onBlur={() => commitEditField(s.id, "costTotal")}
+                            />
+                            <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                              <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'costTotal')}>
+                                <CheckIcon className="h-[1em]" />
+                              </button>
+                              <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'costTotal')}>
+                                <XMarkIcon className="h-[1em]" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <span {...editableCellProps(s.id, "total", s.total)}>
-                          $ {s.total ? Number(s.total).toFixed(2) : "-"}
-                        </span>
-                      )}
-                    </td>
-                  ) : null}
+                        ) : (
+                          <span {...editableCellProps(s.id, "costTotal", s.costTotal)}>
+                            $ {s.costTotal ? Number(s.costTotal).toFixed(2) : "-"}
+                          </span>
+                        )}
+                      </td>
+                    ) : null}
 
-                  {/* Ganancia (editable decimal) */}
-                  {canSeeProfit ? (
+                    {/* Total (editable decimal) */}
+                    {canSeeTotal ? (
+                      <td>
+                        {canEditField("total") && isEditing(s.id, "total") ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="input input-xs w-20"
+                              type="number"
+                              step="0.01"
+                              value={getEditingValue(s.id, "total")}
+                              onChange={(e) => updateEditingValue(s.id, "total", e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") commitEditField(s.id, "total");
+                                if (e.key === "Escape") cancelEditField(s.id, "total");
+                              }}
+                              onBlur={() => commitEditField(s.id, "total")}
+                              disabled={savingField?.saleId === s.id && savingField?.fieldName === "total"}
+                            />
+                            <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                              <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'total')}>
+                                <CheckIcon className="h-[1em]" />
+                              </button>
+                              <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'total')}>
+                                <XMarkIcon className="h-[1em]" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span {...editableCellProps(s.id, "total", s.total)}>
+                            $ {s.total ? Number(s.total).toFixed(2) : "-"}
+                          </span>
+                        )}
+                      </td>
+                    ) : null}
+
+                    {/* Ganancia (editable decimal) */}
+                    {canSeeProfit ? (
+                      <td>
+                        {canEditField("profit") && isEditing(s.id, "profit") ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="input input-xs w-20"
+                              type="number"
+                              step="0.01"
+                              value={getEditingValue(s.id, "profit")}
+                              onChange={(e) =>
+                                updateEditingValue(s.id, "profit", e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") commitEditField(s.id, "profit");
+                                if (e.key === "Escape") cancelEditField(s.id, "profit");
+                              }}
+                              onBlur={() => commitEditField(s.id, "profit")}
+                            />
+                            <div className='flex flex-col join join-horizontal border border-base-content/10'>
+                              <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'profit')}>
+                                <CheckIcon className="h-[1em]" />
+                              </button>
+                              <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'profit')}>
+                                <XMarkIcon className="h-[1em]" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span {...editableCellProps(s.id, "profit", s.profit)}>
+                            $ {s.profit ? Number(s.profit).toFixed(2) : "-"}
+                          </span>
+                        )}
+                      </td>
+                    ) : null}
+
+                    {/* Origen (editable select) */}
                     <td>
-                      {canEditField("profit") && isEditing(s.id, "profit") ? (
+                      {canEditField("origin") && isEditing(s.id, "origin") ? (
                         <div className="flex items-center gap-2">
-                          <input
-                            className="input input-xs w-20"
-                            type="number"
-                            step="0.01"
-                            value={getEditingValue(s.id, "profit")}
+                          <select
+                            className="select select-xs w-20"
+                            value={getEditingValue(s.id, "origin")}
                             onChange={(e) =>
-                              updateEditingValue(s.id, "profit", e.target.value)
+                              updateEditingValue(s.id, "origin", e.target.value)
                             }
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") commitEditField(s.id, "profit");
-                              if (e.key === "Escape") cancelEditField(s.id, "profit");
+                              if (e.key === "Enter") commitEditField(s.id, "origin");
+                              if (e.key === "Escape") cancelEditField(s.id, "origin");
                             }}
-                            onBlur={() => commitEditField(s.id, "profit")}
-                          />
+                            onBlur={() => commitEditField(s.id, "origin")}
+                            autoFocus
+                          >
+                            <option value="">Seleccionar</option>
+                            {originOptions.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
                           <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'profit')}>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'origin')}>
                               <CheckIcon className="h-[1em]" />
                             </button>
-                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'profit')}>
+                            <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'origin')}>
                               <XMarkIcon className="h-[1em]" />
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <span {...editableCellProps(s.id, "profit", s.profit)}>
-                          $ {s.profit ? Number(s.profit).toFixed(2) : "-"}
+                        <span {...editableCellProps(s.id, "origin", s.origin)}>
+                          {s.origin ?? "-"}
                         </span>
                       )}
                     </td>
-                  ) : null}
 
-                  {/* Origen (editable select) */}
-                  <td>
-                    {canEditField("origin") && isEditing(s.id, "origin") ? (
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="select select-xs w-20"
-                          value={getEditingValue(s.id, "origin")}
-                          onChange={(e) =>
-                            updateEditingValue(s.id, "origin", e.target.value)
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitEditField(s.id, "origin");
-                            if (e.key === "Escape") cancelEditField(s.id, "origin");
-                          }}
-                          onBlur={() => commitEditField(s.id, "origin")}
-                          autoFocus
-                        >
-                          <option value="">Seleccionar</option>
-                          {originOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <div className='flex flex-col join join-horizontal border border-base-content/10'>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(s.id, 'origin')}>
-                            <CheckIcon className="h-[1em]" />
-                          </button>
-                          <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(s.id, 'origin')}>
-                            <XMarkIcon className="h-[1em]" />
-                          </button>
+                    {/* Acciones */}
+                    {hasSaleActions ? (
+                      <td>
+                        <div className="flex items-center gap-2">
+                          {canEditSales ? (
+                            <Link
+                              href={`/dashboard/sales/${s.id}/edit`}
+                              className="btn btn-xs btn-square btn-soft"
+                            >
+                              <PencilIcon className="size-[1.2em]" />
+                            </Link>
+                          ) : null}
+                          {canDeleteSales ? (
+                            <button
+                              className="btn btn-xs btn-square btn-soft btn-error"
+                              onClick={() => deleteSale(s.id)}
+                              disabled={deletingId === s.id}
+                              title="Eliminar"
+                            >
+                              {deletingId === s.id ?
+                                <>
+                                  <span className="loading loading-bars loading-xs"></span>
+                                </>
+                                :
+                                <>
+                                  <TrashIcon className="size-[1.2em]" />
+                                </>
+                              }
+                            </button>
+                          ) : null}
                         </div>
-                      </div>
-                    ) : (
-                      <span {...editableCellProps(s.id, "origin", s.origin)}>
-                        {s.origin ?? "-"}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Acciones */}
-                  {hasSaleActions ? (
-                    <td>
-                      <div className="flex items-center gap-2">
-                        {canEditSales ? (
-                          <Link
-                            href={`/dashboard/sales/${s.id}/edit`}
-                            className="btn btn-xs btn-square btn-soft"
-                          >
-                            <PencilIcon className="size-[1.2em]" />
-                          </Link>
-                        ) : null}
-                        {canDeleteSales ? (
-                          <button
-                            className="btn btn-xs btn-square btn-soft btn-error"
-                            onClick={() => deleteSale(s.id)}
-                            disabled={deletingId === s.id}
-                            title="Eliminar"
-                          >
-                            {deletingId === s.id ?
-                              <>
-                                <span className="loading loading-bars loading-xs"></span>
-                              </>
-                              :
-                              <>
-                                <TrashIcon className="size-[1.2em]" />
-                              </>
-                            }
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  ) : null}
-                </tr>
-              )})}
+                      </td>
+                    ) : null}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
