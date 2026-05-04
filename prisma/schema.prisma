@@ -453,6 +453,7 @@ enum AppointmentOutcome {
   PENDIENTE // Aún no se sabe (cita futura / sin registrar)
   VENTA_CONCRETADA // Se concretó una venta (podés linkear Sale)
   NO_SE_CONCRETO // No se concretó venta
+  SENADO // Señaron al menos un producto de la venta
 }
 
 /// Motivo principal de que no haya venta (cuando outcome = NO_SALE).

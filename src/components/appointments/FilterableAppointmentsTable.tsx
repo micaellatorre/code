@@ -56,6 +56,8 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "ALL">("ALL")
   const [outcomeFilter, setOutcomeFilter] = useState<AppointmentOutcome | "ALL">("ALL")
   const [isTableExpanded, setIsTableExpanded] = useState(false)
+  const [savingOutcomeId, setSavingOutcomeId] = useState<string | null>(null)
+  const [editingOutcomeId, setEditingOutcomeId] = useState<string | null>(null)
 
   const [editingCreatedById, setEditingCreatedById] = useState<string | null>(null)
   const [userSearchQuery, setUserSearchQuery] = useState("")
@@ -223,6 +225,37 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
       console.error("Failed to update appointment user", error)
     } finally {
       setIsSavingCreatedBy(false)
+    }
+  }
+
+  async function handleUpdateOutcome(appointment: SerializedAppointment, outcome: AppointmentOutcome) {
+    setSavingOutcomeId(appointment.id)
+
+    try {
+      const response = await fetch(`/api/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduledAt: appointment.scheduledAt,
+          durationMinutes: appointment.durationMinutes,
+          status: appointment.status,
+          outcome,
+          noSaleReason: appointment.noSaleReason,
+          noSaleReasonOther: undefined,
+          resultNotes: appointment.resultNotes,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+
+      const updated = (await response.json()) as SerializedAppointment
+      setAppointments((prev) => prev.map((a) => (a.id === appointment.id ? { ...a, outcome: updated.outcome } : a)))
+    } catch (error) {
+      console.error("Failed to update appointment outcome", error)
+    } finally {
+      setSavingOutcomeId(null)
     }
   }
 
@@ -434,9 +467,31 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                     </span>
                   </td>
                   <td>
-                    <span className={`badge badge-outline badge-${appointment.outcome === "VENTA_CONCRETADA" ? "success" : "ghost"}`}>
-                      {appointment.outcome}
-                    </span>
+                    {editingOutcomeId === appointment.id ? (
+                      <select
+                        className="select select-bordered select-xs w-full"
+                        value={appointment.outcome}
+                        disabled={savingOutcomeId === appointment.id}
+                        onChange={(e) => {
+                          handleUpdateOutcome(appointment, e.target.value as AppointmentOutcome)
+                          setEditingOutcomeId(null)
+                        }}
+                        onBlur={() => setEditingOutcomeId(null)}
+                      >
+                        <option value="PENDIENTE">PENDIENTE</option>
+                        <option value="VENTA_CONCRETADA">VENTA_CONCRETADA</option>
+                        <option value="NO_SE_CONCRETO">NO_SE_CONCRETO</option>
+                        <option value="SENADO">SEÑADO</option>
+                      </select>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`badge badge-outline badge-${appointment.outcome === 'VENTA_CONCRETADA' ? 'success' : appointment.outcome === 'NO_SE_CONCRETO' ? 'error' : 'ghost'} cursor-pointer`}
+                        onClick={() => setEditingOutcomeId(appointment.id)}
+                      >
+                        {appointment.outcome}
+                      </button>
+                    )}
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
