@@ -46,7 +46,23 @@ const RawSchema = z.object({
   publicidades: z.array(z.any())
 });
 
-// normalizador
+const DolarApiItem = z.object({
+  casa: z.string().optional(),
+  nombre: z.string(),
+  compra: z.number().nullable().optional(),
+  venta: z.number().nullable().optional(),
+  fechaActualizacion: z.string().nullable().optional()
+});
+
+const DolarApiSchema = z.array(DolarApiItem);
+
+const DEFAULT_ENDPOINT = "https://backend-ifa-production-a92c.up.railway.app/api/dolar/v2/general";
+const PUBLIC_FALLBACK_ENDPOINT = "https://dolarapi.com/v1/dolares";
+
+// Cache en memoria para fallback (stale-on-error)
+let LAST_OK: DolarResponse | null = null;
+let LAST_OK_AT = 0;
+
 export function toNumberOrNull(v?: string): number | null {
   if (!v) return null;
   const trimmed = v.trim();
@@ -58,10 +74,8 @@ export function toNumberOrNull(v?: string): number | null {
     s = s.replace(/\./g, "").replace(",", ".");
   } else if (lastDot > lastComma) {
     s = s.replace(/,/g, "");
-  } else {
-    if (s.includes(",") && !s.includes(".")) {
-      s = s.replace(/\./g, "").replace(",", ".");
-    }
+  } else if (s.includes(",") && !s.includes(".")) {
+    s = s.replace(/\./g, "").replace(",", ".");
   }
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
@@ -77,7 +91,7 @@ function normalizeItem(i: z.infer<typeof RawItem>): DolarPanelItem {
     historico: toNumberOrNull(i.historico),
     fecha: i.fecha ?? null,
     lastUpdate: i.lastUpdate ?? null,
-    nextMonths: (i.nextMonths ?? []).map(m => ({
+    nextMonths: (i.nextMonths ?? []).map((m) => ({
       month: m.month,
       compra: toNumberOrNull(m.compra),
       venta: toNumberOrNull(m.venta),
@@ -91,92 +105,151 @@ function normalizeItem(i: z.infer<typeof RawItem>): DolarPanelItem {
   };
 }
 
-// Cache en memoria para fallback (stale-on-error)
-let LAST_OK: DolarResponse | null = null;
-let LAST_OK_AT = 0;
+function normalizeRaw(raw: unknown): DolarResponse {
+  const parsed = RawSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error("Respuesta invalida del upstream");
+  }
+
+  return {
+    panel: parsed.data.panel.map(normalizeItem),
+    publicidades: parsed.data.publicidades
+  };
+}
+
+function toPanelTitle(item: z.infer<typeof DolarApiItem>) {
+  const key = (item.casa ?? item.nombre).toLowerCase();
+  if (key.includes("blue")) return "Dólar Blue";
+  if (key.includes("cripto")) return "Dólar Cripto";
+  if (key.includes("oficial")) return "Dólar Oficial";
+  if (key.includes("bolsa")) return "Dólar Bolsa";
+  if (key.includes("contadoconliqui") || key.includes("contado con liqui")) {
+    return "Dólar Contado con Liqui";
+  }
+  if (key.includes("mayorista")) return "Dólar Mayorista";
+  if (key.includes("tarjeta")) return "Dólar Tarjeta";
+  return item.nombre.startsWith("Dólar") ? item.nombre : `Dólar ${item.nombre}`;
+}
+
+function normalizePublicFallback(raw: unknown): DolarResponse {
+  const parsed = DolarApiSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error("Respuesta invalida del fallback publico");
+  }
+
+  return {
+    panel: parsed.data.map((item) => ({
+      titulo: toPanelTitle(item),
+      compra: item.compra ?? null,
+      venta: item.venta ?? null,
+      apertura: null,
+      cierre: null,
+      historico: null,
+      fecha: item.fechaActualizacion ?? null,
+      lastUpdate: item.fechaActualizacion ?? null,
+      nextMonths: []
+    })),
+    publicidades: []
+  };
+}
+
+async function fetchJson(
+  url: string,
+  options: {
+    headers: Record<string, string>;
+    revalidateSeconds?: number;
+    signal?: AbortSignal;
+    timeoutMs: number;
+    maxRetries: number;
+    retryAuthErrors: boolean;
+  }
+) {
+  const res = await fetchWithRetry(
+    url,
+    {
+      method: "GET",
+      headers: options.headers,
+      next: options.revalidateSeconds
+        ? { revalidate: options.revalidateSeconds }
+        : { revalidate: 60 },
+      // @ts-ignore - agregamos timeoutMs custom para nuestro helper
+      timeoutMs: options.timeoutMs,
+      signal: options.signal
+    },
+    {
+      retries: Math.max(0, options.maxRetries),
+      baseDelayMs: 600,
+      retryOn: (r, e) => {
+        if (e) return true;
+        if (!r) return true;
+        if (!options.retryAuthErrors && (r.status === 401 || r.status === 403)) return false;
+        if (r.status === 408 || r.status === 429) return true;
+        if (r.status >= 500) return true;
+        return false;
+      }
+    }
+  );
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Upstream ${res.status} ${res.statusText}${txt ? ` - ${txt}` : ""}`);
+  }
+
+  return res.json();
+}
 
 export async function fetchDolarUpstream(options?: {
   signal?: AbortSignal;
   revalidateSeconds?: number;
   endpoint?: string;
-  // control fino (opcional)
   timeoutMs?: number;
   maxRetries?: number;
-  useStaleOnError?: boolean; // default true
+  useStaleOnError?: boolean;
 }): Promise<DolarResponse> {
-  const endpoint =
-    options?.endpoint ??
-    process.env.DOLAR_API_ENDPOINT ??
-    "https://backend-ifa-production-a92c.up.railway.app/api/dolar/v2/general";
-
+  const endpoint = options?.endpoint ?? process.env.DOLAR_API_ENDPOINT ?? DEFAULT_ENDPOINT;
   const timeoutMs = options?.timeoutMs ?? Number(process.env.DOLAR_API_TIMEOUT_MS || 15000);
   const maxRetries = options?.maxRetries ?? Number(process.env.DOLAR_API_MAX_RETRIES || 3);
   const useStaleOnError = options?.useStaleOnError ?? true;
 
-  // Headers opcionales (privado): Origin/Referer/Bearer/x-api-key
   const headers: Record<string, string> = {
-    "Accept": "application/json, text/plain, */*",
-    // Copiamos lo que viste en Network:
-    "Origin": process.env.DOLAR_API_ORIGIN || "https://www.finanzasargy.com",
-    "Referer": process.env.DOLAR_API_REFERER || "https://www.finanzasargy.com/",
+    Accept: "application/json, text/plain, */*",
+    Origin: process.env.DOLAR_API_ORIGIN || "https://www.finanzasargy.com",
+    Referer: process.env.DOLAR_API_REFERER || "https://www.finanzasargy.com/",
     "api-client": process.env.DOLAR_API_CLIENT || "finanzasargy",
-    // Un UA de navegador (algunos backends los filtran):
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
   };
 
   try {
-    const res = await fetchWithRetry(
-      endpoint,
-      {
-        method: "GET",
+    let normalized: DolarResponse;
+
+    try {
+      const raw = await fetchJson(endpoint, {
         headers,
-        // hint a Next cache; la tolerancia real la maneja nuestro cache local
-        next: options?.revalidateSeconds
-          ? { revalidate: options.revalidateSeconds }
-          : { revalidate: 60 },
-        // @ts-ignore - agregamos timeoutMs custom para nuestro helper
+        revalidateSeconds: options?.revalidateSeconds,
+        signal: options?.signal,
         timeoutMs,
-        signal: options?.signal
-      },
-      {
-        retries: Math.max(0, maxRetries),
-        baseDelayMs: 600,
-        retryOn: (r, e) => {
-          if (e) return true;                 // timeouts / red
-          if (!r) return true;
-          if (r.status === 401 || r.status === 403) return false; // no sirve reintentar
-          if (r.status === 408 || r.status === 429) return true;
-          if (r.status >= 500) return true;
-          return false;
-        }
-      }
-    );
-
-    if (!res.ok) {
-      // 401/403: probablemente falta header/token/origin
-      const txt = await res.text().catch(() => "");
-      throw new Error(`Upstream ${res.status} ${res.statusText}${txt ? ` – ${txt}` : ""}`);
+        maxRetries,
+        retryAuthErrors: false
+      });
+      normalized = normalizeRaw(raw);
+    } catch (primaryError) {
+      console.warn("[dolar] upstream principal fallo, probando fallback publico:", primaryError);
+      const raw = await fetchJson(process.env.DOLAR_API_FALLBACK_ENDPOINT ?? PUBLIC_FALLBACK_ENDPOINT, {
+        headers: { Accept: "application/json, text/plain, */*" },
+        revalidateSeconds: options?.revalidateSeconds,
+        signal: options?.signal,
+        timeoutMs,
+        maxRetries,
+        retryAuthErrors: true
+      });
+      normalized = normalizePublicFallback(raw);
     }
 
-    const raw = await res.json();
-    const parsed = RawSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new Error("Respuesta inválida del upstream");
-    }
-
-    const normalized: DolarResponse = {
-      panel: parsed.data.panel.map(normalizeItem),
-      publicidades: parsed.data.publicidades
-    };
-
-    // actualizar cache en memoria
     LAST_OK = normalized;
     LAST_OK_AT = Date.now();
     return normalized;
-
   } catch (err) {
-    // fallback a stale si existe
     if (useStaleOnError && LAST_OK) {
       console.warn("[dolar] usando STALE por error upstream:", err);
       return LAST_OK;
@@ -185,7 +258,6 @@ export async function fetchDolarUpstream(options?: {
   }
 }
 
-// util para inspección del estado del cache (opcional)
 export function getDolarCacheInfo() {
   return {
     hasStale: !!LAST_OK,
