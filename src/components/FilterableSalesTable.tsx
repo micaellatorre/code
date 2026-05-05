@@ -1216,7 +1216,6 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                                 item?.id ??
                                 item?.product?.id ??
                                 `${item?.product?.modelName ?? "item"}-${idx}`;
-                              // console.log('item', item)
                               return (
                                 <li key={String(k)}>
                                   <Link

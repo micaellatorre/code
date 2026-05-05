@@ -1,16 +1,17 @@
 'use client';
 
 import type { Product } from '@prisma/client';
+import Link from 'next/link';
 import { useState } from 'react';
 import ProductSelectionModal from '../sales/ProductSelectionModal';
 
 // This is a temporary type, it should be defined where it is used, e.g., in the appointment page.
 export type AppointmentInterestDraft = {
-  _id: string; // for react key
-  productId: string;
-  product: Product;
-  notes?: string;
-  priority?: number;
+    _id: string; // for react key
+    productId: string;
+    product: Product;
+    notes?: string;
+    priority?: number;
 };
 
 interface AppointmentInterestSectionProps {
@@ -51,7 +52,7 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
     return (
         <div className="card bg-base-100 border border-base-content/50 p-4">
             <h2 className="font-bold text-lg">Productos de Interés</h2>
-            
+
             {items.length === 0 ? (
                 <div className="text-center p-8 border border-base-content/50 border-dashed border-base-300 rounded-box mt-4">
                     <p className="text-base-content/70">Aún no hay productos de interés.</p>
@@ -63,7 +64,9 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
                         <table className="table w-full">
                             <thead>
                                 <tr>
-                                    <th>Producto</th>
+                                    <th>IMEI</th>
+                                    <th>Modelo</th>
+                                    <th>% Bateria</th>
                                     <th>Notas</th>
                                     <th>Prioridad</th>
                                     <th></th>
@@ -72,9 +75,21 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
                             <tbody>
                                 {items.map(item => (
                                     <tr key={item._id}>
-                                        <td>{item.product.modelName}</td>
+                                        <td>{item.product.imei ? item.product.imei.slice(-4) : 'N/A'}</td>
+
                                         <td>
-                                            <input 
+                                            <Link
+                                                href={`/dashboard/products/${item?.productId}/edit`}
+                                                className="btn btn-xs btn-ghost gap-1 flex flex-row justify-between"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                {item.product.modelName}
+                                            </Link>
+                                        </td>
+                                        <td>{item.product.batteryPct}</td>
+                                        <td>
+                                            <input
                                                 type="text"
                                                 value={item.notes || ''}
                                                 onChange={(e) => handleUpdateItem(item._id, { notes: e.target.value })}
@@ -83,8 +98,8 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
                                             />
                                         </td>
                                         <td>
-                                            <input 
-                                                type="number" 
+                                            <input
+                                                type="number"
                                                 value={item.priority || 1}
                                                 onChange={(e) => handleUpdateItem(item._id, { priority: parseInt(e.target.value) || 1 })}
                                                 className="input input-bordered input-sm w-20"
@@ -104,10 +119,10 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
             )}
 
             {isModalOpen && (
-                <ProductSelectionModal 
+                <ProductSelectionModal
                     existingItems={[]} // Simplified for now
-                    onClose={() => setIsModalOpen(false)} 
-                    onAddItems={handleAddItems} 
+                    onClose={() => setIsModalOpen(false)}
+                    onAddItems={handleAddItems}
                 />
             )}
         </div>

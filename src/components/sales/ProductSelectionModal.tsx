@@ -110,7 +110,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
 
   const buildUrl = (q: string, type: ProductType | 'ALL', cursor?: string | null) => {
     const params = new URLSearchParams()
-    params.set('sellable', 'true')
+    params.set('state', 'EN_STOCK')
+    params.set('senado', 'false')
     params.set('limit', String(LIMIT))
     if (q.trim()) params.set('q', q.trim())
     if (type !== 'ALL') params.set('type', type)
