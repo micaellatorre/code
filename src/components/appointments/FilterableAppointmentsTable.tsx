@@ -9,6 +9,18 @@ import type { Role } from "@/lib/auth/roles"
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE } from "@/lib/timezone"
 
+type AppointmentInterestSummary = {
+  id: string
+  productId: string
+  priority: number | null
+  notes: string | null
+  product: {
+    id: string
+    type: string
+    modelName: string
+  }
+}
+
 type AppointmentUserSummary = {
   id: string
   name: string | null
@@ -28,7 +40,7 @@ type SerializedAppointment = {
     phone: string | null
     instagram: string | null
   } | null
-  interests: string
+  interests: AppointmentInterestSummary[]
   resultNotes: string | null
   createdBy: string
   createdByUser: AppointmentUserSummary | null
@@ -41,9 +53,41 @@ type UserSearchResult = {
   role: Role
 }
 
+const OUTCOME_OPTIONS: AppointmentOutcome[] = [
+  "PENDIENTE",
+  "VENTA_CONCRETADA",
+  "NO_SE_CONCRETO",
+  "SENADO",
+  "SENADO_EN_CAMINO",
+  "SENADO_EN_STOCK",
+]
+
 function displayUser(user: AppointmentUserSummary | null) {
   if (!user) return "-"
   return user.name?.trim() || user.email
+}
+
+function getInterestsSearchText(interests: AppointmentInterestSummary[]) {
+  return interests
+    .map((interest) => [interest.product?.modelName, interest.product?.type, interest.notes].filter(Boolean).join(" "))
+    .join(" ")
+    .toLowerCase()
+}
+
+function ProductTypeIcon({ type }: { type: string }) {
+  if (type.toUpperCase() === "PHONE") {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4 shrink-0">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-4 shrink-0">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+    </svg>
+  )
 }
 
 export default function FilterableAppointmentsTable({ initial }: { initial: SerializedAppointment[] }) {
@@ -147,7 +191,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
         a.buyer?.name.toLowerCase().includes(query) ||
         a.buyer?.phone?.toLowerCase().includes(query) ||
         a.buyer?.instagram?.toLowerCase().includes(query) ||
-        a.interests.toLowerCase().includes(query) ||
+        getInterestsSearchText(a.interests).includes(query) ||
         a.createdBy.toLowerCase().includes(query)
 
       const matchesStatus = statusFilter === "ALL" || a.status === statusFilter
@@ -346,7 +390,7 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
           onChange={(e) => setOutcomeFilter(e.target.value as AppointmentOutcome | "ALL")}
         >
           <option value="ALL">Todos los Resultados</option>
-          {["PENDIENTE", "VENTA_CONCRETADA", "NO_SE_CONCRETO"].map((outcome) => (
+          {OUTCOME_OPTIONS.map((outcome) => (
             <option key={outcome} value={outcome}>
               {outcome}
             </option>
@@ -460,7 +504,39 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                       </div>
                     }
                   </td>
-                  <td className="max-w-xs truncate">{appointment.interests}</td>
+                  <td>
+                    {Array.isArray(appointment.interests) && appointment.interests.length > 0 ? (
+                      <div className="dropdown dropdown-hover">
+                        <div tabIndex={0} role="button" className="btn btn-xs m-1">
+                          {appointment.interests.length} items
+                        </div>
+                        <ul tabIndex={-1} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-60">
+                          {appointment.interests.map((interest, idx) => {
+                            const key = interest.id ?? interest.productId ?? `${interest.product?.modelName ?? "item"}-${idx}`
+
+                            return (
+                              <li key={String(key)}>
+                                <Link
+                                  href={`/dashboard/products/${interest.productId}/edit`}
+                                  className="btn btn-xs btn-ghost gap-1 flex flex-row justify-between"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ProductTypeIcon type={interest.product?.type ?? ""} />
+                                  <span className="text-left truncate w-full max-w-[10rem]">
+                                    {interest.product?.modelName ?? "-"}
+                                  </span>
+                                  {interest.priority ? <span>#{interest.priority}</span> : null}
+                                </Link>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </div>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                   <td>
                     <span className={`badge badge-outline badge-${appointment.status === "CONCRETADA" ? "success" : "warning"}`}>
                       {appointment.status}
@@ -478,10 +554,11 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
                         }}
                         onBlur={() => setEditingOutcomeId(null)}
                       >
-                        <option value="PENDIENTE">PENDIENTE</option>
-                        <option value="VENTA_CONCRETADA">VENTA_CONCRETADA</option>
-                        <option value="NO_SE_CONCRETO">NO_SE_CONCRETO</option>
-                        <option value="SENADO">SEÑADO</option>
+                        {OUTCOME_OPTIONS.map((outcome) => (
+                          <option key={outcome} value={outcome}>
+                            {outcome}
+                          </option>
+                        ))}
                       </select>
                     ) : (
                       <button

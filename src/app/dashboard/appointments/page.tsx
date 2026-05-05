@@ -24,6 +24,8 @@ export default async function AppointmentsPage() {
         include: {
           product: {
             select: {
+              id: true,
+              type: true,
               modelName: true,
             },
           },
@@ -54,7 +56,17 @@ export default async function AppointmentsPage() {
           instagram: a.buyer.instagram,
         }
       : null,
-    interests: a.interests.map((i) => i.product.modelName).join(", "),
+    interests: a.interests.map((i) => ({
+      id: i.id,
+      productId: i.productId,
+      priority: i.priority,
+      notes: i.notes,
+      product: {
+        id: i.product.id,
+        type: i.product.type,
+        modelName: i.product.modelName,
+      },
+    })),
     resultNotes: a.resultNotes,
     createdBy: a.user?.name || a.user?.email || "-",
     createdByUser: a.user
