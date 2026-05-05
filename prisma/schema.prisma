@@ -402,6 +402,7 @@ enum ProductState {
   DISPONIBLE_PARA_VENTA
   FUERA_DE_STOCK
   VENDIDO
+  SENADO
 }
 
 enum SaleItemKind {

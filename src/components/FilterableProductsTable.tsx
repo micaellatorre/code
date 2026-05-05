@@ -211,7 +211,7 @@ export default function FilterableProductsTable() {
   }, [data, cursor])
 
   // enums + labels
-  const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "VENDIDO"] as const
+  const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "VENDIDO", "SENADO"] as const
   const stateColorMap: Record<string, string> = {
     EN_STOCK: "badge-success",
     EN_CAMINO: "badge-info",
@@ -219,6 +219,7 @@ export default function FilterableProductsTable() {
     CON_CLIENTE: "badge-primary",
     VENDIDO: "badge-outline",
     FUERA_DE_STOCK: "badge-error",
+    SENADO: "badge-secondary",
   }
   const stateLabelMap: Record<string, string> = {
     EN_STOCK: "En stock",
@@ -227,6 +228,7 @@ export default function FilterableProductsTable() {
     CON_CLIENTE: "Con cliente",
     VENDIDO: "Vendido",
     FUERA_DE_STOCK: "Fuera de stock",
+    SENADO: "Señado"
   }
 
   const conditionOptions = ["A_PLUS", "OEM", "ASIS", "ASIS_PLUS", "SEALED"] as const

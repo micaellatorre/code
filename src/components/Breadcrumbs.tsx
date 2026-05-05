@@ -1,4 +1,17 @@
+"use client"
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
+import {
+  ArrowPathIcon,
+  CalendarIcon,
+  CurrencyDollarIcon,
+  DevicePhoneMobileIcon,
+  UsersIcon,
+} from '@heroicons/react/24/solid'
+import type { Role } from '@/lib/auth/roles'
 
 export interface BreadcrumbItem {
   /** Texto visible para este paso en el breadcrumb. */
@@ -10,6 +23,37 @@ export interface BreadcrumbItem {
   href?: string
 }
 
+const sectionMenuItems = [
+  {
+    key: "buyers",
+    label: "Clientes",
+    href: "/dashboard/buyers",
+    icon: <UsersIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
+  },
+  {
+    key: "appointments",
+    label: "Citas",
+    href: "/dashboard/appointments",
+    icon: <CalendarIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
+  },
+  {
+    key: "products",
+    label: "Productos",
+    href: "/dashboard/products",
+    icon: <DevicePhoneMobileIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN", "VENDEDOR", "STOCK", "SOCIO"] as Role[],
+  },
+  {
+    key: "sales",
+    label: "Ventas",
+    href: "/dashboard/sales",
+    icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"] as Role[],
+  },
+]
+
 /**
  * Componente de Breadcrumbs. Muestra la ruta de navegación actual como una
  * lista ordenada de enlaces. Utiliza el estilo `breadcrumbs` de DaisyUI
@@ -17,15 +61,101 @@ export interface BreadcrumbItem {
  * proporciona `href`, se renderiza como texto plano.
  */
 export default function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
+  const { data: session } = useSession()
+  const pathname = usePathname()
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const activeRole = session?.user?.activeRole
+
+  useEffect(() => {
+    setPendingHref(null)
+  }, [pathname])
+
   if (!items || items.length === 0) return null
+
+  const visibleSectionItems = sectionMenuItems.filter((menuItem) =>
+    activeRole ? menuItem.allowedRoles.includes(activeRole) : true
+  )
+
   return (
-    <div className="breadcrumbs text-sm sm:mb-2">
+    <div className="breadcrumbs relative z-[120] overflow-visible text-sm sm:mb-2">
       <ul>
-        {items.map((item, index) => (
-          <li key={index}>
-            {item.href ? <Link href={item.href}>{item.label}</Link> : <span>{item.label}</span>}
-          </li>
-        ))}
+        {items.map((item, index) => {
+          const activeMenuItem = sectionMenuItems.find((menuItem) =>
+            item.href ? menuItem.href === item.href : menuItem.label === item.label
+          )
+
+          if (index === 1) {
+            return (
+              <li key={`${item.label}-${index}`}>
+                <div className="dropdown dropdown-bottom relative z-[130]">
+                  <div
+                    tabIndex={0}
+                    role="button"
+                    className="btn btn-ghost btn-xs h-auto min-h-0 gap-1 px-1 py-0.5 text-sm font-normal normal-case"
+                  >
+                    {pendingHref ? (
+                      <ArrowPathIcon className="size-5 shrink-0 animate-spin" />
+                    ) : activeMenuItem ? (
+                      <span className="shrink-0">{activeMenuItem.icon}</span>
+                    ) : null}
+                    {activeMenuItem?.label ?? item.label}
+                  </div>
+                  <ul
+                    tabIndex={0}
+                    className="dropdown-content menu z-[140] mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
+                  >
+                    {visibleSectionItems.map((menuItem) => {
+                      const active = activeMenuItem?.key === menuItem.key
+
+                      return (
+                        <li key={menuItem.key}>
+                          <Link
+                            href={menuItem.href}
+                            onClick={() => {
+                              if (!active) setPendingHref(menuItem.href)
+                            }}
+                            className={active ? "active font-semibold" : undefined}
+                          >
+                            {pendingHref === menuItem.href ? (
+                              <ArrowPathIcon className="size-5 shrink-0 animate-spin" />
+                            ) : (
+                              menuItem.icon
+                            )}
+                            <span>{menuItem.label}</span>
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              </li>
+            )
+          }
+
+          return (
+            <li key={`${item.label}-${index}`}>
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  onClick={() => {
+                    if (item.href !== pathname) setPendingHref(item.href ?? null)
+                  }}
+                >
+                  {pendingHref === item.href ? (
+                    <span className="inline-flex items-center gap-1">
+                      <ArrowPathIcon className="size-4 animate-spin" />
+                      {item.label}
+                    </span>
+                  ) : (
+                    item.label
+                  )}
+                </Link>
+              ) : (
+                <span>{item.label}</span>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
