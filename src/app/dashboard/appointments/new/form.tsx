@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import Breadcrumbs from '@/components/Breadcrumbs';
-import type { Buyer } from '../../../../../prisma/generated/client';
+import type { Buyer } from '@prisma/client';
 import BuyerSection from '@/components/sales/BuyerSection';
 import AppointmentInterestSection, { AppointmentInterestDraft } from '@/components/appointments/AppointmentInterestSection';
 import { fromArgDateTimeInputValue, toArgDateTimeInputValue } from '@/lib/timezone';

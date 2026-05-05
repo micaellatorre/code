@@ -2,7 +2,7 @@
 'use client';
 
 import type { PaymentDraft } from '@/app/dashboard/sales/new/form';
-import type { PaymentMethod, Currency } from '../../../prisma/generated/client';
+import type { PaymentMethod, Currency } from '@prisma/client';
 import { useMemo } from 'react';
 
 interface PaymentsSectionProps {

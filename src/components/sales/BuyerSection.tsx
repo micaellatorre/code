@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Buyer } from "../../../prisma/generated/client";
+import type { Buyer } from "@prisma/client";
 import { useState, useEffect, useCallback } from "react";
 import { toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone';
 

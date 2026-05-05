@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from "../../../../../../prisma/generated/client";
+import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from "@prisma/client";
 
 export type SaleItemDraft = {
   productId: string;

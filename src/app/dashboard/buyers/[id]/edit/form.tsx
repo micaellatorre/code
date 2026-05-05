@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
-import type { Buyer } from '../../../../../../prisma/generated/client'
+import type { Buyer } from '@prisma/client'
 import { fromArgDateInputValue, toArgDateInputValue } from '@/lib/timezone'
 
 interface EditBuyerFormProps {
