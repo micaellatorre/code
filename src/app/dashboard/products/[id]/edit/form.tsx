@@ -26,6 +26,7 @@ export default function EditProductForm({ id }: EditProductFormProps) {
     salePrice: '',
     shippingCost: '',
     type: 'PHONE',
+    senado: false,
     notes: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -49,6 +50,7 @@ export default function EditProductForm({ id }: EditProductFormProps) {
           salePrice: data.salePrice ?? '',
           shippingCost: data.shippingCost ?? '',
           type: data.type,
+          senado: Boolean(data.senado),
           notes: data.notes ?? '',
         })
       }
@@ -58,8 +60,9 @@ export default function EditProductForm({ id }: EditProductFormProps) {
   }, [id])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+    const { name, value, type } = e.target
+    const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined
+    setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,6 +82,7 @@ export default function EditProductForm({ id }: EditProductFormProps) {
       salePrice: parseFloat(String(form.salePrice)) || 0,
       shippingCost: form.shippingCost ? parseFloat(String(form.shippingCost)) : null,
       type: form.type,
+      senado: form.senado,
       notes: form.notes || null,
     }
     const res = await fetch(`/api/products/${id}`, {
@@ -210,6 +214,10 @@ export default function EditProductForm({ id }: EditProductFormProps) {
               <label className="label"><span className="label-text">Notas</span></label>
               <textarea className="textarea textarea-bordered" name="notes" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}></textarea>
             </div>
+            <label className="label cursor-pointer justify-start gap-3">
+              <input type="checkbox" name="senado" checked={form.senado} onChange={handleChange} className="checkbox checkbox-sm" />
+              <span className="label-text">Producto señado</span>
+            </label>
           </fieldset>
         </div>
         <div className="card bg-base-100 border border-base-content/50 max-h-fit p-4 flex flex-col gap-2">

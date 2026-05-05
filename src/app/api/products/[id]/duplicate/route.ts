@@ -40,12 +40,23 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     })
     const nextCopyNumber = Math.max(0, ...copyNumbers) + 1
 
-    const { id: _id, createdAt: _ca, updatedAt: _ua, stock: _s, stockAvailable: _sa, ...dataToCopy } = productToCopy
+    const {
+      id: _id,
+      createdAt: _ca,
+      updatedAt: _ua,
+      stock: _s,
+      stockAvailable: _sa,
+      senado: _senado,
+      senadoAt: _senadoAt,
+      ...dataToCopy
+    } = productToCopy
 
     const newProduct = await prisma.product.create({
       data: {
         ...dataToCopy,
         modelName: `${productToCopy.modelName} Copia #${nextCopyNumber}`,
+        senado: false,
+        senadoAt: null,
         stock: 0,
         stockAvailable: 0,
       },

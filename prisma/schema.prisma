@@ -69,6 +69,8 @@ model Product {
   shippingCost   Decimal?      @db.Decimal(12, 2) // costo_envio (si es fijo/por unidad)
   status         ProductStatus @default(AVAILABLE)
   state          ProductState  @default(EN_CAMINO) // estado actual del producto
+  senado         Boolean       @default(false)
+  senadoAt       DateTime?
   stockInitial   Int           @default(1) // stock inicial
   stock          Int           @default(1) // stock actual
   stockAvailable Int           @default(1) // stock disponible para venta
@@ -399,10 +401,9 @@ enum ProductState {
   EN_CAMINO
   EN_REPARACION
   CON_CLIENTE
-  DISPONIBLE_PARA_VENTA
+  DISPONIBLE
   FUERA_DE_STOCK
   VENDIDO
-  SENADO
 }
 
 enum SaleItemKind {
@@ -455,6 +456,8 @@ enum AppointmentOutcome {
   VENTA_CONCRETADA // Se concretó una venta (podés linkear Sale)
   NO_SE_CONCRETO // No se concretó venta
   SENADO // Señaron al menos un producto de la venta
+  SENADO_EN_CAMINO // Señaron al menos un producto de la venta y tiene estado EN_CAMINO
+  SENADO_EN_STOCK // Señaron al menos un producto de la venta y tiene estado EN_STOCK
 }
 
 /// Motivo principal de que no haya venta (cuando outcome = NO_SALE).

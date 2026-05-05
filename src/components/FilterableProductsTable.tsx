@@ -39,6 +39,8 @@ type SerializedProduct = {
   salePrice: string | null
   shippingCost: string | null
   state: string
+  senado: boolean
+  senadoAt: string | null
   status: string
   stockInitial: number
   stock: number
@@ -140,6 +142,7 @@ export default function FilterableProductsTable() {
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("PHONE")
   const [stateFilter, setStateFilter] = useState<string>("EN_STOCK")
+  const [senadoFilter, setSenadoFilter] = useState<string>("")
 
   // client-side filters (work on already-fetched page)
   const [brandFilter, setBrandFilter] = useState<string>("")
@@ -148,6 +151,7 @@ export default function FilterableProductsTable() {
   const [batteryMax, setBatteryMax] = useState<string>("")
   const [colorFilter, setColorFilter] = useState<string>("")
   const [capacityFilter, setCapacityFilter] = useState<string>("")
+  const [originFilter, setOriginFilter] = useState<string>("")
 
   // UI state
   const [isTableExpanded, setIsTableExpanded] = useState(false)
@@ -164,6 +168,7 @@ export default function FilterableProductsTable() {
   const [editingFields, setEditingFields] = useState<Record<string, Record<string, string>>>({})
   const [savingField, setSavingField] = useState<{ productId: string; fieldName: string } | null>(null)
   const [savingStateId, setSavingStateId] = useState<string | null>(null)
+  const [savingSenadoId, setSavingSenadoId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
 
@@ -175,18 +180,19 @@ export default function FilterableProductsTable() {
   // Reset pagination when server-backed filters change
   useEffect(() => {
     setCursor(null)
-  }, [search, typeFilter, stateFilter])
+  }, [search, typeFilter, stateFilter, senadoFilter])
 
   const apiUrl = useMemo(() => {
     const sp = new URLSearchParams()
     if (typeFilter) sp.set("type", typeFilter)
     if (stateFilter) sp.set("state", stateFilter)
+    if (senadoFilter) sp.set("senado", senadoFilter)
     if (search.trim()) sp.set("q", search.trim())
     sp.set("orderBy", orderBy)
     sp.set("limit", String(limit))
     if (cursor) sp.set("cursor", cursor)
     return `/api/products?${sp.toString()}`
-  }, [search, typeFilter, stateFilter, orderBy, limit, cursor])
+  }, [search, typeFilter, stateFilter, senadoFilter, orderBy, limit, cursor])
 
   const { data, error, isLoading, mutate } = useSWR(apiUrl, fetcher, {
     revalidateOnFocus: false,
@@ -211,24 +217,24 @@ export default function FilterableProductsTable() {
   }, [data, cursor])
 
   // enums + labels
-  const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "VENDIDO", "SENADO"] as const
+  const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "DISPONIBLE", "FUERA_DE_STOCK", "VENDIDO"] as const
   const stateColorMap: Record<string, string> = {
     EN_STOCK: "badge-success",
     EN_CAMINO: "badge-info",
     EN_REPARACION: "badge-warning",
     CON_CLIENTE: "badge-primary",
+    DISPONIBLE: "badge-accent",
     VENDIDO: "badge-outline",
     FUERA_DE_STOCK: "badge-error",
-    SENADO: "badge-secondary",
   }
   const stateLabelMap: Record<string, string> = {
     EN_STOCK: "En stock",
     EN_CAMINO: "En camino",
-    EN_REPARACION: "En reparación",
+    EN_REPARACION: "En reparacion",
     CON_CLIENTE: "Con cliente",
+    DISPONIBLE: "Disponible para venta",
     VENDIDO: "Vendido",
     FUERA_DE_STOCK: "Fuera de stock",
-    SENADO: "Señado"
   }
 
   const conditionOptions = ["A_PLUS", "OEM", "ASIS", "ASIS_PLUS", "SEALED"] as const
@@ -271,6 +277,9 @@ export default function FilterableProductsTable() {
       const matchesCondition = conditionFilter ? p.condition === conditionFilter : true
       const matchesColor = colorFilter ? p.color === colorFilter : true
       const matchesCapacity = capacityFilter ? p.capacityGB === Number(capacityFilter) : true
+      const matchesOrigin = originFilter
+        ? (p.origin ?? "").toLowerCase().includes(originFilter.trim().toLowerCase())
+        : true
 
       let matchesBattery = true
       if (min != null || max != null) {
@@ -282,9 +291,9 @@ export default function FilterableProductsTable() {
         }
       }
 
-      return matchesBrand && matchesCondition && matchesColor && matchesCapacity && matchesBattery
+      return matchesBrand && matchesCondition && matchesColor && matchesCapacity && matchesOrigin && matchesBattery
     })
-  }, [productsLocal, brandFilter, conditionFilter, colorFilter, capacityFilter, batteryMin, batteryMax])
+  }, [productsLocal, brandFilter, conditionFilter, colorFilter, capacityFilter, originFilter, batteryMin, batteryMax])
 
   const grouped = useMemo(() => {
     const map = new Map<
@@ -337,7 +346,9 @@ export default function FilterableProductsTable() {
     setBatteryMax("")
     setColorFilter("")
     setCapacityFilter("")
+    setOriginFilter("")
     setStateFilter("")
+    setSenadoFilter("")
   }
 
   function canEditField(fieldName: string) {
@@ -630,6 +641,45 @@ export default function FilterableProductsTable() {
 
     setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: newState } : p)))
     persistStateUpdate(id, newState)
+  }
+
+  async function changeSenado(id: string, nextSenado: boolean) {
+    if (!canEditProducts) return
+
+    setSavingSenadoId(id)
+    const rollback = productsLocal.find((p) => p.id === id) ?? null
+    const nextSenadoAt = nextSenado ? new Date().toISOString() : null
+
+    setProductsLocal((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, senado: nextSenado, senadoAt: nextSenadoAt } : p)),
+    )
+
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senado: nextSenado }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const updated = await res.json()
+      setProductsLocal((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                senado: updated.senado,
+                senadoAt: updated.senadoAt ? new Date(updated.senadoAt).toISOString() : null,
+              }
+            : p,
+        ),
+      )
+      mutate()
+    } catch (err) {
+      if (rollback) setProductsLocal((prev) => prev.map((p) => (p.id === id ? rollback : p)))
+      console.error("Failed to persist senado update", err)
+    } finally {
+      setSavingSenadoId(null)
+    }
   }
 
   async function deleteProduct(id: string) {
@@ -1228,6 +1278,18 @@ export default function FilterableProductsTable() {
         </td>
 
         <td>
+          <button
+            type="button"
+            className={`badge badge-sm ${p.senado ? "badge-secondary" : "badge-ghost"} ${canEditProducts ? "cursor-pointer" : "cursor-default"}`}
+            disabled={!canEditProducts || savingSenadoId === p.id}
+            onClick={() => changeSenado(p.id, !p.senado)}
+            title={p.senadoAt ? `Señado el ${formatInTimeZone(new Date(p.senadoAt), AR_TIME_ZONE, "dd/MM/yyyy HH:mm")}` : undefined}
+          >
+            {savingSenadoId === p.id ? "..." : p.senado ? "Señado" : "Libre"}
+          </button>
+        </td>
+
+        <td>
           {canEditState ? (
             <div className="dropdown dropdown-start relative">
               <div
@@ -1242,11 +1304,11 @@ export default function FilterableProductsTable() {
                 {stateOptions.map((s) => (
                   <li key={s} className="py-2 flex flex-row items-center gap-2">
                     <button
-                      className={`w-full text-left btn btn-ghost btn-xs justify-start ${stateColorMap[s] ?? ""}`}
+                      className={`w-full text-left btn btn-ghost btn-xs justify-between ${stateColorMap[s] ?? ""}`}
                       disabled={savingStateId === p.id}
                       onClick={() => changeState(p.id, s)}
                     >
-                      {s}
+                      <span className="truncate w-auto">{s}</span>
                       <div className={`w-2 h-2 rounded-full border ${stateColorMap[s] ?? ""}`}></div>
                     </button>
                   </li>
@@ -1443,6 +1505,15 @@ export default function FilterableProductsTable() {
               </option>
             ))}
           </select>
+          <select
+            className="select select-bordered select-xs sm:select-sm"
+            value={senadoFilter}
+            onChange={(e) => setSenadoFilter(e.target.value)}
+          >
+            <option value="">Todas las señas</option>
+            <option value="false">No señados</option>
+            <option value="true">Señados</option>
+          </select>
           <button type="button" className="btn btn-ghost btn-xs sm:btn-sm" onClick={() => clearFilters()}>
             Limpiar
           </button>
@@ -1460,7 +1531,7 @@ export default function FilterableProductsTable() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        {(brandFilter || conditionFilter || colorFilter || capacityFilter || stateFilter || batteryMin || batteryMax) && (
+        {(brandFilter || conditionFilter || colorFilter || capacityFilter || originFilter || stateFilter || senadoFilter || batteryMin || batteryMax) && (
           <div className="flex items-center gap-2">
             {brandFilter && (
               <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
@@ -1494,11 +1565,27 @@ export default function FilterableProductsTable() {
                 </button>
               </span>
             )}
+            {originFilter && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Origen: {originFilter}
+                <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setOriginFilter("")}>
+                  x
+                </button>
+              </span>
+            )}
             {stateFilter && (
               <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
                 Estado: {stateLabelMap[stateFilter]}
                 <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setStateFilter("")}>
                   ✕
+                </button>
+              </span>
+            )}
+            {senadoFilter && (
+              <span className="badge badge-sm badge-soft h-8 pl-3 pr-1 py-2">
+                Seña: {senadoFilter === "true" ? "Señados" : "No señalados"}
+                <button type="button" className="btn btn-ghost btn-xs btn-circle ml-1" onClick={() => setSenadoFilter("")}>
+                  x
                 </button>
               </span>
             )}
@@ -1632,6 +1719,25 @@ export default function FilterableProductsTable() {
 
                 <div className="form-control relative">
                   <label className="label">
+                    <span className="label-text font-semibold">Origen</span>
+                  </label>
+                  <input
+                    type="search"
+                    value={originFilter}
+                    onChange={(e) => setOriginFilter(e.target.value)}
+                    placeholder="Buscar origen"
+                    className="input input-bordered input-sm"
+                  />
+                  {originFilter && (
+                    <button className="btn btn-xs text-red-500 absolute right-1 top-0 mt-1" onClick={() => setOriginFilter("")}>
+                      <span className="text-xs text-base-content/30 mr-2">Limpiar</span>
+                      x
+                    </button>
+                  )}
+                </div>
+
+                <div className="form-control relative">
+                  <label className="label">
                     <span className="label-text font-semibold">Capacidad (GB)</span>
                   </label>
                   <select value={capacityFilter} onChange={(e) => setCapacityFilter(e.target.value)} className="select select-bordered select-sm">
@@ -1719,6 +1825,7 @@ export default function FilterableProductsTable() {
                 {canSeeSalePrice ? <th>Precio Venta (USD)</th> : null}
                 <th>Stock Inicial</th>
                 <th>Stock</th>
+                <th>Seña</th>
                 <th>Estado</th>
                 {hasProductActions ? <th>Acciones</th> : null}
                 {renderSensitiveColumnsToggle()}
@@ -1824,6 +1931,7 @@ export default function FilterableProductsTable() {
                                     {canSeeSalePrice ? <th>Precio Venta (USD)</th> : null}
                                     <th>Stock Inicial</th>
                                     <th>Stock</th>
+                                    <th>Seña</th>
                                     <th>Estado</th>
                                     {hasProductActions ? <th>Acciones</th> : null}
                                     {renderSensitiveColumnsToggle()}

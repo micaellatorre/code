@@ -113,6 +113,7 @@ export async function POST(request: Request) {
             stockAvailable: true,
             costPrice: true,
             state: true,
+            senado: true,
           },
         });
         const productMap = new Map(products.map((p) => [p.id, p]));
@@ -132,10 +133,26 @@ export async function POST(request: Request) {
             throw err;
           }
 
-          // Stock
-          if (prod.stock < raw.units) {
+          if (prod.senado) {
             const err = new Error(
-              `Stock insuficiente para ${prod.modelName}. Disponible: ${prod.stock}, solicitado: ${raw.units}`
+              `${prod.modelName} está señado y no puede venderse hasta liberar la seña.`
+            ) as ApiError;
+            err.statusCode = 409;
+            throw err;
+          }
+
+          if (!["EN_STOCK", "DISPONIBLE"].includes(prod.state)) {
+            const err = new Error(
+              `${prod.modelName} no está disponible para venta. Estado actual: ${prod.state}`
+            ) as ApiError;
+            err.statusCode = 409;
+            throw err;
+          }
+
+          // Stock
+          if (prod.stockAvailable < raw.units) {
+            const err = new Error(
+              `Stock insuficiente para ${prod.modelName}. Disponible: ${prod.stockAvailable}, solicitado: ${raw.units}`
             ) as ApiError;
             err.statusCode = 409;
             throw err;

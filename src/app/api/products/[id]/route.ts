@@ -29,6 +29,9 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   const { id } = await params
   const body = await request.json()
   try {
+    if (body.senado === false) body.senadoAt = null
+    if (body.senado === true && !body.senadoAt) body.senadoAt = new Date()
+
     const product = await prisma.product.update({ where: { id }, data: body })
     return NextResponse.json(product)
   } catch (err: any) {
@@ -72,6 +75,23 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         return NextResponse.json({ error: "Valor de stock inicial inválido" }, { status: 400 })
       }
       updateData.stockInitial = stockInitial
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "senado")) {
+      updateData.senado = Boolean(body.senado)
+      updateData.senadoAt = updateData.senado ? new Date() : null
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "senadoAt")) {
+      if (body.senadoAt === null || body.senadoAt === "") {
+        updateData.senadoAt = null
+      } else {
+        const senadoAt = new Date(body.senadoAt)
+        if (Number.isNaN(senadoAt.getTime())) {
+          return NextResponse.json({ error: "Fecha de seña inválida" }, { status: 400 })
+        }
+        updateData.senadoAt = senadoAt
+      }
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "costPrice")) {

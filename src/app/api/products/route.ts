@@ -6,6 +6,16 @@ import type { Prisma } from "@prisma/client"
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
+const SELLABLE_STATES = ["EN_STOCK", "DISPONIBLE"] as const
+const PRODUCT_STATES = [
+  "EN_STOCK",
+  "EN_CAMINO",
+  "EN_REPARACION",
+  "CON_CLIENTE",
+  "DISPONIBLE",
+  "FUERA_DE_STOCK",
+  "VENDIDO",
+] as const
 
 function parseLimit(v: string | null) {
   const n = v ? Number(v) : DEFAULT_LIMIT
@@ -40,6 +50,8 @@ const PRODUCT_SELECT = {
   id: true,
   tenantId: true,
   state: true,
+  senado: true,
+  senadoAt: true,
   status: true,
   type: true,
   brand: true,
@@ -93,12 +105,20 @@ export async function GET(request: Request) {
     const q = qRaw?.trim() ? qRaw.trim() : null
 
     const stateParam = searchParams.get("state")
+    const senadoParam = searchParams.get("senado")
+    const sellableParam = searchParams.get("sellable")
     const typeParam = searchParams.get("type")
 
     const where: NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"] = { tenantId }
 
-    // Cast string params to the correct Prisma enum types rather than `any`
-    if (stateParam) where.state = stateParam as any
+    if (sellableParam === "true") {
+      where.state = { in: SELLABLE_STATES as unknown as string[] } as any
+      where.senado = false
+    } else if (stateParam && PRODUCT_STATES.includes(stateParam as any)) {
+      where.state = stateParam as any
+    }
+    if (senadoParam === "true") where.senado = true
+    if (senadoParam === "false") where.senado = false
     if (typeParam) where.type = typeParam as any
 
     if (q) {
@@ -135,6 +155,8 @@ export async function GET(request: Request) {
 
       type: p.type,
       state: p.state,
+      senado: p.senado,
+      senadoAt: p.senadoAt ? p.senadoAt.toISOString() : null,
       status: p.status, // don't coerce to string/defaults; keep enum value
 
       brand: p.brand ?? null,
@@ -185,6 +207,9 @@ export async function POST(request: Request) {
     if (!tenantId) {
       return NextResponse.json({ error: "DEFAULT_TENANT_ID not set" }, { status: 500 })
     }
+
+    if (body.senado === false) body.senadoAt = null
+    if (body.senado === true && !body.senadoAt) body.senadoAt = new Date()
 
     const product = await prisma.product.create({
       data: { ...body, tenantId },

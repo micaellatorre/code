@@ -35,6 +35,8 @@ type ApiProduct = {
   salePrice: string | null
   shippingCost: string | null
   state: string
+  senado: boolean
+  senadoAt: string | null
   status: string
   stockInitial: number
   stock: number
@@ -73,6 +75,8 @@ function apiToPrismaProduct(p: ApiProduct): Product {
     shippingCost: p.shippingCost != null ? (p.shippingCost as any) : null,
 
     state: p.state as any,
+    senado: p.senado,
+    senadoAt: p.senadoAt ? new Date(p.senadoAt) : null,
     status: p.status as ProductStatus,
 
     stockInitial: p.stockInitial ?? 0,
@@ -106,7 +110,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
 
   const buildUrl = (q: string, type: ProductType | 'ALL', cursor?: string | null) => {
     const params = new URLSearchParams()
-    params.set('state', 'EN_STOCK')
+    params.set('sellable', 'true')
     params.set('limit', String(LIMIT))
     if (q.trim()) params.set('q', q.trim())
     if (type !== 'ALL') params.set('type', type)
