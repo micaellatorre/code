@@ -9,6 +9,7 @@ import ProductSelectionModal from './ProductSelectionModal';
 interface SaleItemsSectionProps {
     items: SaleItemDraft[];
     setItems: (items: SaleItemDraft[]) => void;
+    disabled?: boolean;
 }
 
 function getStateBadgeClass(state: string) {
@@ -19,10 +20,12 @@ function getStateBadgeClass(state: string) {
     return 'badge-ghost';
 }
 
-export default function SaleItemsSection({ items, setItems }: SaleItemsSectionProps) {
+export default function SaleItemsSection({ items, setItems, disabled = false }: SaleItemsSectionProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleAddItems = (newItems: SaleItemDraft[]) => {
+        if (disabled) return;
+
         const updatedItems = [...items];
         newItems.forEach(newItem => {
             const existingIndex = updatedItems.findIndex(i => i.productId === newItem.productId);
@@ -43,21 +46,23 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
     };
 
     const handleRemoveItem = (itemId: string) => {
+        if (disabled) return;
         setItems(items.filter(i => i._id !== itemId));
     }
 
     const handleUpdateItem = (itemId: string, updatedFields: Partial<SaleItemDraft>) => {
+        if (disabled) return;
         setItems(items.map(i => i._id === itemId ? { ...i, ...updatedFields } : i));
     }
 
     return (
         <div className="card bg-base-100 border border-base-content/50 p-4">
             <h2 className="font-bold text-lg">3. Items de Venta</h2>
-            
+
             {items.length === 0 ? (
                 <div className="text-center p-8 border border-base-content/50 border-dashed border-base-300 rounded-box mt-4">
                     <p className="text-base-content/70">Aún no agregaste productos.</p>
-                    <button onClick={() => setIsModalOpen(true)} className="btn btn-primary btn-sm mt-4">Agregar Ítem</button>
+                    <button onClick={() => setIsModalOpen(true)} className="btn btn-primary btn-sm mt-4" disabled={disabled}>Agregar Ítem</button>
                 </div>
             ) : (
                 <div className="mt-4">
@@ -67,10 +72,10 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
                                 <tr>
                                     <th>IMEI</th>
                                     <th>Producto</th>
+                                    <th>% Bateria</th>
                                     <th>Estado</th>
                                     <th>Cantidad</th>
                                     <th>Precio Unit.</th>
-                                    <th>Tipo</th>
                                     <th>Total</th>
                                     <th></th>
                                 </tr>
@@ -78,64 +83,62 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
                             <tbody>
                                 {items.map(item => (
                                     <tr key={item._id}>
-                                        <td>{item.product.imei ? item.product.imei.slice(-4) : 'N/A'}</td>
+                                        <td>{item.product.imei ? item.product.imei.slice(-4) : '-'}</td>
                                         <td>{item.product.modelName}</td>
+                                        <td>{item.product.batteryPct ? item.product.batteryPct : '-'}</td>
                                         <td>
                                             <span className={`badge badge-sm ${getStateBadgeClass(String(item.product.state))}`}>
                                                 {String(item.product.state).replace(/_/g, ' ')}
                                             </span>
                                         </td>
                                         <td>
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={item.units}
                                                 onChange={(e) => handleUpdateItem(item._id, { units: parseInt(e.target.value) || 1 })}
                                                 className="input input-bordered input-sm w-20"
                                                 min={1}
                                                 max={item.product.stockAvailable ?? item.product.stock}
+                                                disabled={disabled}
                                             />
                                         </td>
                                         <td>
-                                            <input 
-                                                type="text" 
-                                                value={item.unitPrice}
-                                                onChange={(e) => handleUpdateItem(item._id, { unitPrice: e.target.value })}
-                                                className="input input-bordered input-sm w-24"
-                                            />
+                                            <div className="relative items-center baseline">
+                                                <input
+                                                    type="text"
+                                                    value={item.unitPrice}
+                                                    onChange={(e) => handleUpdateItem(item._id, { unitPrice: e.target.value })}
+                                                    className="input input-bordered input-sm w-24 pl-6 text-right"
+                                                    disabled={disabled}
+                                                />
+                                                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs opacity-50">$</span>
+                                            </div>
                                         </td>
                                         <td>
-                                            {item.product.type === 'ACCESSORY' ? (
-                                                <select 
-                                                    value={item.kind}
-                                                    onChange={(e) => handleUpdateItem(item._id, { kind: e.target.value as SaleItemKind })}
-                                                    className="select select-bordered select-sm"
-                                                >
-                                                    <option value="NORMAL">Normal</option>
-                                                    <option value="ZERO_COST">Sin Cargo</option>
-                                                    <option value="IN_TOTAL">Costo en Total</option>
-                                                </select>
-                                            ) : (
-                                                <span className="badge badge-ghost">{item.kind}</span>
-                                            )}
+                                            <div className="flex flex-row justify-between items-center gap-2 h-full">
+                                                <span className="text-xs opacity-50">$</span>
+                                                <span className="text-right">
+                                                    {(parseFloat(item.unitPrice) * item.units).toFixed(2)}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td>{(parseFloat(item.unitPrice) * item.units).toFixed(2)}</td>
                                         <td>
-                                            <button onClick={() => handleRemoveItem(item._id)} className="btn btn-ghost btn-xs">Quitar</button>
+                                            <button onClick={() => handleRemoveItem(item._id)} className="btn btn-ghost btn-xs" disabled={disabled}>Quitar</button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                    <button onClick={() => setIsModalOpen(true)} className="btn btn-outline btn-sm mt-4 w-full">+ Agregar más ítems</button>
+                    <button onClick={() => setIsModalOpen(true)} className="btn btn-outline btn-sm mt-4 w-full" disabled={disabled}>+ Agregar más ítems</button>
                 </div>
             )}
 
-            {isModalOpen && (
-                <ProductSelectionModal 
+            {isModalOpen && !disabled && (
+                <ProductSelectionModal
                     existingItems={items}
-                    onClose={() => setIsModalOpen(false)} 
-                    onAddItems={handleAddItems} 
+                    onClose={() => setIsModalOpen(false)}
+                    onAddItems={handleAddItems}
                 />
             )}
         </div>

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency } from "@prisma/client";
+import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency, SaleStatus } from "@prisma/client";
 
 export type SaleItemDraft = {
   productId: string;
@@ -52,6 +52,7 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
   const [meta, setMeta] = useState<SaleMeta>({ date: new Date(), origin: "Instagram" });
   const [items, setItems] = useState<SaleItemDraft[]>([]);
   const [payments, setPayments] = useState<PaymentDraft[]>([]);
+  const [saleStatus, setSaleStatus] = useState<SaleStatus>("CONFIRMADA");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -76,6 +77,7 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
     return {
       total: total.toFixed(2),
+      totalPaid: totalPaid.toFixed(2),
       remaining: (total - totalPaid).toFixed(2),
     };
   }, [items, payments]);
@@ -94,6 +96,7 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
         const data = await res.json();
 
         const sale = data.sale;
+        if (mounted) setSaleStatus(sale?.status ?? "CONFIRMADA");
 
         const buyer: Buyer | null = sale?.buyer ?? null;
         if (mounted) setSelectedBuyer(buyer);
@@ -171,6 +174,21 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
       });
       if (!r3.ok) throw new Error(await r3.text());
 
+      const r4 = await fetch(`/api/sales/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payments: payments.map((p) => ({
+            method: p.method,
+            currency: p.currency,
+            amount: p.amount,
+            note: p.note,
+            paidAt: p.paidAt?.toISOString(),
+          })),
+        }),
+      });
+      if (!r4.ok) throw new Error(await r4.text());
+
       router.push("/dashboard/sales");
     } catch (e: any) {
       setError(e?.message || "No se pudo guardar la venta.");
@@ -201,15 +219,43 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
         <div className="lg:col-span-2 flex flex-col gap-6">
           <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} />
           <SaleMetaSection meta={meta} setMeta={setMeta} />
-          <SaleItemsSection items={items} setItems={setItems} />
-          <PaymentsSection payments={payments} setPayments={setPayments} total={totals.total} />
+          <SaleItemsSection
+            items={items}
+            setItems={setItems}
+            disabled={saleStatus === "CONFIRMADA"}
+          />
+          <PaymentsSection
+            payments={payments}
+            setPayments={setPayments}
+            total={totals.total}
+            disabled={saleStatus === "CONFIRMADA"}
+          />
         </div>
 
         <div className="lg:col-span-1">
           <div className="sticky top-4 flex flex-col gap-6">
+            <div className="card bg-base-100 border border-base-content/50 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-base-content/70">Estado</span>
+                <span className={`badge ${saleStatus === "SENADA" ? "badge-warning" : "badge-success"}`}>
+                  {saleStatus}
+                </span>
+              </div>
+              <div className="divider my-2"></div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-base-content/60">Pagado</div>
+                  <div className="font-mono font-semibold">$ {totals.totalPaid}</div>
+                </div>
+                <div>
+                  <div className="text-base-content/60">Pendiente</div>
+                  <div className="font-mono font-semibold">$ {totals.remaining}</div>
+                </div>
+              </div>
+            </div>
             <TotalsBar items={items} payments={payments} />
             <SubmitBar
-              disabled={isSubmitting}
+              disabled={isSubmitting || saleStatus === "CONFIRMADA"}
               error={error}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}

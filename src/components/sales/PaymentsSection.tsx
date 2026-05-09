@@ -9,6 +9,7 @@ interface PaymentsSectionProps {
     payments: PaymentDraft[];
     setPayments: (payments: PaymentDraft[]) => void;
     total: string; // The total from the TotalsBar to compare against
+    disabled?: boolean;
 }
 
 const PAYMENT_METHODS: PaymentMethod[] = [
@@ -21,7 +22,7 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 ];
 const CURRENCIES: Currency[] = ['ARS', 'USD', 'USDT'];
 
-export default function PaymentsSection({ payments, setPayments, total }: PaymentsSectionProps) {
+export default function PaymentsSection({ payments, setPayments, total, disabled = false }: PaymentsSectionProps) {
 
     const totalPaid = useMemo(() => {
         // TODO: Use big.js for precision
@@ -34,6 +35,8 @@ export default function PaymentsSection({ payments, setPayments, total }: Paymen
     }, [total, totalPaid]);
 
     const addPayment = () => {
+        if (disabled) return;
+
         const newPayment: PaymentDraft = {
             _id: `payment-${Date.now()}`,
             amount: remaining > 0 ? remaining.toFixed(2) : '0.00',
@@ -44,10 +47,12 @@ export default function PaymentsSection({ payments, setPayments, total }: Paymen
     };
 
     const updatePayment = (id: string, updatedFields: Partial<PaymentDraft>) => {
+        if (disabled) return;
         setPayments(payments.map(p => p._id === id ? { ...p, ...updatedFields } : p));
     };
 
     const removePayment = (id: string) => {
+        if (disabled) return;
         setPayments(payments.filter(p => p._id !== id));
     };
 
@@ -72,6 +77,7 @@ export default function PaymentsSection({ payments, setPayments, total }: Paymen
                                 value={p.amount}
                                 onChange={e => updatePayment(p._id, { amount: e.target.value })}
                                 className="input input-bordered input-sm"
+                                disabled={disabled}
                             />
                         </div>
                         <div className="form-control">
@@ -80,6 +86,7 @@ export default function PaymentsSection({ payments, setPayments, total }: Paymen
                                 value={p.method}
                                 onChange={e => updatePayment(p._id, { method: e.target.value as PaymentMethod })}
                                 className="select select-bordered select-sm"
+                                disabled={disabled}
                             >
                                 {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
                             </select>
@@ -90,19 +97,28 @@ export default function PaymentsSection({ payments, setPayments, total }: Paymen
                                 value={p.currency}
                                 onChange={e => updatePayment(p._id, { currency: e.target.value as Currency })}
                                 className="select select-bordered select-sm"
+                                disabled={disabled}
                             >
                                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
                         <div className="flex items-end gap-1">
                             {/* Optional: Add note field later */}
-                            <button onClick={() => removePayment(p._id)} className="btn btn-ghost btn-sm text-error">Quitar</button>
+                            <button
+                                onClick={() => removePayment(p._id)}
+                                className="btn btn-ghost btn-sm text-error"
+                                disabled={disabled}
+                            >
+                                Quitar
+                            </button>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <button onClick={addPayment} className="btn btn-outline btn-sm mt-4 w-full">+ Agregar Pago</button>
+            <button onClick={addPayment} className="btn btn-outline btn-sm mt-4 w-full" disabled={disabled}>
+                + Agregar Pago
+            </button>
         </div>
     );
 }
