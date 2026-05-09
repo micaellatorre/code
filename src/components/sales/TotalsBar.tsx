@@ -25,7 +25,7 @@ export default function TotalsBar({ items, payments }: TotalsBarProps) {
         const costOfInTotalItems = items
             .filter(it => it.kind === 'IN_TOTAL')
             .reduce((acc, it) => acc + (parseFloat(it.unitCost || '0') + parseFloat(it.extraCost || '0')) * it.units, 0);
-        
+
         // This is a simplification. A more robust calculation might be needed depending on business rules for other extra costs.
         const extraCosts = costOfInTotalItems;
 
@@ -37,7 +37,7 @@ export default function TotalsBar({ items, payments }: TotalsBarProps) {
         const profit = total - costTotal;
 
         const totalPaid = payments.reduce((acc, p) => acc + parseFloat(p.amount || '0'), 0);
-        
+
         const remaining = total - totalPaid;
 
         return {
@@ -72,18 +72,18 @@ export default function TotalsBar({ items, payments }: TotalsBarProps) {
                     <div className="divider my-1"></div>
                     {isAdmin ? (
                         <>
-                            <div className="flex justify-between">
-                                <span className="text-base-content/70">Costo Total</span>
-                                <span className="font-mono text-warning">-${totals.costTotal}</span>
-                            </div>
-                            <div className="flex justify-between font-semibold">
-                                <span className="text-success">Ganancia</span>
-                                <span className={`font-mono ${totals.profit.startsWith('-') ? 'text-error' : 'text-success'}`}>${totals.profit}</span>
-                            </div>
-                            <div className="divider my-1"></div>
+                    <div className="flex justify-between">
+                        <span className="text-base-content/70">Costo Total</span>
+                        <span className="font-mono text-warning">-${totals.costTotal}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                        <span className="text-success">Ganancia</span>
+                        <span className={`font-mono ${totals.profit.startsWith('-') ? 'text-error' : 'text-success'}`}>${totals.profit}</span>
+                    </div>
+                    <div className="divider my-1"></div>
                         </>
                     ) : null}
-                     <div className={`flex justify-between p-2 rounded-lg ${totals.remainingRaw < 0 ? 'bg-error/20' : 'bg-base-200'}`}>
+                    <div className={`flex justify-between p-2 rounded-lg ${totals.remainingRaw < 0 ? 'bg-error/20' : 'bg-base-200'}`}>
                         <span className="font-semibold">Restan por Pagar</span>
                         <span className={`font-mono font-bold ${totals.remainingRaw !== 0 ? 'text-warning' : 'text-success'}`}>${totals.remaining}</span>
                     </div>

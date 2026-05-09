@@ -7,6 +7,6 @@ interface EditSalePageProps {
 
 export default async function EditSalePage({ params }: EditSalePageProps) {
   const { id } = await params
-  await requireRolePage(['ADMIN'])
+  await requireRolePage(['ADMIN', 'VENDEDOR'])
   return <EditSaleForm id={id} />
 }

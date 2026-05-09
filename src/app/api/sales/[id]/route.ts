@@ -34,7 +34,7 @@ function toDecimal(v: unknown): Prisma.Decimal | null {
 }
 
 export async function GET(_: NextRequest, { params }: Ctx) {
-  const auth = await requireRoleApi(["ADMIN"])
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
 
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status })
@@ -70,7 +70,7 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const auth = await requireRoleApi(["ADMIN"])
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
 
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status })
