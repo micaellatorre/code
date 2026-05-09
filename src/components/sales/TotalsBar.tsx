@@ -2,6 +2,8 @@
 'use client';
 
 import type { SaleItemDraft, PaymentDraft } from '@/app/dashboard/sales/new/form';
+import type { Role } from '@/lib/auth/roles';
+import { useSession } from 'next-auth/react';
 import { useMemo } from 'react';
 
 interface TotalsBarProps {
@@ -10,6 +12,9 @@ interface TotalsBarProps {
 }
 
 export default function TotalsBar({ items, payments }: TotalsBarProps) {
+    const { data: session } = useSession();
+    const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
+    const isAdmin = activeRole === 'ADMIN';
 
     const totals = useMemo(() => {
         // TODO: Use big.js for precision to avoid floating point issues.
@@ -65,15 +70,19 @@ export default function TotalsBar({ items, payments }: TotalsBarProps) {
                         <span className="font-mono">${totals.total}</span>
                     </div>
                     <div className="divider my-1"></div>
-                    <div className="flex justify-between">
-                        <span className="text-base-content/70">Costo Total</span>
-                        <span className="font-mono text-warning">-${totals.costTotal}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                        <span className="text-success">Ganancia</span>
-                        <span className={`font-mono ${totals.profit.startsWith('-') ? 'text-error' : 'text-success'}`}>${totals.profit}</span>
-                    </div>
-                    <div className="divider my-1"></div>
+                    {isAdmin ? (
+                        <>
+                            <div className="flex justify-between">
+                                <span className="text-base-content/70">Costo Total</span>
+                                <span className="font-mono text-warning">-${totals.costTotal}</span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                                <span className="text-success">Ganancia</span>
+                                <span className={`font-mono ${totals.profit.startsWith('-') ? 'text-error' : 'text-success'}`}>${totals.profit}</span>
+                            </div>
+                            <div className="divider my-1"></div>
+                        </>
+                    ) : null}
                      <div className={`flex justify-between p-2 rounded-lg ${totals.remainingRaw < 0 ? 'bg-error/20' : 'bg-base-200'}`}>
                         <span className="font-semibold">Restan por Pagar</span>
                         <span className={`font-mono font-bold ${totals.remainingRaw !== 0 ? 'text-warning' : 'text-success'}`}>${totals.remaining}</span>
