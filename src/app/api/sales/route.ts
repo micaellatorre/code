@@ -2,14 +2,15 @@
 import prisma from "@/lib/prisma";
 import { requireRoleApi } from "@/lib/auth/auth";
 import { NextResponse } from "next/server";
-import { Prisma, SaleItemKind, ProductState } from "@prisma/client";
+import { Prisma, ProductState, SaleItemKind, SaleStatus } from "@prisma/client";
 
-// GET: lista de ventas con items, payments y buyer
+type SaleOperationType = "CONFIRM_SALE" | "RESERVE";
+
 export async function GET() {
-  const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "SOCIO"])
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "SOCIO"]);
 
   if (!auth.ok) {
-    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+    return Response.json({ error: "Unauthorized" }, { status: auth.status });
   }
 
   const sales = await prisma.sale.findMany({
@@ -21,6 +22,7 @@ export async function GET() {
     },
     orderBy: { date: "desc" },
   });
+
   return NextResponse.json(sales);
 }
 
@@ -41,6 +43,7 @@ interface PaymentInput {
 }
 
 interface SaleInputBody {
+  operationType?: SaleOperationType;
   date?: string;
   buyerId?: string;
   customerName?: string;
@@ -54,12 +57,29 @@ interface ApiError extends Error {
   statusCode?: number;
 }
 
-// POST: crea una venta y sus items/pagos; descuenta stock y controla estado
+function apiError(message: string, statusCode = 400): ApiError {
+  const err = new Error(message) as ApiError;
+  err.statusCode = statusCode;
+  return err;
+}
+
+function decimal(value: number | string | Prisma.Decimal | null | undefined) {
+  return new Prisma.Decimal(value ?? 0);
+}
+
+function isAllowedToConfirmSale(state: ProductState) {
+  return state === "EN_STOCK" || state === "DISPONIBLE";
+}
+
+function isAllowedToReserve(state: ProductState) {
+  return state === "EN_STOCK" || state === "EN_CAMINO";
+}
+
 export async function POST(request: Request) {
-  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
+  const auth = await requireRoleApi(["ADMIN", "VENDEDOR"]);
 
   if (!auth.ok) {
-    return Response.json({ error: "Unauthorized" }, { status: auth.status })
+    return Response.json({ error: "Unauthorized" }, { status: auth.status });
   }
 
   let body: SaleInputBody;
@@ -69,18 +89,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { date, buyerId, customerName, origin, notes, items, payments } = body;
+  const {
+    operationType = "CONFIRM_SALE",
+    date,
+    buyerId,
+    customerName,
+    origin,
+    notes,
+    items,
+    payments,
+  } = body;
+
+  if (!["CONFIRM_SALE", "RESERVE"].includes(operationType)) {
+    return NextResponse.json({ error: "Tipo de operación inválido." }, { status: 400 });
+  }
 
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json(
-      { error: "La venta debe tener al menos 1 item." },
-      { status: 400 }
+      { error: "La operación debe tener al menos 1 item." },
+      { status: 400 },
     );
   }
+
   if (!Array.isArray(payments) || payments.length === 0) {
     return NextResponse.json(
-      { error: "La venta debe incluir el total de pagos declarados." },
-      { status: 400 }
+      { error: "La operación debe incluir al menos un pago." },
+      { status: 400 },
     );
   }
 
@@ -90,25 +124,19 @@ export async function POST(request: Request) {
     const txResult = await prisma.$transaction(
       async (tx) => {
         const tenantId = process.env.DEFAULT_TENANT_ID as string | undefined;
-        if (!tenantId) {
-          const err = new Error("DEFAULT_TENANT_ID no configurado") as ApiError;
-          err.statusCode = 500;
-          throw err;
-        }
-        const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });
-        if (!tenant) {
-          const err = new Error("Tenant no encontrado") as ApiError;
-          err.statusCode = 500;
-          throw err;
-        }
+        if (!tenantId) throw apiError("DEFAULT_TENANT_ID no configurado", 500);
 
-        // Productos necesarios para validar y calcular
+        const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });
+        if (!tenant) throw apiError("Tenant no encontrado", 500);
+
         const productIds = items.map((it) => String(it.productId));
         const products = await tx.product.findMany({
-          where: { id: { in: productIds } },
+          where: { id: { in: productIds }, tenantId: tenant.id },
           select: {
             id: true,
             modelName: true,
+            type: true,
+            imei: true,
             stock: true,
             stockAvailable: true,
             costPrice: true,
@@ -116,9 +144,9 @@ export async function POST(request: Request) {
             senado: true,
           },
         });
+
         const productMap = new Map(products.map((p) => [p.id, p]));
 
-        // Cálculo de totales con Decimal (autoridad servidor)
         let subtotal = new Prisma.Decimal(0);
         let costTotal = new Prisma.Decimal(0);
         let extraCosts = new Prisma.Decimal(0);
@@ -126,44 +154,39 @@ export async function POST(request: Request) {
         for (const raw of items) {
           const prod = productMap.get(String(raw.productId));
           if (!prod) {
-            const err = new Error(
-              `No se encontró el producto ${raw.productId}`
-            ) as ApiError;
-            err.statusCode = 400;
-            throw err;
+            throw apiError(`No se encontró el producto ${raw.productId}`, 400);
           }
 
           if (prod.senado) {
-            const err = new Error(
-              `${prod.modelName} está señado y no puede venderse hasta liberar la seña.`
-            ) as ApiError;
-            err.statusCode = 409;
-            throw err;
+            throw apiError("El producto ya está señado.", 409);
           }
 
-          if (!["EN_STOCK", "DISPONIBLE"].includes(prod.state)) {
-            const err = new Error(
-              `${prod.modelName} no está disponible para venta. Estado actual: ${prod.state}`
-            ) as ApiError;
-            err.statusCode = 409;
-            throw err;
+          if (operationType === "CONFIRM_SALE" && !isAllowedToConfirmSale(prod.state)) {
+            throw apiError("Solo se pueden vender productos en stock.", 409);
           }
 
-          // Stock
-          if (prod.stockAvailable < raw.units) {
-            const err = new Error(
-              `Stock insuficiente para ${prod.modelName}. Disponible: ${prod.stockAvailable}, solicitado: ${raw.units}`
-            ) as ApiError;
-            err.statusCode = 409;
-            throw err;
+          if (operationType === "RESERVE" && !isAllowedToReserve(prod.state)) {
+            throw apiError("Solo se pueden señar productos en stock o en camino.", 409);
           }
 
-          const units = new Prisma.Decimal(raw.units);
-          const unitPrice = new Prisma.Decimal(raw.unitPrice);
-          const unitCost = new Prisma.Decimal(prod.costPrice); // costo autoridad DB
-          const extra = new Prisma.Decimal(raw.extraCost || 0);
+          const unitsNum = Number(raw.units);
+          if (!Number.isInteger(unitsNum) || unitsNum < 1) {
+            throw apiError(`Cantidad inválida para ${prod.modelName}.`, 400);
+          }
 
+          if (prod.stockAvailable < unitsNum) {
+            throw apiError(
+              `Stock insuficiente para ${prod.modelName}. Disponible: ${prod.stockAvailable}, solicitado: ${unitsNum}`,
+              409,
+            );
+          }
+
+          const units = new Prisma.Decimal(unitsNum);
+          const unitPrice = decimal(raw.unitPrice);
+          const unitCost = decimal(prod.costPrice);
+          const extra = decimal(raw.extraCost);
           const lineCost = units.mul(unitCost.add(extra));
+
           costTotal = costTotal.add(lineCost);
 
           if (raw.kind === "NORMAL") {
@@ -175,25 +198,34 @@ export async function POST(request: Request) {
 
         const total = subtotal.add(extraCosts);
         const profit = total.sub(costTotal);
-
-        // Validación de pagos
         const totalPaid = payments.reduce(
-          (acc, p) => acc.add(new Prisma.Decimal(p.amount)),
-          new Prisma.Decimal(0)
+          (acc, p) => acc.add(decimal(p.amount)),
+          new Prisma.Decimal(0),
         );
-        if (!totalPaid.equals(total)) {
-          const err = new Error(
-            `El total de pagos (${totalPaid}) no coincide con el total de la venta (${total})`
-          ) as ApiError;
-          err.statusCode = 400;
-          throw err;
+
+        if (operationType === "CONFIRM_SALE" && !totalPaid.equals(total)) {
+          throw apiError(
+            `El total de pagos (${totalPaid.toFixed(2)}) no coincide con el total de la venta (${total.toFixed(2)}).`,
+            400,
+          );
         }
 
-        // Crear Sale + Payments
+        if (operationType === "RESERVE") {
+          if (totalPaid.lessThanOrEqualTo(0)) {
+            throw apiError("La seña debe tener al menos un pago mayor a 0.", 400);
+          }
+
+          if (totalPaid.greaterThan(total)) {
+            throw apiError("La seña no puede superar el total de la venta.", 400);
+          }
+        }
+
+        const saleStatus: SaleStatus = operationType === "RESERVE" ? "SENADA" : "CONFIRMADA";
+        const balanceDue = total.sub(totalPaid);
         const paymentsData = payments.map((p) => ({
-          method: p.method as any, // Cast necessary if method is string but Enum type required
+          method: p.method as any,
           currency: p.currency as any,
-          amount: new Prisma.Decimal(p.amount),
+          amount: decimal(p.amount),
           note: p.note,
           paidAt: p.paidAt ? new Date(p.paidAt) : new Date(),
         }));
@@ -207,32 +239,32 @@ export async function POST(request: Request) {
             customerName: buyerId ? undefined : customerName || "Consumidor Final",
             origin: origin || null,
             notes: notes || null,
+            status: saleStatus,
+            amountPaid: totalPaid,
+            balanceDue,
             subtotal,
             extraCosts,
             costTotal,
             total,
             profit,
-            payments: {
-              create: paymentsData,
-            },
+            payments: { create: paymentsData },
           },
           select: { id: true },
         });
 
-        // SaleItems + actualización de productos
         for (const raw of items) {
           const prod = productMap.get(String(raw.productId))!;
           const unitsNum = Number(raw.units);
           const unitsDec = new Prisma.Decimal(unitsNum);
-
-          const unitPrice = new Prisma.Decimal(raw.unitPrice);
-          const unitCost = new Prisma.Decimal(prod.costPrice);
-          const extra = new Prisma.Decimal(raw.extraCost || 0);
+          const unitPrice = decimal(raw.unitPrice);
+          const unitCost = decimal(prod.costPrice);
+          const extra = decimal(raw.extraCost);
 
           let lineTotal = new Prisma.Decimal(0);
           if (raw.kind === "NORMAL") {
             lineTotal = unitPrice.mul(unitsDec);
           }
+
           const lineCost = unitCost.add(extra).mul(unitsDec);
           const lineProfit = lineTotal.sub(lineCost);
 
@@ -251,20 +283,31 @@ export async function POST(request: Request) {
             },
           });
 
-          // Descontar stock y leer stock resultante
+          if (operationType === "RESERVE") {
+            await tx.product.update({
+              where: { id: prod.id },
+              data: {
+                senado: true,
+                senadoAt: new Date(),
+                state: "RESERVADO",
+              },
+            });
+
+            continue;
+          }
+
           const updated = await tx.product.update({
             where: { id: prod.id },
             data: {
               stock: { decrement: unitsNum },
               stockAvailable: { decrement: unitsNum },
             },
-            select: { id: true, modelName: true, stock: true, state: true },
+            select: { id: true, modelName: true, stock: true, stockAvailable: true, state: true },
           });
 
-          // Cambiar estado según stock resultante
           let nextState: ProductState | null = null;
-          if (updated.stock < 1 && updated.state !== "FUERA_DE_STOCK") {
-            nextState = "FUERA_DE_STOCK";
+          if (updated.stock < 1) {
+            nextState = prod.type === "PHONE" ? "VENDIDO" : "FUERA_DE_STOCK";
           } else if (updated.stock >= 1 && updated.state === "FUERA_DE_STOCK") {
             nextState = "EN_STOCK";
           }
@@ -276,19 +319,18 @@ export async function POST(request: Request) {
             });
           }
 
-          // Sync snapshot local para consistencia si hubiera más iteraciones
           prod.stock = updated.stock;
+          prod.stockAvailable = updated.stockAvailable;
           prod.state = nextState ?? updated.state;
         }
 
         return { saleId: sale.id };
       },
-      { timeout: 15000, maxWait: 5000 }
+      { timeout: 15000, maxWait: 5000 },
     );
 
     newSaleId = txResult.saleId;
 
-    // Lectura FUERA de la transacción
     const created = await prisma.sale.findUnique({
       where: { id: newSaleId },
       include: {
@@ -302,9 +344,12 @@ export async function POST(request: Request) {
     return NextResponse.json(created, { status: 201 });
   } catch (err: unknown) {
     const error = err as ApiError;
+    console.error("Error creating sale/reservation", error);
+
     if (error.statusCode) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
+
     return NextResponse.json({ error: "Error creating sale" }, { status: 500 });
   }
 }

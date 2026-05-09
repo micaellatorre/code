@@ -93,12 +93,22 @@ function apiToPrismaProduct(p: ApiProduct): Product {
 
 // selection stores Prisma Product now (to satisfy SaleItemDraft)
 type SelectionDraft = Omit<SaleItemDraft, '_id' | 'product'> & { product: Product }
+type StateFilter = 'EN_STOCK' | 'EN_CAMINO' | 'TODOS'
+
+function getStateBadgeClass(state: string) {
+  if (state === 'EN_STOCK' || state === 'DISPONIBLE') return 'badge-success'
+  if (state === 'EN_CAMINO') return 'badge-info'
+  if (state === 'RESERVADO') return 'badge-warning'
+  if (state === 'VENDIDO' || state === 'FUERA_DE_STOCK') return 'badge-error'
+  return 'badge-ghost'
+}
 
 export default function ProductSelectionModal({ existingItems, onClose, onAddItems }: ProductSelectionModalProps) {
   const [products, setProducts] = useState<ApiProduct[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<ProductType | 'ALL'>('ALL')
+  const [stateFilter, setStateFilter] = useState<StateFilter>('EN_STOCK')
   const [orderBy, setOrderBy] = useState<'alpha_asc' | 'alpha_desc' | 'created_desc' | 'created_asc' | 'updated_desc' | 'updated_asc'>('alpha_asc')
   const [selection, setSelection] = useState<Record<string, SelectionDraft>>({})
 
@@ -108,9 +118,9 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
 
   const requestSeq = useRef(0)
 
-  const buildUrl = (q: string, type: ProductType | 'ALL', cursor?: string | null) => {
+  const buildUrl = (q: string, type: ProductType | 'ALL', state: StateFilter, cursor?: string | null) => {
     const params = new URLSearchParams()
-    params.set('state', 'EN_STOCK')
+    params.set('state', state)
     params.set('senado', 'false')
     params.set('limit', String(LIMIT))
     if (q.trim()) params.set('q', q.trim())
@@ -120,12 +130,12 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     return `/api/products?${params.toString()}`
   }
 
-  const fetchProducts = useCallback(async (q: string, type: ProductType | 'ALL') => {
+  const fetchProducts = useCallback(async (q: string, type: ProductType | 'ALL', state: StateFilter) => {
     setIsLoading(true)
     const seq = ++requestSeq.current
 
     try {
-      const res = await fetch(buildUrl(q, type), { cache: 'no-store' })
+      const res = await fetch(buildUrl(q, type, state), { cache: 'no-store' })
       if (!res.ok) throw new Error(await res.text())
 
       const data: ApiResponse = await res.json()
@@ -150,7 +160,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     const seq = ++requestSeq.current
 
     try {
-      const res = await fetch(buildUrl(query, typeFilter, nextCursor), { cache: 'no-store' })
+      const res = await fetch(buildUrl(query, typeFilter, stateFilter, nextCursor), { cache: 'no-store' })
       if (!res.ok) throw new Error(await res.text())
 
       const data: ApiResponse = await res.json()
@@ -176,8 +186,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
 
   const debouncedFetch = useMemo(() => debounce(fetchProducts, 300), [fetchProducts])
   useEffect(() => {
-    debouncedFetch(query, typeFilter)
-  }, [query, typeFilter, orderBy, debouncedFetch])
+    debouncedFetch(query, typeFilter, stateFilter)
+  }, [query, typeFilter, stateFilter, orderBy, debouncedFetch])
 
   const availableStock = useMemo(() => {
     const stockMap = new Map<string, number>()
@@ -248,6 +258,11 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
             <button onClick={() => setTypeFilter('PHONE')} className={`btn btn-sm join-item ${typeFilter === 'PHONE' ? 'btn-active' : ''}`}>Teléfonos</button>
             <button onClick={() => setTypeFilter('ACCESSORY')} className={`btn btn-sm join-item ${typeFilter === 'ACCESSORY' ? 'btn-active' : ''}`}>Accesorios</button>
           </div>
+          <div className="join">
+            <button onClick={() => setStateFilter('EN_STOCK')} className={`btn btn-sm join-item ${stateFilter === 'EN_STOCK' ? 'btn-active' : ''}`}>En stock</button>
+            <button onClick={() => setStateFilter('EN_CAMINO')} className={`btn btn-sm join-item ${stateFilter === 'EN_CAMINO' ? 'btn-active' : ''}`}>En camino</button>
+            <button onClick={() => setStateFilter('TODOS')} className={`btn btn-sm join-item ${stateFilter === 'TODOS' ? 'btn-active' : ''}`}>Todos</button>
+          </div>
           <div className="flex flex-col items-start gap-1">
             <label className="text-xs font-medium text-base-content/60">Ordenar por</label>
             <select
@@ -276,6 +291,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                     <th></th>
                     <th>IMEI</th>
                     <th>Producto</th>
+                    <th>Estado</th>
                     <th>Stock Disp.</th>
                     <th>% Batería</th>
                     <th>Cantidad</th>
@@ -310,6 +326,11 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                           <div className="text-xs opacity-70">
                             {p.color || ''} {p.capacityGB ? `${p.capacityGB}GB` : ''}
                           </div>
+                        </td>
+                        <td>
+                          <span className={`badge badge-sm ${getStateBadgeClass(p.state)}`}>
+                            {p.state.replace(/_/g, ' ')}
+                          </span>
                         </td>
                         <td><span className="badge badge-ghost">{currentStock}</span></td>
                         <td>{p.batteryPct != null ? `${p.batteryPct}%` : 'N/A'}</td>

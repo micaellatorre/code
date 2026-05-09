@@ -14,6 +14,7 @@ const PRODUCT_STATES = [
   "CON_CLIENTE",
   "DISPONIBLE",
   "FUERA_DE_STOCK",
+  "RESERVADO",
   "VENDIDO",
 ] as const
 
@@ -114,7 +115,7 @@ export async function GET(request: Request) {
     if (sellableParam === "true") {
       where.state = { in: SELLABLE_STATES as unknown as string[] } as any
       where.senado = false
-    } else if (stateParam && PRODUCT_STATES.includes(stateParam as any)) {
+    } else if (stateParam && stateParam !== "TODOS" && PRODUCT_STATES.includes(stateParam as any)) {
       where.state = stateParam as any
     }
     if (senadoParam === "true") where.senado = true

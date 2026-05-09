@@ -59,6 +59,9 @@ export default async function SalesPage() {
     // por compat: primer método si existe, pero la UI nueva usa payments aparte
     payment: s.payments.length > 0 ? s.payments[0].method : null,
     notes: s.notes,
+    status: s.status,
+    amountPaid: toStr(s.amountPaid),
+    balanceDue: toStr(s.balanceDue),
     subtotal: toStr(s.subtotal),
     extraCosts: toStr(s.extraCosts),
     total: toStr(s.total),

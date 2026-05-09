@@ -28,6 +28,9 @@ type SerializedSale = {
   payment: string | null;
   notes: string | null;
   items?: any[];
+  status: string | null;
+  amountPaid: string | null;
+  balanceDue: string | null;
   subtotal: string | null;
   extraCosts: string | null;
   total: string | null;
@@ -74,6 +77,9 @@ function normalizeSales(input: any[]): SerializedSale[] {
   return (Array.isArray(input) ? input : []).map((s) => ({
     ...s,
     date: s?.date ?? null,
+    status: s?.status ?? "CONFIRMADA",
+    amountPaid: toStr(s?.amountPaid),
+    balanceDue: toStr(s?.balanceDue),
     subtotal: toStr(s?.subtotal),
     extraCosts: toStr(s?.extraCosts),
     total: toStr(s?.total),
@@ -1018,8 +1024,11 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                 <th>Cliente</th>
                 <th>Modelo</th>
                 <th>Items</th>
+                <th>Estado</th>
                 {canSeeCosts ? <th>Costo</th> : null}
                 {canSeeTotal ? <th>Total</th> : null}
+                {canSeeTotal ? <th>Pagado</th> : null}
+                {canSeeTotal ? <th>Pendiente</th> : null}
                 {canSeeProfit ? <th>Ganancia</th> : null}
                 <th>Origen</th>
                 {hasSaleActions ? <th>Acciones</th> : null}
@@ -1272,6 +1281,20 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                       )}
                     </td>
 
+                    <td>
+                      <span
+                        className={`badge badge-sm ${
+                          s.status === "SENADA"
+                            ? "badge-warning"
+                            : s.status === "CANCELADA"
+                              ? "badge-error"
+                              : "badge-success"
+                        }`}
+                      >
+                        {s.status ?? "CONFIRMADA"}
+                      </span>
+                    </td>
+
                     {/* Costo */}
                     {canSeeCosts ? (
                       <td>
@@ -1342,6 +1365,14 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                     ) : null}
 
                     {/* Ganancia (editable decimal) */}
+                    {canSeeTotal ? (
+                      <td>$ {s.amountPaid ? Number(s.amountPaid).toFixed(2) : "0.00"}</td>
+                    ) : null}
+
+                    {canSeeTotal ? (
+                      <td>$ {s.balanceDue ? Number(s.balanceDue).toFixed(2) : "0.00"}</td>
+                    ) : null}
+
                     {canSeeProfit ? (
                       <td>
                         {canEditField("profit") && isEditing(s.id, "profit") ? (

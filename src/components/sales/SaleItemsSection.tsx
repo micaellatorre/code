@@ -11,6 +11,14 @@ interface SaleItemsSectionProps {
     setItems: (items: SaleItemDraft[]) => void;
 }
 
+function getStateBadgeClass(state: string) {
+    if (state === 'EN_STOCK' || state === 'DISPONIBLE') return 'badge-success';
+    if (state === 'EN_CAMINO') return 'badge-info';
+    if (state === 'RESERVADO') return 'badge-warning';
+    if (state === 'VENDIDO' || state === 'FUERA_DE_STOCK') return 'badge-error';
+    return 'badge-ghost';
+}
+
 export default function SaleItemsSection({ items, setItems }: SaleItemsSectionProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -22,7 +30,7 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
                 // If item exists, just update units
                 const existingItem = updatedItems[existingIndex];
                 const newUnits = existingItem.units + newItem.units;
-                const stock = existingItem.product.stock;
+                const stock = existingItem.product.stockAvailable ?? existingItem.product.stock;
                 updatedItems[existingIndex] = { ...existingItem, units: Math.min(newUnits, stock) };
             } else {
                 // Otherwise, add the new item
@@ -57,9 +65,9 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
                         <table className="table w-full">
                             <thead>
                                 <tr>
-                                    <th></th>
                                     <th>IMEI</th>
                                     <th>Producto</th>
+                                    <th>Estado</th>
                                     <th>Cantidad</th>
                                     <th>Precio Unit.</th>
                                     <th>Tipo</th>
@@ -73,13 +81,18 @@ export default function SaleItemsSection({ items, setItems }: SaleItemsSectionPr
                                         <td>{item.product.imei ? item.product.imei.slice(-4) : 'N/A'}</td>
                                         <td>{item.product.modelName}</td>
                                         <td>
+                                            <span className={`badge badge-sm ${getStateBadgeClass(String(item.product.state))}`}>
+                                                {String(item.product.state).replace(/_/g, ' ')}
+                                            </span>
+                                        </td>
+                                        <td>
                                             <input 
                                                 type="number"
                                                 value={item.units}
                                                 onChange={(e) => handleUpdateItem(item._id, { units: parseInt(e.target.value) || 1 })}
                                                 className="input input-bordered input-sm w-20"
                                                 min={1}
-                                                max={item.product.stock} // Simple stock validation
+                                                max={item.product.stockAvailable ?? item.product.stock}
                                             />
                                         </td>
                                         <td>
