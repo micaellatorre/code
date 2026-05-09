@@ -128,9 +128,9 @@ export default function FilterableProductsTable() {
   const canSeeCosts = isAdmin
   const canSeeSalePrice = isAdmin || isSeller || isSocio
   const canCreateProducts = isAdmin || isStock || isSeller
-  const canEditProducts = isAdmin || isStock || isSeller
+  const canEditProducts = isAdmin || isStock
   const canDuplicateProducts = isAdmin
-  const canDeleteProducts = isAdmin || isStock || isSeller
+  const canDeleteProducts = isAdmin || isStock
   const canEditStock = isAdmin || isStock
   const canEditState = isAdmin || isStock
   const isReadOnly = !canEditProducts
