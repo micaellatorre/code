@@ -7,6 +7,6 @@ interface EditProductPageProps {
 
 export default async function EditProductPage({ params }: EditProductPageProps) {
   const { id } = await params
-  await requireRolePage(['ADMIN', 'STOCK'])
+  await requireRolePage(['ADMIN', 'STOCK', 'VENDEDOR'])
   return <EditProductForm id={id} />
 }

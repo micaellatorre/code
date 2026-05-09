@@ -127,10 +127,10 @@ export default function FilterableProductsTable() {
   const isSocio = activeRole === "SOCIO"
   const canSeeCosts = isAdmin
   const canSeeSalePrice = isAdmin || isSeller || isSocio
-  const canCreateProducts = isAdmin || isStock
-  const canEditProducts = isAdmin || isStock
+  const canCreateProducts = isAdmin || isStock || isSeller
+  const canEditProducts = isAdmin || isStock || isSeller
   const canDuplicateProducts = isAdmin
-  const canDeleteProducts = isAdmin
+  const canDeleteProducts = isAdmin || isStock || isSeller
   const canEditStock = isAdmin || isStock
   const canEditState = isAdmin || isStock
   const isReadOnly = !canEditProducts

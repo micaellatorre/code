@@ -196,7 +196,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireRoleApi(["ADMIN", "STOCK"])
+  const auth = await requireRoleApi(["ADMIN", "STOCK", "VENDEDOR"])
 
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status })

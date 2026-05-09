@@ -4,6 +4,6 @@ import NewProductForm from './form'
 export const dynamic = 'force-dynamic'
 
 export default async function NewProductPage() {
-  await requireRolePage(['ADMIN', 'STOCK'])
+  await requireRolePage(['ADMIN', 'STOCK', 'VENDEDOR'])
   return <NewProductForm />
 }
