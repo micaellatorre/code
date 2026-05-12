@@ -6,8 +6,22 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import DashboardLayout from "@/components/DashboardLayout";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency, SaleStatus } from "@prisma/client";
+import type {
+  Buyer,
+  Product,
+  SaleItemKind,
+  PaymentMethod,
+  Currency,
+  SaleStatus,
+} from "@prisma/client";
 import type { Role } from "@/lib/auth/roles";
+
+import BuyerSection from "@/components/sales/BuyerSection";
+import SaleMetaSection from "@/components/sales/SaleMetaSection";
+import SaleItemsSection from "@/components/sales/SaleItemsSection";
+import PaymentsSection from "@/components/sales/PaymentsSection";
+import TotalsBar from "@/components/sales/TotalsBar";
+import SubmitBar from "@/components/sales/SubmitBar";
 
 export type SaleItemDraft = {
   productId: string;
@@ -36,51 +50,109 @@ export type SaleMeta = {
   notes?: string;
 };
 
-import BuyerSection from "@/components/sales/BuyerSection";
-import SaleMetaSection from "@/components/sales/SaleMetaSection";
-import SaleItemsSection from "@/components/sales/SaleItemsSection";
-import PaymentsSection from "@/components/sales/PaymentsSection";
-import TotalsBar from "@/components/sales/TotalsBar";
-import SubmitBar from "@/components/sales/SubmitBar";
-
 interface EditSaleFormProps {
-  id: string
+  id: string;
+}
+
+async function readApiError(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    const data = await res.json().catch(() => null);
+
+    if (data?.error) {
+      return String(data.error);
+    }
+
+    if (data?.message) {
+      return String(data.message);
+    }
+
+    return JSON.stringify(data);
+  }
+
+  const text = await res.text().catch(() => "");
+  return text || "Error inesperado.";
+}
+
+function getStatusBadgeClass(status: SaleStatus) {
+  if (status === "SENADA") return "badge-warning";
+  if (status === "CONFIRMADA") return "badge-success";
+  if (status === "CANCELADA") return "badge-error";
+  return "badge-neutral";
+}
+
+function parseResponseBody(text: string, contentType: string) {
+  if (!text) return null;
+  if (!contentType.includes("application/json")) return text;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function responseErrorMessage(body: unknown) {
+  if (body && typeof body === "object" && "error" in body) {
+    return String((body as { error?: unknown }).error || "Error inesperado.");
+  }
+
+  if (body && typeof body === "object" && "message" in body) {
+    return String((body as { message?: unknown }).message || "Error inesperado.");
+  }
+
+  return typeof body === "string" && body.trim() ? body : "Error inesperado.";
 }
 
 export default function EditSaleForm({ id }: EditSaleFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
+
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
 
   const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
-  const [meta, setMeta] = useState<SaleMeta>({ date: new Date(), origin: "Instagram" });
+  const [meta, setMeta] = useState<SaleMeta>({
+    date: new Date(),
+    origin: "Instagram",
+  });
   const [items, setItems] = useState<SaleItemDraft[]>([]);
   const [payments, setPayments] = useState<PaymentDraft[]>([]);
   const [saleStatus, setSaleStatus] = useState<SaleStatus>("CONFIRMADA");
+
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+
   const saleIsLocked = saleStatus === "CONFIRMADA" && activeRole !== "ADMIN";
+  const canChangeStatus = activeRole === "ADMIN" || saleStatus === "SENADA";
 
   const totals = useMemo(() => {
     const subtotal = items
       .filter((it) => it.kind === "NORMAL")
-      .reduce((acc, it) => acc + (parseFloat(it.unitPrice || "0") || 0) * it.units, 0);
+      .reduce((acc, it) => {
+        const unitPrice = parseFloat(it.unitPrice || "0") || 0;
+        return acc + unitPrice * it.units;
+      }, 0);
 
     const extraCosts = items
       .filter((it) => it.kind === "IN_TOTAL")
-      .reduce(
-        (acc, it) =>
-          acc +
-          ((parseFloat(it.unitCost || "0") || 0) + (parseFloat(it.extraCost || "0") || 0)) *
-            it.units,
-        0
-      );
+      .reduce((acc, it) => {
+        const unitCost = parseFloat(it.unitCost || "0") || 0;
+        const extraCost = parseFloat(it.extraCost || "0") || 0;
+        return acc + (unitCost + extraCost) * it.units;
+      }, 0);
 
     const total = subtotal + extraCosts;
-    const totalPaid = payments.reduce((acc, p) => acc + (parseFloat(p.amount || "0") || 0), 0);
+
+    const totalPaid = payments.reduce((acc, p) => {
+      const amount = parseFloat(p.amount || "0") || 0;
+      return acc + amount;
+    }, 0);
 
     return {
+      subtotal: subtotal.toFixed(2),
+      extraCosts: extraCosts.toFixed(2),
       total: total.toFixed(2),
       totalPaid: totalPaid.toFixed(2),
       remaining: (total - totalPaid).toFixed(2),
@@ -89,59 +161,86 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    async function loadSale() {
       setLoading(true);
       setError(null);
+
       try {
-        const res = await fetch(`/api/sales/${id}`, { cache: "no-store" });
+        const res = await fetch(`/api/sales/${id}`, {
+          cache: "no-store",
+        });
+
         if (!res.ok) {
-          const m = await res.text();
-          throw new Error(m || "No se pudo cargar la venta.");
+          throw new Error(await readApiError(res));
         }
+
         const data = await res.json();
-
         const sale = data.sale;
-        if (mounted) setSaleStatus(sale?.status ?? "CONFIRMADA");
 
-        const buyer: Buyer | null = sale?.buyer ?? null;
-        if (mounted) setSelectedBuyer(buyer);
+        if (!sale) {
+          throw new Error("No se encontró la venta.");
+        }
 
-        const date = sale?.date ? new Date(sale.date) : new Date();
-        const origin = sale?.origin ?? "Instagram";
-        const notes = sale?.notes ?? undefined;
-        if (mounted) setMeta({ date, origin, notes });
+        if (!mounted) return;
 
-        const itemDrafts: SaleItemDraft[] = Array.isArray(sale?.items)
+        setSaleStatus(sale.status ?? "CONFIRMADA");
+
+        const buyer: Buyer | null = sale.buyer ?? null;
+        setSelectedBuyer(buyer);
+
+        const date = sale.date ? new Date(sale.date) : new Date();
+        const origin = sale.origin ?? "Instagram";
+        const notes = sale.notes ?? undefined;
+
+        setMeta({
+          date,
+          origin,
+          notes,
+        });
+
+        const itemDrafts: SaleItemDraft[] = Array.isArray(sale.items)
           ? sale.items.map((it: any) => ({
-              productId: it.productId,
+              productId: String(it.productId),
               product: it.product,
-              units: it.units,
-              unitPrice: String(it.unitPrice),
-              unitCost: String(it.unitCost),
-              extraCost: String(it.extraCost),
-              kind: it.kind,
-              _id: it.id,
+              units: Number(it.units || 1),
+              unitPrice: it.unitPrice != null ? String(it.unitPrice) : "0",
+              unitCost: it.unitCost != null ? String(it.unitCost) : "0",
+              extraCost: it.extraCost != null ? String(it.extraCost) : "0",
+              kind: it.kind as SaleItemKind,
+              _id: String(it.id ?? `${it.productId}-${crypto.randomUUID()}`),
             }))
           : [];
-        if (mounted) setItems(itemDrafts);
 
-        const paymentDrafts: PaymentDraft[] = Array.isArray(sale?.payments)
+        setItems(itemDrafts);
+
+        const paymentDrafts: PaymentDraft[] = Array.isArray(sale.payments)
           ? sale.payments.map((p: any) => ({
-              method: p.method,
-              currency: p.currency,
-              amount: String(p.amount),
+              method: p.method as PaymentMethod,
+              currency: p.currency as Currency,
+              amount: p.amount != null ? String(p.amount) : "0",
               note: p.note ?? undefined,
               paidAt: p.paidAt ? new Date(p.paidAt) : undefined,
-              _id: p.id,
+              _id: String(p.id ?? crypto.randomUUID()),
             }))
           : [];
-        if (mounted) setPayments(paymentDrafts);
-      } catch (e: any) {
-        if (mounted) setError(e?.message || "Error cargando la venta.");
+
+        setPayments(paymentDrafts);
+      } catch (e: unknown) {
+        const error = e as Error;
+
+        if (mounted) {
+          setError(error?.message || "Error cargando la venta.");
+        }
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    })();
+    }
+
+    loadSale();
+
     return () => {
       mounted = false;
     };
@@ -153,66 +252,64 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
       return;
     }
 
+    if (items.length === 0 && saleStatus !== "CANCELADA") {
+      setError("La venta debe tener al menos un producto.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const r1 = await fetch(`/api/sales/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buyerId: selectedBuyer?.id ?? null }),
-      });
-      if (!r1.ok) throw new Error(await r1.text());
+      const originToSend =
+        meta.origin === "Otro" ? meta.customOrigin?.trim() : meta.origin?.trim();
 
-      const r2 = await fetch(`/api/sales/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: meta.date.toISOString() }),
-      });
-      if (!r2.ok) throw new Error(await r2.text());
+      const payload = {
+        buyerId: selectedBuyer?.id ?? null,
+        date: meta.date instanceof Date ? meta.date.toISOString() : new Date(meta.date).toISOString(),
+        origin: originToSend || null,
+        notes: meta.notes?.trim() || null,
+        status: saleStatus,
+        items: items.map((it) => ({
+          productId: it.productId,
+          units: Number(it.units || 1),
+          unitPrice: it.unitPrice || "0",
+          unitCost: it.unitCost || "0",
+          extraCost: it.extraCost || "0",
+          kind: it.kind,
+        })),
+        payments: payments.map((p) => ({
+          method: p.method,
+          currency: p.currency,
+          amount: p.amount || "0",
+          note: p.note?.trim() || null,
+          paidAt: p.paidAt ? p.paidAt.toISOString() : undefined,
+        })),
+      };
 
-      const originToSend = meta.origin === "Otro" ? meta.customOrigin : meta.origin;
-      const r3 = await fetch(`/api/sales/${id}`, {
+      const res = await fetch(`/api/sales/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ origin: originToSend ?? null, notes: meta.notes ?? null }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       });
-      if (!r3.ok) throw new Error(await r3.text());
 
-      const rItems = await fetch(`/api/sales/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((it) => ({
-            productId: it.productId,
-            units: it.units,
-            unitPrice: it.unitPrice,
-            unitCost: it.unitCost,
-            extraCost: it.extraCost,
-            kind: it.kind,
-          })),
-        }),
-      });
-      if (!rItems.ok) throw new Error(await rItems.text());
+      const responseText = await res.text();
+      const responseBody = parseResponseBody(
+        responseText,
+        res.headers.get("content-type") || "",
+      );
 
-      const r4 = await fetch(`/api/sales/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          payments: payments.map((p) => ({
-            method: p.method,
-            currency: p.currency,
-            amount: p.amount,
-            note: p.note,
-            paidAt: p.paidAt?.toISOString(),
-          })),
-        }),
-      });
-      if (!r4.ok) throw new Error(await r4.text());
+      if (!res.ok) {
+        throw new Error(responseErrorMessage(responseBody));
+      }
 
+      router.refresh();
       router.push("/dashboard/sales");
-    } catch (e: any) {
-      setError(e?.message || "No se pudo guardar la venta.");
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error?.message || "No se pudo guardar la venta.");
     } finally {
       setIsSubmitting(false);
     }
@@ -220,14 +317,14 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
   if (loading) {
     return (
-      <DashboardLayout >
+      <DashboardLayout>
         <div className="p-6">Cargando venta…</div>
       </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout >
+    <DashboardLayout>
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
@@ -238,13 +335,24 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} disabled={saleIsLocked} />
-          <SaleMetaSection meta={meta} setMeta={setMeta} disabled={saleIsLocked} />
+          <BuyerSection
+            selectedBuyer={selectedBuyer}
+            setSelectedBuyer={setSelectedBuyer}
+            disabled={saleIsLocked}
+          />
+
+          <SaleMetaSection
+            meta={meta}
+            setMeta={setMeta}
+            disabled={saleIsLocked}
+          />
+
           <SaleItemsSection
             items={items}
             setItems={setItems}
             disabled={saleIsLocked}
           />
+
           <PaymentsSection
             payments={payments}
             setPayments={setPayments}
@@ -255,32 +363,87 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
         <div className="lg:col-span-1">
           <div className="sticky top-4 flex flex-col gap-6">
-            <div className="card bg-base-100 border border-base-content/50 p-4">
+            <div className="card bg-base-100 border border-base-content/20 p-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-base-content/70">Estado</span>
-                <span className={`badge ${saleStatus === "SENADA" ? "badge-warning" : "badge-success"}`}>
+
+                <span className={`badge ${getStatusBadgeClass(saleStatus)}`}>
                   {saleStatus}
                 </span>
               </div>
-              <div className="divider my-2"></div>
+
+              <div className="divider my-2" />
+
+              <label className="form-control w-full">
+                <div className="label">
+                  <span className="label-text">Cambiar estado</span>
+                </div>
+
+                <select
+                  className="select select-bordered w-full"
+                  value={saleStatus}
+                  disabled={!canChangeStatus || saleIsLocked || isSubmitting}
+                  onChange={(e) => setSaleStatus(e.target.value as SaleStatus)}
+                >
+                  <option value="SENADA">SENADA</option>
+                  <option value="CONFIRMADA">CONFIRMADA</option>
+                  {activeRole === "ADMIN" && (
+                    <option value="CANCELADA">CANCELADA</option>
+                  )}
+                </select>
+
+                {saleStatus === "SENADA" && (
+                  <div className="label">
+                    <span className="label-text-alt text-warning">
+                      Al guardar como CONFIRMADA se descuenta stock y se actualizan los estados de productos.
+                    </span>
+                  </div>
+                )}
+
+                {saleIsLocked && (
+                  <div className="label">
+                    <span className="label-text-alt text-error">
+                      Esta venta confirmada solo puede editarla un ADMIN.
+                    </span>
+                  </div>
+                )}
+              </label>
+
+              <div className="divider my-2" />
+
               <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-base-content/60">Subtotal</div>
+                  <div className="font-mono font-semibold">$ {totals.subtotal}</div>
+                </div>
+
+                <div>
+                  <div className="text-base-content/60">Extras</div>
+                  <div className="font-mono font-semibold">$ {totals.extraCosts}</div>
+                </div>
+
                 <div>
                   <div className="text-base-content/60">Pagado</div>
                   <div className="font-mono font-semibold">$ {totals.totalPaid}</div>
                 </div>
+
                 <div>
                   <div className="text-base-content/60">Pendiente</div>
                   <div className="font-mono font-semibold">$ {totals.remaining}</div>
                 </div>
               </div>
             </div>
+
             <TotalsBar items={items} payments={payments} />
+
             <SubmitBar
               disabled={isSubmitting || saleIsLocked}
               error={error}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
-              submitLabel="Guardar cambios"
+              submitLabel={
+                saleStatus === "CONFIRMADA" ? "Guardar y confirmar" : "Guardar cambios"
+              }
               submittingLabel="Guardando cambios..."
             />
           </div>

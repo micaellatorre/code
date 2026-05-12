@@ -81,7 +81,11 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                 </tr>
                             </thead>
                             <tbody>
-                                {items.map(item => (
+                                {items.map(item => {
+                                    const availableForItem =
+                                        (item.product.stockAvailable ?? item.product.stock ?? 0) + item.units;
+
+                                    return (
                                     <tr key={item._id}>
                                         <td>{item.product.imei ? item.product.imei.slice(-4) : '-'}</td>
                                         <td>{item.product.modelName}</td>
@@ -98,7 +102,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                                 onChange={(e) => handleUpdateItem(item._id, { units: parseInt(e.target.value) || 1 })}
                                                 className="input input-bordered input-sm w-20"
                                                 min={1}
-                                                max={item.product.stockAvailable ?? item.product.stock}
+                                                max={Math.max(1, availableForItem)}
                                                 disabled={disabled}
                                             />
                                         </td>
@@ -126,7 +130,8 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                             <button onClick={() => handleRemoveItem(item._id)} className="btn btn-ghost btn-xs" disabled={disabled}>Quitar</button>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
