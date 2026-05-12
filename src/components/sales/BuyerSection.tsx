@@ -8,6 +8,7 @@ import { toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone';
 interface BuyerSectionProps {
     selectedBuyer: Buyer | null;
     setSelectedBuyer: (buyer: Buyer | null) => void;
+    disabled?: boolean;
 }
 
 // A simple debounce function
@@ -39,7 +40,7 @@ async function dniExists(dni: string) {
     }
 }
 
-export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerSectionProps) {
+export default function BuyerSection({ selectedBuyer, setSelectedBuyer, disabled = false }: BuyerSectionProps) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Buyer[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +49,11 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
     const [formError, setFormError] = useState<string | null>(null);
 
     const searchBuyers = async (searchQuery: string) => {
+        if (disabled) {
+            setResults([]);
+            return;
+        }
+
         if (searchQuery.length < 2) {
             setResults([]);
             return;
@@ -65,13 +71,20 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
         setIsLoading(false);
     };
 
-    const debouncedSearch = useCallback(debounce(searchBuyers, 300), []);
+    const debouncedSearch = useCallback(debounce(searchBuyers, 300), [disabled]);
 
     useEffect(() => {
+        if (disabled) {
+            setResults([]);
+            return;
+        }
+
         debouncedSearch(query);
-    }, [query, debouncedSearch]);
+    }, [disabled, query, debouncedSearch]);
 
     const handleCreateBuyer = async () => {
+        if (disabled) return;
+
         const name = newBuyer.name?.toString().trim() || '';
         const surname = newBuyer.surname?.toString().trim() || '';
         const rawDni = newBuyer.dni?.toString() || '';
@@ -132,7 +145,13 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                         <p className="font-semibold">{selectedBuyer.name} {selectedBuyer.surname}</p>
                         <p className="text-sm text-base-content/70">DNI: {selectedBuyer.dni || 'N/A'} - Instagram: {selectedBuyer.instagram || 'N/A'}</p>
                     </div>
-                    <button onClick={() => setSelectedBuyer(null)} className="btn btn-sm btn-circle btn-ghost">X</button>
+                    <button
+                        onClick={() => setSelectedBuyer(null)}
+                        className="btn btn-sm btn-circle btn-ghost"
+                        disabled={disabled}
+                    >
+                        X
+                    </button>
                 </div>
             </div>
         );
@@ -146,7 +165,13 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                 </div>
                 {!isLoading && !showNewBuyerForm && (
                     <div className="text-center">
-                        <button onClick={() => { setShowNewBuyerForm(true); setFormError(null); setNewBuyer({ name: query }); }} className="btn btn-primary btn-sm">Agregar Nuevo Cliente</button>
+                        <button
+                            onClick={() => { setShowNewBuyerForm(true); setFormError(null); setNewBuyer({ name: query }); }}
+                            className="btn btn-primary btn-sm"
+                            disabled={disabled}
+                        >
+                            Agregar Nuevo Cliente
+                        </button>
                     </div>
                 )}
             </div>
@@ -159,6 +184,7 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar cliente por nombre, apellido, DNI, ..."
                 className="input input-bordered w-full"
+                disabled={disabled}
             />
 
             {isLoading &&
@@ -171,7 +197,15 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
             {!isLoading && results.length > 0 && (
                 <ul className="menu bg-base-200 rounded-box mt-2">
                     {results.map(buyer => (
-                        <li key={buyer.id} onClick={() => { setSelectedBuyer(buyer); setQuery(''); }}>
+                        <li
+                            key={buyer.id}
+                            className={disabled ? 'disabled' : undefined}
+                            onClick={() => {
+                                if (disabled) return;
+                                setSelectedBuyer(buyer);
+                                setQuery('');
+                            }}
+                        >
                             <a>
                                 <span className="text-base-content/50 uppercase">{buyer.id.slice(-4)}</span>
                                 {buyer.name} {buyer.surname}
@@ -198,24 +232,25 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer }: BuyerS
                 <div className="mt-4 p-4 border border-base-300 rounded-box">
                     <h3 className="font-semibold mb-2">Nuevo Cliente</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <input type="text" placeholder="Nombre *" required value={newBuyer.name || ''} onChange={e => setNewBuyer({ ...newBuyer, name: e.target.value })} className="input input-bordered required:input-warning" />
-                        <input type="text" placeholder="Apellido *" required value={newBuyer.surname || ''} onChange={e => setNewBuyer({ ...newBuyer, surname: e.target.value })} className="input input-bordered required:input-warning" />
-                        <input type="text" placeholder="DNI *" required value={newBuyer.dni || ''} onChange={e => setNewBuyer({ ...newBuyer, dni: cleanDni(e.target.value) })} className="input input-bordered required:input-warning" />
-                        <input type="text" placeholder="Instagram" value={newBuyer.instagram || ''} onChange={e => setNewBuyer({ ...newBuyer, instagram: e.target.value })} className="input input-bordered" />
-                        <input type="text" placeholder="Teléfono" value={newBuyer.phone || ''} onChange={e => setNewBuyer({ ...newBuyer, phone: e.target.value })} className="input input-bordered" />
-                        <input type="email" placeholder="Email" value={newBuyer.email || ''} onChange={e => setNewBuyer({ ...newBuyer, email: e.target.value })} className="input input-bordered" />
-                        <input type="date" placeholder="Fecha de Nacimiento" value={newBuyer.dob ? toArgDateInputValue(newBuyer.dob) : ''} onChange={e => setNewBuyer({ ...newBuyer, dob: e.target.value ? fromArgDateInputValue(e.target.value) : undefined })} className="input input-bordered" />
-                        <input type="text" placeholder="CUIT" value={newBuyer.cuit || ''} onChange={e => setNewBuyer({ ...newBuyer, cuit: e.target.value })} className="input input-bordered" />
+                        <input type="text" placeholder="Nombre *" required value={newBuyer.name || ''} onChange={e => setNewBuyer({ ...newBuyer, name: e.target.value })} className="input input-bordered required:input-warning" disabled={disabled} />
+                        <input type="text" placeholder="Apellido *" required value={newBuyer.surname || ''} onChange={e => setNewBuyer({ ...newBuyer, surname: e.target.value })} className="input input-bordered required:input-warning" disabled={disabled} />
+                        <input type="text" placeholder="DNI *" required value={newBuyer.dni || ''} onChange={e => setNewBuyer({ ...newBuyer, dni: cleanDni(e.target.value) })} className="input input-bordered required:input-warning" disabled={disabled} />
+                        <input type="text" placeholder="Instagram" value={newBuyer.instagram || ''} onChange={e => setNewBuyer({ ...newBuyer, instagram: e.target.value })} className="input input-bordered" disabled={disabled} />
+                        <input type="text" placeholder="Teléfono" value={newBuyer.phone || ''} onChange={e => setNewBuyer({ ...newBuyer, phone: e.target.value })} className="input input-bordered" disabled={disabled} />
+                        <input type="email" placeholder="Email" value={newBuyer.email || ''} onChange={e => setNewBuyer({ ...newBuyer, email: e.target.value })} className="input input-bordered" disabled={disabled} />
+                        <input type="date" placeholder="Fecha de Nacimiento" value={newBuyer.dob ? toArgDateInputValue(newBuyer.dob) : ''} onChange={e => setNewBuyer({ ...newBuyer, dob: e.target.value ? fromArgDateInputValue(e.target.value) : undefined })} className="input input-bordered" disabled={disabled} />
+                        <input type="text" placeholder="CUIT" value={newBuyer.cuit || ''} onChange={e => setNewBuyer({ ...newBuyer, cuit: e.target.value })} className="input input-bordered" disabled={disabled} />
                     </div>
                     {formError ? (
                         <div className="text-sm text-error mb-2">{formError}</div>
                     ) : null}
                     <div className="mt-4 flex justify-end gap-2">
-                        <button onClick={() => { setShowNewBuyerForm(false); setFormError(null); }} className="btn btn-ghost">Cancelar</button>
+                        <button onClick={() => { setShowNewBuyerForm(false); setFormError(null); }} className="btn btn-ghost" disabled={disabled}>Cancelar</button>
                         <button
                             onClick={handleCreateBuyer}
                             className="btn btn-primary"
                             disabled={
+                                disabled ||
                                 isLoading ||
                                 !newBuyer.name?.toString().trim() ||
                                 !newBuyer.surname?.toString().trim() ||

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma } from "@prisma/client";
+import { Prisma, ProductState, SaleItemKind } from "@prisma/client";
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 
@@ -20,6 +20,8 @@ const ALLOWED_FIELDS = new Set<string>([
   "profit",
   "costTotal",
   "buyer",
+  "buyerId",
+  "items",
   "payments",
   "userId",
 ])
@@ -31,6 +33,16 @@ function toDecimal(v: unknown): Prisma.Decimal | null {
   const n = typeof v === "number" ? v : parseFloat(String(v))
   if (!Number.isFinite(n)) return null
   return new Prisma.Decimal(n)
+}
+
+function decimal(v: unknown): Prisma.Decimal {
+  return toDecimal(v) ?? new Prisma.Decimal(0)
+}
+
+function nextProductState(type: string, stock: number, state: ProductState): ProductState {
+  if (stock < 1) return type === "PHONE" ? "VENDIDO" as ProductState : "FUERA_DE_STOCK" as ProductState
+  if (state === ("VENDIDO" as ProductState) || state === "FUERA_DE_STOCK") return "EN_STOCK"
+  return state
 }
 
 export async function GET(_: NextRequest, { params }: Ctx) {
@@ -83,6 +95,227 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (keys.length === 0) return NextResponse.json({ error: "Empty body" }, { status: 400 })
   if (!keys.every((k) => ALLOWED_FIELDS.has(k))) {
     return NextResponse.json({ error: "Some fields are not allowed" }, { status: 400 })
+  }
+
+  const currentSale = await prisma.sale.findUnique({
+    where: { id },
+    select: { id: true, status: true },
+  })
+
+  if (!currentSale) {
+    return NextResponse.json({ error: "Venta no encontrada" }, { status: 404 })
+  }
+
+  if (currentSale.status === "CONFIRMADA" && auth.session.user.activeRole !== "ADMIN") {
+    return NextResponse.json(
+      { error: "La venta confirmada solo puede modificarse con rol activo ADMIN." },
+      { status: 403 },
+    )
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "buyerId")) {
+    const buyerId = body.buyerId == null || String(body.buyerId).trim() === "" ? null : String(body.buyerId).trim()
+
+    try {
+      const sale = await prisma.sale.findUnique({
+        where: { id },
+        select: { id: true, tenantId: true },
+      })
+
+      if (!sale) {
+        return NextResponse.json({ error: "Venta no encontrada" }, { status: 404 })
+      }
+
+      if (!buyerId) {
+        const updated = await prisma.sale.update({
+          where: { id },
+          data: { buyerId: null, customerName: null },
+          include: saleInclude(),
+        })
+        return NextResponse.json({ sale: serializeSale(updated) })
+      }
+
+      const buyer = await prisma.buyer.findFirst({
+        where: { id: buyerId, tenantId: sale.tenantId },
+        select: { id: true, name: true, surname: true },
+      })
+
+      if (!buyer) {
+        return NextResponse.json({ error: "Comprador no disponible" }, { status: 404 })
+      }
+
+      const updated = await prisma.sale.update({
+        where: { id },
+        data: {
+          buyerId: buyer.id,
+          customerName: [buyer.name, buyer.surname].filter(Boolean).join(" ") || null,
+        },
+        include: saleInclude(),
+      })
+      return NextResponse.json({ sale: serializeSale(updated) })
+    } catch (e: unknown) {
+      const error = e as Error
+      return NextResponse.json({ error: error?.message ?? "PATCH buyer failed" }, { status: 500 })
+    }
+  }
+
+  if (Array.isArray(body.items)) {
+    const items = body.items as SaleItemInput[]
+
+    if (items.length === 0) {
+      return NextResponse.json({ error: "La venta debe tener al menos un item" }, { status: 400 })
+    }
+
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        const sale = await tx.sale.findUnique({
+          where: { id },
+          include: { items: true },
+        })
+
+        if (!sale) {
+          throw new Error("Venta no encontrada")
+        }
+
+        const productIds = Array.from(new Set(items.map((item) => String(item.productId))))
+        const products = await tx.product.findMany({
+          where: { id: { in: productIds }, tenantId: sale.tenantId },
+          select: {
+            id: true,
+            type: true,
+            modelName: true,
+            costPrice: true,
+            stock: true,
+            stockAvailable: true,
+            state: true,
+          },
+        })
+        const productMap = new Map(products.map((product) => [product.id, product]))
+
+        const oldUnitsByProduct = new Map<string, number>()
+        for (const item of sale.items) {
+          oldUnitsByProduct.set(item.productId, (oldUnitsByProduct.get(item.productId) ?? 0) + item.units)
+        }
+
+        const newUnitsByProduct = new Map<string, number>()
+        let subtotal = new Prisma.Decimal(0)
+        let costTotal = new Prisma.Decimal(0)
+        let extraCosts = new Prisma.Decimal(0)
+
+        const itemCreates = items.map((raw) => {
+          const productId = String(raw.productId)
+          const product = productMap.get(productId)
+          if (!product) {
+            throw new Error(`No se encontrÃ³ el producto ${productId}`)
+          }
+
+          const unitsNum = Number(raw.units)
+          if (!Number.isInteger(unitsNum) || unitsNum < 1) {
+            throw new Error(`Cantidad invÃ¡lida para ${product.modelName}`)
+          }
+
+          newUnitsByProduct.set(productId, (newUnitsByProduct.get(productId) ?? 0) + unitsNum)
+
+          const units = new Prisma.Decimal(unitsNum)
+          const unitPrice = decimal(raw.unitPrice)
+          const unitCost = decimal(raw.unitCost ?? product.costPrice)
+          const extraCost = decimal(raw.extraCost)
+          const lineTotal = raw.kind === "NORMAL" ? unitPrice.mul(units) : new Prisma.Decimal(0)
+          const lineCost = unitCost.add(extraCost).mul(units)
+          const lineProfit = lineTotal.sub(lineCost)
+
+          if (raw.kind === "NORMAL") {
+            subtotal = subtotal.add(lineTotal)
+          } else if (raw.kind === "IN_TOTAL") {
+            extraCosts = extraCosts.add(lineCost)
+          }
+          costTotal = costTotal.add(lineCost)
+
+          return {
+            saleId: id,
+            productId,
+            kind: raw.kind as SaleItemKind,
+            units: unitsNum,
+            unitPrice,
+            unitCost,
+            extraCost,
+            lineTotal,
+            lineCost,
+            lineProfit,
+          }
+        })
+
+        if (sale.status === "CONFIRMADA") {
+          for (const [productId, newUnits] of newUnitsByProduct) {
+            const product = productMap.get(productId)!
+            const oldUnits = oldUnitsByProduct.get(productId) ?? 0
+            const availableForSale = product.stockAvailable + oldUnits
+            if (newUnits > availableForSale) {
+              throw new Error(`Stock insuficiente para ${product.modelName}. Disponible: ${availableForSale}`)
+            }
+          }
+        }
+
+        await tx.saleItem.deleteMany({ where: { saleId: id } })
+
+        for (const item of itemCreates) {
+          await tx.saleItem.create({ data: item })
+        }
+
+        if (sale.status === "CONFIRMADA") {
+          const touchedProductIds = new Set([...oldUnitsByProduct.keys(), ...newUnitsByProduct.keys()])
+          for (const productId of touchedProductIds) {
+            const oldUnits = oldUnitsByProduct.get(productId) ?? 0
+            const newUnits = newUnitsByProduct.get(productId) ?? 0
+            const delta = newUnits - oldUnits
+            if (delta === 0) continue
+
+            const product = productMap.get(productId) ?? await tx.product.findUnique({
+              where: { id: productId },
+              select: { id: true, type: true, stock: true, stockAvailable: true, state: true },
+            })
+            if (!product) continue
+
+            const stock = product.stock - delta
+            const stockAvailable = product.stockAvailable - delta
+            if (stock < 0 || stockAvailable < 0) {
+              throw new Error("El ajuste deja stock negativo")
+            }
+
+            await tx.product.update({
+              where: { id: productId },
+              data: {
+                stock,
+                stockAvailable,
+                state: nextProductState(product.type, stock, product.state),
+              },
+            })
+          }
+        }
+
+        const total = subtotal.add(extraCosts)
+        const profit = total.sub(costTotal)
+        const amountPaid = sale.amountPaid ?? new Prisma.Decimal(0)
+
+        return tx.sale.update({
+          where: { id },
+          data: {
+            subtotal,
+            extraCosts,
+            costTotal,
+            total,
+            profit,
+            balanceDue: total.sub(amountPaid),
+          },
+          include: saleInclude(),
+        })
+      })
+
+      return NextResponse.json({ sale: serializeSale(updated) })
+    } catch (e: unknown) {
+      const error = e as Error
+      return NextResponse.json({ error: error?.message ?? "PATCH items failed" }, { status: 500 })
+    }
   }
 
   const buyerObj = body.buyer as Record<string, string> | undefined
@@ -242,6 +475,15 @@ type PaymentInput = {
   amount?: string | number
   note?: string | null
   paidAt?: string | Date | null
+}
+
+type SaleItemInput = {
+  productId?: string
+  kind?: string
+  units?: number | string
+  unitPrice?: string | number
+  unitCost?: string | number | Prisma.Decimal | null
+  extraCost?: string | number | Prisma.Decimal | null
 }
 
 function serializeSale(sale: any) {

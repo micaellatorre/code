@@ -11,6 +11,8 @@ interface SubmitBarProps {
     onReserve?: () => void;
     isSubmitting: boolean;
     isReserving?: boolean;
+    submitLabel?: string;
+    submittingLabel?: string;
 }
 
 export default function SubmitBar({
@@ -21,6 +23,8 @@ export default function SubmitBar({
     onReserve,
     isSubmitting,
     isReserving = false,
+    submitLabel = 'Confirmar Venta',
+    submittingLabel = 'Creando Venta...',
 }: SubmitBarProps) {
     return (
         <div className="card bg-base-100 border border-base-content/50">
@@ -39,9 +43,9 @@ export default function SubmitBar({
                         disabled={disabled || isSubmitting || isReserving}
                     >
                         {isSubmitting ? (
-                            <><span className="loading loading-spinner"></span> Creando Venta...</>
+                            <><span className="loading loading-spinner"></span> {submittingLabel}</>
                         ) : (
-                            'Confirmar Venta'
+                            submitLabel
                         )}
                     </button>
                     {onReserve ? (

@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PUT(request: NextRequest, { params }: Ctx) {
-  const auth = await requireRoleApi(["ADMIN", "STOCK", "VENDEDOR"])
+  const auth = await requireRoleApi(["ADMIN", "STOCK"])
 
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status })

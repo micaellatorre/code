@@ -7,6 +7,7 @@ import { toArgDateTimeInputValue, fromArgDateTimeInputValue } from '@/lib/timezo
 interface SaleMetaSectionProps {
     meta: SaleMeta;
     setMeta: (meta: SaleMeta) => void;
+    disabled?: boolean;
 }
 
 const ORIGIN_OPTIONS = [
@@ -19,7 +20,7 @@ const ORIGIN_OPTIONS = [
     'Otro',
 ];
 
-export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps) {
+export default function SaleMetaSection({ meta, setMeta, disabled = false }: SaleMetaSectionProps) {
     
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -42,6 +43,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
                         value={toArgDateTimeInputValue(meta.date)}
                         onChange={handleDateChange}
                         className="input input-bordered"
+                        disabled={disabled}
                     />
                 </div>
                 <div className="form-control">
@@ -51,6 +53,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
                         value={meta.origin}
                         onChange={handleChange}
                         className="select select-bordered"
+                        disabled={disabled}
                     >
                         {ORIGIN_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
@@ -65,6 +68,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
                             onChange={handleChange}
                             className="input input-bordered"
                             placeholder="Escriba el origen..."
+                            disabled={disabled}
                         />
                     </div>
                 )}
@@ -76,6 +80,7 @@ export default function SaleMetaSection({ meta, setMeta }: SaleMetaSectionProps)
                         onChange={handleChange}
                         className="textarea textarea-bordered"
                         placeholder="Notas internas sobre la venta..."
+                        disabled={disabled}
                     />
                 </div>
             </div>

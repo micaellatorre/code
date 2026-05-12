@@ -3,9 +3,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import DashboardLayout from "@/components/DashboardLayout";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import type { Buyer, Product, SaleItemKind, PaymentMethod, Currency, SaleStatus } from "@prisma/client";
+import type { Role } from "@/lib/auth/roles";
 
 export type SaleItemDraft = {
   productId: string;
@@ -47,6 +49,8 @@ interface EditSaleFormProps {
 
 export default function EditSaleForm({ id }: EditSaleFormProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
 
   const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
   const [meta, setMeta] = useState<SaleMeta>({ date: new Date(), origin: "Instagram" });
@@ -56,6 +60,7 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const saleIsLocked = saleStatus === "CONFIRMADA" && activeRole !== "ADMIN";
 
   const totals = useMemo(() => {
     const subtotal = items
@@ -143,21 +148,21 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
   }, [id]);
 
   const handleSubmit = async () => {
+    if (saleIsLocked) {
+      setError("La venta confirmada solo puede modificarse con rol activo ADMIN.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
-      if (selectedBuyer) {
-        const buyerPayload = {
-          buyer: { name: selectedBuyer.name ?? "", surname: selectedBuyer.surname ?? "" },
-        };
-        const r1 = await fetch(`/api/sales/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(buyerPayload),
-        });
-        if (!r1.ok) throw new Error(await r1.text());
-      }
+      const r1 = await fetch(`/api/sales/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ buyerId: selectedBuyer?.id ?? null }),
+      });
+      if (!r1.ok) throw new Error(await r1.text());
 
       const r2 = await fetch(`/api/sales/${id}`, {
         method: "PATCH",
@@ -173,6 +178,22 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
         body: JSON.stringify({ origin: originToSend ?? null, notes: meta.notes ?? null }),
       });
       if (!r3.ok) throw new Error(await r3.text());
+
+      const rItems = await fetch(`/api/sales/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((it) => ({
+            productId: it.productId,
+            units: it.units,
+            unitPrice: it.unitPrice,
+            unitCost: it.unitCost,
+            extraCost: it.extraCost,
+            kind: it.kind,
+          })),
+        }),
+      });
+      if (!rItems.ok) throw new Error(await rItems.text());
 
       const r4 = await fetch(`/api/sales/${id}`, {
         method: "PATCH",
@@ -217,18 +238,18 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} />
-          <SaleMetaSection meta={meta} setMeta={setMeta} />
+          <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={setSelectedBuyer} disabled={saleIsLocked} />
+          <SaleMetaSection meta={meta} setMeta={setMeta} disabled={saleIsLocked} />
           <SaleItemsSection
             items={items}
             setItems={setItems}
-            disabled={saleStatus === "CONFIRMADA"}
+            disabled={saleIsLocked}
           />
           <PaymentsSection
             payments={payments}
             setPayments={setPayments}
             total={totals.total}
-            disabled={saleStatus === "CONFIRMADA"}
+            disabled={saleIsLocked}
           />
         </div>
 
@@ -255,10 +276,12 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
             </div>
             <TotalsBar items={items} payments={payments} />
             <SubmitBar
-              disabled={isSubmitting || saleStatus === "CONFIRMADA"}
+              disabled={isSubmitting || saleIsLocked}
               error={error}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
+              submitLabel="Guardar cambios"
+              submittingLabel="Guardando cambios..."
             />
           </div>
         </div>

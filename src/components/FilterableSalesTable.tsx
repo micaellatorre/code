@@ -468,7 +468,11 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   const getEditingValue = (saleId: string, fieldName: string) =>
     editingFields[saleId]?.[fieldName] ?? "";
 
-  function canEditField(fieldName: string) {
+  function canEditField(fieldName: string, sale?: SerializedSale) {
+    if (sale?.status === "CONFIRMADA" && !isAdmin) {
+      return false;
+    }
+
     if (["costTotal", "profit", "total"].includes(fieldName)) {
       return canEditSales && canEditSensitiveFinancialFields;
     }
@@ -535,7 +539,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   }
 
   function editableCellProps(saleId: string, fieldName: string, currentValue: any) {
-    if (!canEditField(fieldName)) {
+    const sale = items.find((item) => item.id === saleId);
+    if (!canEditField(fieldName, sale)) {
       return {
         className: "rounded px-1",
       };
@@ -549,7 +554,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   }
 
   const startEditField = (saleId: string, fieldName: string, currentValue: any) => {
-    if (!canEditField(fieldName)) return;
+    const sale = items.find((item) => item.id === saleId);
+    if (!canEditField(fieldName, sale)) return;
 
     let formattedValue = currentValue;
     if (fieldName === "date" && currentValue) {
@@ -589,7 +595,8 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
   // === NUEVO: persistFieldUpdate (estilo Products) ===
   async function persistFieldUpdate(saleId: string, fieldName: string, value: any) {
-    if (!canEditField(fieldName)) return;
+    const sale = items.find((item) => item.id === saleId);
+    if (!canEditField(fieldName, sale)) return;
 
     setSavingField({ saleId, fieldName });
     try {
@@ -655,13 +662,12 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   }
 
   function commitEditField(saleId: string, fieldName: string) {
-    if (!canEditField(fieldName)) return;
-
     const editingValue = editingFields[saleId]?.[fieldName];
     if (editingValue === undefined) return;
 
     const row = items.find((s) => s.id === saleId);
     if (!row) return;
+    if (!canEditField(fieldName, row)) return;
 
     let processed: any =
       typeof editingValue === "string" ? editingValue.trim() : editingValue;
@@ -1042,7 +1048,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                   <tr key={s.id ?? `sale-${idx}`}>
                     {/* Fecha (click para editar) */}
                     <td>
-                      {canEditField("date") && isEditing(s.id, "date") ? (
+                      {canEditField("date", s) && isEditing(s.id, "date") ? (
                         <div className="flex items-center gap-2">
                           <input
                             autoFocus
@@ -1142,7 +1148,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
                     {/* Cliente (buyer.name + buyer.surname) */}
                     <td>
-                      {canEditField("buyer.name") && (isEditing(s.id, "buyer.name") || isEditing(s.id, "buyer.surname")) ? (
+                      {canEditField("buyer.name", s) && (isEditing(s.id, "buyer.name") || isEditing(s.id, "buyer.surname")) ? (
                         <div className="flex items-center gap-2">
                           <input
                             className="input input-xs w-24"
@@ -1185,7 +1191,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                         </div>
                       ) : (
                         <span
-                          {...(canEditField("buyer.name")
+                          {...(canEditField("buyer.name", s)
                             ? {
                               className: "cursor-pointer hover:bg-base-200 rounded px-1",
                               title: "Click para editar",
@@ -1298,7 +1304,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                     {/* Costo */}
                     {canSeeCosts ? (
                       <td>
-                        {canEditField("costTotal") && isEditing(s.id, "costTotal") ? (
+                        {canEditField("costTotal", s) && isEditing(s.id, "costTotal") ? (
                           <div className="flex items-center gap-2">
                             <input
                               className="input input-xs w-20"
@@ -1332,7 +1338,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
                     {/* Total (editable decimal) */}
                     {canSeeTotal ? (
                       <td>
-                        {canEditField("total") && isEditing(s.id, "total") ? (
+                        {canEditField("total", s) && isEditing(s.id, "total") ? (
                           <div className="flex items-center gap-2">
                             <input
                               className="input input-xs w-20"
@@ -1375,7 +1381,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
                     {canSeeProfit ? (
                       <td>
-                        {canEditField("profit") && isEditing(s.id, "profit") ? (
+                        {canEditField("profit", s) && isEditing(s.id, "profit") ? (
                           <div className="flex items-center gap-2">
                             <input
                               className="input input-xs w-20"
@@ -1410,7 +1416,7 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
 
                     {/* Origen (editable select) */}
                     <td>
-                      {canEditField("origin") && isEditing(s.id, "origin") ? (
+                      {canEditField("origin", s) && isEditing(s.id, "origin") ? (
                         <div className="flex items-center gap-2">
                           <select
                             className="select select-xs w-20"
