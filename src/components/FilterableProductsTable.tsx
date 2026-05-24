@@ -1278,15 +1278,12 @@ export default function FilterableProductsTable() {
         </td>
 
         <td>
-          <button
-            type="button"
-            className={`badge badge-sm ${p.senado ? "badge-secondary" : "badge-ghost"} ${canEditProducts ? "cursor-pointer" : "cursor-default"}`}
-            disabled={!canEditProducts || savingSenadoId === p.id}
-            onClick={() => changeSenado(p.id, !p.senado)}
+          <span
+            className={`badge badge-sm ${p.senado ? "badge-secondary" : "badge-ghost"}`}
             title={p.senadoAt ? `Señado el ${formatInTimeZone(new Date(p.senadoAt), AR_TIME_ZONE, "dd/MM/yyyy HH:mm")}` : undefined}
           >
-            {savingSenadoId === p.id ? "..." : p.senado ? "Señado" : "Libre"}
-          </button>
+            {p.senado ? "Señado" : "Libre"}
+          </span>
         </td>
 
         <td>

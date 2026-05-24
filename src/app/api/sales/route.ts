@@ -289,7 +289,6 @@ export async function POST(request: Request) {
               data: {
                 senado: true,
                 senadoAt: new Date(),
-                state: "RESERVADO",
               },
             });
 

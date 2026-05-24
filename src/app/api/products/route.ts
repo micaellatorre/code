@@ -14,7 +14,6 @@ const PRODUCT_STATES = [
   "CON_CLIENTE",
   "DISPONIBLE",
   "FUERA_DE_STOCK",
-  "RESERVADO",
   "VENDIDO",
 ] as const
 

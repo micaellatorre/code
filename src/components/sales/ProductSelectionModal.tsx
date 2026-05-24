@@ -98,7 +98,6 @@ type StateFilter = 'EN_STOCK' | 'EN_CAMINO' | 'TODOS'
 function getStateBadgeClass(state: string) {
   if (state === 'EN_STOCK' || state === 'DISPONIBLE') return 'badge-success'
   if (state === 'EN_CAMINO') return 'badge-info'
-  if (state === 'RESERVADO') return 'badge-warning'
   if (state === 'VENDIDO' || state === 'FUERA_DE_STOCK') return 'badge-error'
   return 'badge-ghost'
 }

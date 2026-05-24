@@ -76,8 +76,7 @@ function nextProductState(type: string, stock: number, state: ProductState): Pro
 
   if (
     state === ("VENDIDO" as ProductState) ||
-    state === "FUERA_DE_STOCK" ||
-    state === "RESERVADO"
+    state === "FUERA_DE_STOCK"
   ) {
     return "EN_STOCK"
   }
@@ -580,7 +579,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         let senadoAt: Date | null = null
 
         if (saleWillBeReserved && newUnits > 0) {
-          nextState = "RESERVADO" as ProductState
           senado = true
           senadoAt = new Date()
         }
