@@ -2,8 +2,11 @@
 'use client';
 
 import type { SaleItemDraft } from '@/app/dashboard/sales/new/form';
-import type { SaleItemKind } from '@prisma/client';
 import { useState } from 'react';
+import { CheckIcon } from '@heroicons/react/24/solid';
+import { useSession } from 'next-auth/react';
+import type { Role } from '@/lib/auth/roles';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import ProductSelectionModal from './ProductSelectionModal';
 
 interface SaleItemsSectionProps {
@@ -20,7 +23,12 @@ function getStateBadgeClass(state: string) {
 }
 
 export default function SaleItemsSection({ items, setItems, disabled = false }: SaleItemsSectionProps) {
+    const { data: session } = useSession();
+    const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
+    const isAdmin = activeRole === 'ADMIN';
+    const confirmDialog = useConfirmDialog();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
 
     const handleAddItems = (newItems: SaleItemDraft[]) => {
         if (disabled) return;
@@ -54,6 +62,58 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
         setItems(items.map(i => i._id === itemId ? { ...i, ...updatedFields } : i));
     }
 
+    const getCostDraftValue = (item: SaleItemDraft) => costDrafts[item._id] ?? item.unitCost ?? '0';
+
+    const handleCostDraftChange = (itemId: string, value: string) => {
+        if (disabled || !isAdmin) return;
+        setCostDrafts((prev) => ({ ...prev, [itemId]: value }));
+    }
+
+    const handleSaveCost = async (item: SaleItemDraft) => {
+        if (disabled || !isAdmin) return;
+
+        const nextCost = getCostDraftValue(item).trim() || '0';
+        const parsed = Number(nextCost);
+        if (!Number.isFinite(parsed) || parsed < 0) return;
+
+        const normalizedCost = String(parsed);
+        if (String(item.unitCost ?? '0') === normalizedCost) {
+            setCostDrafts((prev) => {
+                const next = { ...prev };
+                delete next[item._id];
+                return next;
+            });
+            return;
+        }
+
+        const confirmed = await confirmDialog.confirm({
+            variant: 'warning',
+            title: 'Guardar costo del item',
+            description: 'Esta accion actualizara el costo usado para calcular el resultado de la venta.',
+            details: [
+                { label: 'Producto', value: item.product.modelName },
+                { label: 'IMEI', value: item.product.imei ?? 'Sin IMEI' },
+                { label: 'Costo actual', value: `$${item.unitCost || '0'}`, sensitive: true },
+                { label: 'Nuevo costo', value: `$${normalizedCost}`, sensitive: true },
+            ],
+            banner: {
+                variant: 'warning',
+                description: 'El cambio impacta en el costo total y la ganancia de la venta.',
+            },
+            confirmLabel: 'Guardar',
+            cancelLabel: 'Cerrar',
+        });
+
+        if (!confirmed) return;
+
+        handleUpdateItem(item._id, { unitCost: normalizedCost });
+        setCostDrafts((prev) => {
+            const next = { ...prev };
+            delete next[item._id];
+            return next;
+        });
+    }
+
     return (
         <div className="card bg-base-100 border border-base-content/50 p-4">
             <h2 className="font-bold text-lg">3. Items de Venta</h2>
@@ -72,6 +132,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                     <th>IMEI</th>
                                     <th>Producto</th>
                                     <th>% Bateria</th>
+                                    {isAdmin ? <th>Costo</th> : null}
                                     <th>Estado</th>
                                     <th>Cantidad</th>
                                     <th>Precio Unit.</th>
@@ -89,8 +150,35 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                         <td>{item.product.imei ? item.product.imei.slice(-4) : '-'}</td>
                                         <td>{item.product.modelName}</td>
                                         <td>{item.product.batteryPct ? item.product.batteryPct : '-'}</td>
+                                        {isAdmin ? (
+                                            <td>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min={0}
+                                                            value={getCostDraftValue(item)}
+                                                            onChange={(e) => handleCostDraftChange(item._id, e.target.value)}
+                                                            className="input input-bordered input-sm w-24 pl-6 text-right"
+                                                            disabled={disabled}
+                                                        />
+                                                        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs opacity-50">$</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary btn-xs px-2"
+                                                        onClick={() => void handleSaveCost(item)}
+                                                        disabled={disabled || getCostDraftValue(item).trim() === String(item.unitCost ?? '0')}
+                                                        title="Guardar costo"
+                                                    >
+                                                        <CheckIcon className="size-3.5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        ) : null}
                                         <td>
-                                            <span className={`badge badge-sm ${getStateBadgeClass(String(item.product.state))}`}>
+                                            <span className={`text-nowrap badge badge-sm ${getStateBadgeClass(String(item.product.state))}`}>
                                                 {String(item.product.state).replace(/_/g, ' ')}
                                             </span>
                                         </td>
