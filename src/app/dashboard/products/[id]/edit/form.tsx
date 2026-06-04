@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { useConfirmDialog } from '@/components/ui/confirm-dialog'
 
 interface EditProductFormProps {
   id: string
@@ -11,6 +12,7 @@ interface EditProductFormProps {
 
 export default function EditProductForm({ id }: EditProductFormProps) {
   const router = useRouter()
+  const confirmDialog = useConfirmDialog()
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
     modelName: '',
@@ -102,11 +104,33 @@ export default function EditProductForm({ id }: EditProductFormProps) {
   }
 
   const handleDelete = async () => {
-    if (!confirm('¿Eliminar producto?')) return
-    const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      router.push('/dashboard/products')
-    }
+    await confirmDialog.confirmAction({
+      variant: "danger",
+      title: "Eliminar producto",
+      description: "Esta accion eliminara el producto del inventario. No podra recuperarse desde esta pantalla.",
+      details: [
+        { label: "Producto", value: form.modelName || "Sin modelo" },
+        { label: "IMEI", value: form.imei || "Sin IMEI" },
+        { label: "Tipo", value: form.type },
+        { label: "Sucursal", value: form.location || "Sin sucursal" },
+        { label: "Costo", value: form.costPrice || "0", sensitive: true },
+        { label: "Precio venta", value: form.salePrice || "0", sensitive: true },
+      ],
+      banner: {
+        variant: "danger",
+        title: "Accion destructiva",
+        description: "Verifica que este producto no este asociado a una operacion activa antes de continuar.",
+      },
+      confirmLabel: "Eliminar",
+      cancelLabel: "Cerrar",
+      loadingLabel: "Eliminando...",
+      onConfirm: async () => {
+        const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+        if (res.ok) {
+          router.push('/dashboard/products')
+        }
+      },
+    })
   }
 
   if (loading) {

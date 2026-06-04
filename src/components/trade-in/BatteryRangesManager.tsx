@@ -2,6 +2,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { TradeInBatteryRangeDto } from "./types"
 
 type Draft = TradeInBatteryRangeDto
@@ -58,6 +59,52 @@ function getRangeBadgeLabel(index: number, total: number) {
   return "Medio"
 }
 
+function recalculateRanges(ranges: Draft[]) {
+  const sorted = ranges.map((range) => ({ ...range })).sort(sortRanges)
+  const active = sorted.filter((range) => range.isActive)
+
+  if (active.length) {
+    active.forEach((range, index) => {
+      if (index === 0) {
+        range.minPct = 0
+      } else {
+        range.minPct = clampPct(active[index - 1].maxPct + 1)
+      }
+
+      if (index === active.length - 1) {
+        range.maxPct = 100
+      } else if (range.maxPct < range.minPct) {
+        range.maxPct = range.minPct
+      }
+
+      range.sortOrder = index
+      range.label = buildRangeLabel(range.minPct, range.maxPct)
+    })
+  }
+
+  let inactiveOrder = active.length
+
+  return sorted
+    .map((range) => {
+      if (range.isActive) return range
+
+      const nextRange = {
+        ...range,
+        minPct: clampPct(range.minPct),
+        maxPct: clampPct(range.maxPct),
+        sortOrder: inactiveOrder,
+      }
+
+      if (nextRange.minPct > nextRange.maxPct) {
+        nextRange.maxPct = nextRange.minPct
+      }
+
+      inactiveOrder += 1
+      return nextRange
+    })
+    .sort(sortRanges)
+}
+
 export default function BatteryRangesManager({
   ranges,
   onChange,
@@ -65,12 +112,15 @@ export default function BatteryRangesManager({
   ranges: TradeInBatteryRangeDto[]
   onChange: () => Promise<void>
 }) {
+  const confirmDialog = useConfirmDialog()
   const [drafts, setDrafts] = useState<Draft[]>([])
+  const [deletedRangeIds, setDeletedRangeIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setDrafts(ranges.map((range) => ({ ...range })).sort(sortRanges))
+    setDeletedRangeIds([])
   }, [ranges])
 
   const sortedDrafts = useMemo(() => {
@@ -84,6 +134,8 @@ export default function BatteryRangesManager({
   const hasUnsavedNewRanges = useMemo(() => {
     return drafts.some((range) => range.id.startsWith(TEMP_ID_PREFIX))
   }, [drafts])
+
+  const hasDeletedRanges = deletedRangeIds.length > 0
 
   const validation = useMemo<ValidationResult>(() => {
     if (!activeDrafts.length) {
@@ -203,9 +255,37 @@ export default function BatteryRangesManager({
     setDrafts((current) => [newRange, ...current].sort(sortRanges))
   }
 
-  const removeUnsavedRange = (id: string) => {
+  const removeRange = async (id: string) => {
+    const range = sortedDrafts.find((item) => item.id === id)
+    if (!range) return
+
+    const confirmed = await confirmDialog.confirm({
+      variant: "danger",
+      title: "Eliminar rango de bateria",
+      description: "Esta accion quitara el rango y recalculara los limites de los rangos restantes.",
+      details: [
+        { label: "Rango", value: range.label },
+        { label: "Minimo", value: `${range.minPct}%` },
+        { label: "Maximo", value: `${range.maxPct}%` },
+        { label: "Estado", value: range.isActive ? "Activo" : "Inactivo" },
+      ],
+      banner: {
+        variant: "warning",
+        title: "Recalculo automatico",
+        description: "El cambio queda pendiente hasta que guardes la configuracion de rangos.",
+      },
+      confirmLabel: "Eliminar",
+      cancelLabel: "Cerrar",
+    })
+
+    if (!confirmed) return
+
     setError(null)
-    setDrafts((current) => current.filter((range) => range.id !== id))
+    setDrafts((current) => recalculateRanges(current.filter((range) => range.id !== id)))
+
+    if (!id.startsWith(TEMP_ID_PREFIX)) {
+      setDeletedRangeIds((current) => (current.includes(id) ? current : [...current, id]))
+    }
   }
 
   const saveAll = async () => {
@@ -221,7 +301,7 @@ export default function BatteryRangesManager({
       const res = await fetch("/api/trade-in/battery-ranges/batch", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ranges: drafts }),
+        body: JSON.stringify({ ranges: drafts, deletedRangeIds }),
       })
 
       if (!res.ok) {
@@ -232,6 +312,7 @@ export default function BatteryRangesManager({
       }
 
       await onChange()
+      setDeletedRangeIds([])
     } catch {
       setError("No se pudieron guardar los rangos")
     } finally {
@@ -247,6 +328,9 @@ export default function BatteryRangesManager({
             <h2 className="text-lg font-semibold">Rangos de batería</h2>
             {hasUnsavedNewRanges ? (
               <span className="badge badge-warning badge-sm">Hay rangos nuevos sin guardar</span>
+            ) : null}
+            {hasDeletedRanges ? (
+              <span className="badge badge-error badge-sm">Hay rangos para eliminar</span>
             ) : null}
           </div>
 
@@ -278,6 +362,13 @@ export default function BatteryRangesManager({
         </div>
       ) : null}
 
+      {saving ? (
+        <div className="alert alert-info mb-4 py-2 text-sm">
+          <span className="loading loading-spinner loading-xs" />
+          <span>Actualizando rangos...</span>
+        </div>
+      ) : null}
+
       <div className="mb-4 rounded-xl border border-base-300 bg-base-200/40 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
@@ -295,7 +386,7 @@ export default function BatteryRangesManager({
               return (
                 <div
                   key={range.id}
-                  className="flex min-w-16 flex-col items-center justify-center border-r px-2 py-2 text-center last:border-r-0"
+                  className="flex min-w-16 flex-col items-center justify-center border-r px-2 text-center last:border-r-0"
                   style={{
                     width,
                     background: colors.background,
@@ -343,8 +434,6 @@ export default function BatteryRangesManager({
                     border: "rgba(148,163,184,0.35)",
                     color: "rgb(100,116,139)",
                   }
-
-              const isNew = range.id.startsWith(TEMP_ID_PREFIX)
 
               return (
                 <tr key={range.id} className={!range.isActive ? "opacity-60" : undefined}>
@@ -424,18 +513,14 @@ export default function BatteryRangesManager({
                   </td>
 
                   <td className="text-right">
-                    {isNew ? (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-xs text-error"
-                        onClick={() => removeUnsavedRange(range.id)}
-                        disabled={saving}
-                      >
-                        Quitar
-                      </button>
-                    ) : (
-                      <span className="text-xs text-base-content/40">Guardado</span>
-                    )}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs text-error"
+                      onClick={() => removeRange(range.id)}
+                      disabled={saving || sortedDrafts.length <= 1}
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               )

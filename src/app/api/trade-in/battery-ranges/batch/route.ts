@@ -40,6 +40,14 @@ function normalizeRange(range: unknown): NormalizedRange {
   }
 }
 
+function normalizeDeletedRangeIds(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return Array.from(
+    new Set(value.filter((id): id is string => typeof id === "string" && id.trim().length > 0))
+  )
+}
+
 function validateRanges(normalized: NormalizedRange[]) {
   if (!normalized.length) {
     return "Debe enviarse al menos un rango"
@@ -105,6 +113,7 @@ export async function PATCH(request: Request) {
   const body = await request.json().catch(() => null)
   const rangesInput: unknown[] = isRecord(body) && Array.isArray(body.ranges) ? body.ranges : []
   const normalized = rangesInput.map(normalizeRange)
+  const deletedRangeIds = isRecord(body) ? normalizeDeletedRangeIds(body.deletedRangeIds) : []
 
   const validationError = validateRanges(normalized)
 
@@ -115,24 +124,51 @@ export async function PATCH(request: Request) {
   const existingIds = normalized
     .filter((range) => !range.isNew)
     .map((range) => range.id)
+  const deletedIdSet = new Set(deletedRangeIds)
 
-  if (existingIds.length) {
+  if (existingIds.some((id) => deletedIdSet.has(id))) {
+    return NextResponse.json({ error: "Un rango no puede actualizarse y eliminarse a la vez" }, { status: 400 })
+  }
+
+  const rangeIdsToCheck = Array.from(new Set([...existingIds, ...deletedRangeIds]))
+
+  if (rangeIdsToCheck.length) {
     const existingCount = await prisma.tradeInBatteryRange.count({
       where: {
         tenantId,
         id: {
-          in: existingIds,
+          in: rangeIdsToCheck,
         },
       },
     })
 
-    if (existingCount !== existingIds.length) {
+    if (existingCount !== rangeIdsToCheck.length) {
       return NextResponse.json({ error: "Rango no encontrado" }, { status: 404 })
     }
   }
 
-  await prisma.$transaction(
-    normalized.map((range) => {
+  await prisma.$transaction([
+    ...(deletedRangeIds.length
+      ? [
+          prisma.tradeInPrice.deleteMany({
+            where: {
+              tenantId,
+              batteryRangeId: {
+                in: deletedRangeIds,
+              },
+            },
+          }),
+          prisma.tradeInBatteryRange.deleteMany({
+            where: {
+              tenantId,
+              id: {
+                in: deletedRangeIds,
+              },
+            },
+          }),
+        ]
+      : []),
+    ...normalized.map((range) => {
       const data = {
         label: range.label,
         minPct: range.minPct!,
@@ -156,8 +192,8 @@ export async function PATCH(request: Request) {
         },
         data,
       })
-    })
-  )
+    }),
+  ])
 
   return NextResponse.json({ ok: true })
 }

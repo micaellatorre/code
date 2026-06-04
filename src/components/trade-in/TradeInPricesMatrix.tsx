@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { IPHONE_TRADE_IN_CATALOG } from "@/lib/trade-in/iphoneCatalog"
 import type { TradeInBatteryRangeDto, TradeInPriceDto } from "./types"
+import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 
 type HistoricalAverage = {
   modelName: string
@@ -31,6 +32,7 @@ export default function TradeInPricesMatrix({
   prices: TradeInPriceDto[]
   onChange: () => Promise<void>
 }) {
+  const confirmDialog = useConfirmDialog()
   const [localPrices, setLocalPrices] = useState<Map<string, string>>(new Map())
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [autofillingScope, setAutofillingScope] = useState<string | null>(null)
@@ -97,7 +99,23 @@ export default function TradeInPricesMatrix({
   }
 
   const autofill = async (seriesName?: string) => {
-    if (!window.confirm("Esto completara celdas vacias usando promedios historicos disponibles. Continuar?")) return
+    const confirmed = await confirmDialog.confirm({
+      variant: "warning",
+      title: seriesName ? "Autocompletar serie" : "Autocompletar precios",
+      description: "Esta accion completara celdas vacias usando promedios historicos disponibles.",
+      details: [
+        { label: "Alcance", value: seriesName ?? "Todas las series" },
+        { label: "Criterio", value: "Solo celdas vacias" },
+      ],
+      banner: {
+        variant: "info",
+        description: "Los precios ya cargados no se sobrescriben.",
+      },
+      confirmLabel: "Autocompletar",
+      cancelLabel: "Cerrar",
+    })
+
+    if (!confirmed) return
 
     const scope = seriesName ?? "__all__"
     setAutofillingScope(scope)

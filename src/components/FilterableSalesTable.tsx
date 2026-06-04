@@ -11,6 +11,7 @@ import { startOfDay, endOfDay } from 'date-fns'
 import { es } from "date-fns/locale"
 import { AR_TIME_ZONE, toArgDateInputValue, fromArgDateInputValue } from '@/lib/timezone'
 import type { Role } from "@/lib/auth/roles";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ====== Tipos ======
 type SaleUserSummary = {
@@ -135,6 +136,7 @@ const getMainModel = (items: any[] | undefined) => {
 // ====== Componente ======
 export default function FilterableSalesTable({ initial }: { initial: SerializedSale[] }) {
   const { data: session } = useSession();
+  const confirmDialog = useConfirmDialog();
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
   const isAdmin = activeRole === "ADMIN";
   const isSeller = activeRole === "VENDEDOR";
@@ -653,7 +655,13 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
       cancelEditField(saleId, fieldName);
     } catch (err) {
       console.error(`Failed to persist ${fieldName} update`, err);
-      alert("No se pudo guardar. Se revirtieron los cambios.");
+      await confirmDialog.confirm({
+        variant: "danger",
+        title: "No se pudo guardar la venta",
+        description: "Se revirtieron los cambios para mantener la informacion anterior.",
+        confirmLabel: "Cerrar",
+        hideCancel: true,
+      });
       // revertimos a initial (o a la última versión known-good si la tuvieras)
       setItems((_) => normalizeSales(initial));
     } finally {
@@ -702,22 +710,58 @@ export default function FilterableSalesTable({ initial }: { initial: SerializedS
   const deleteSale = async (id: string) => {
     if (!canDeleteSales) return;
 
-    if (!window.confirm("¿Está seguro que desea eliminar esta venta?")) return;
-    setDeletingId(id);
+    const sale = items.find((s) => s.id === id);
+    let failed = false;
 
-    // snapshot para rollback
-    const snapshot = items;
-    setItems((prev) => prev.filter((s) => s.id !== id));
+    const confirmed = await confirmDialog.confirmAction({
+      variant: "danger",
+      title: "Eliminar venta",
+      description: "Esta accion eliminara la venta seleccionada y puede afectar reportes historicos.",
+      details: sale
+        ? [
+            { label: "Cliente", value: sale.customerName ?? (`${sale.buyer?.name ?? ""} ${sale.buyer?.surname ?? ""}`.trim() || "Sin cliente") },
+            { label: "Estado", value: sale.status ?? "Sin estado" },
+            { label: "Total", value: sale.total ?? "0", sensitive: true },
+            { label: "Costo", value: sale.costTotal ?? "0", sensitive: true },
+            { label: "Ganancia", value: sale.profit ?? "0", sensitive: true },
+          ]
+        : undefined,
+      banner: {
+        variant: "danger",
+        title: "Accion destructiva",
+        description: "Esta operacion no puede deshacerse desde esta pantalla.",
+      },
+      confirmLabel: "Eliminar",
+      cancelLabel: "Cerrar",
+      loadingLabel: "Eliminando...",
+      onConfirm: async () => {
+        setDeletingId(id);
 
-    try {
-      const res = await fetch(`/api/sales/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await res.text());
-    } catch (err) {
-      console.error("Delete failed", err);
-      alert("No se pudo eliminar la venta. Revirtiendo cambios.");
-      setItems(snapshot);
-    } finally {
-      setDeletingId(null);
+        // snapshot para rollback
+        const snapshot = items;
+        setItems((prev) => prev.filter((s) => s.id !== id));
+
+        try {
+          const res = await fetch(`/api/sales/${id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error(await res.text());
+        } catch (err) {
+          console.error("Delete failed", err);
+          failed = true;
+          setItems(snapshot);
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
+
+    if (confirmed && failed) {
+      await confirmDialog.confirm({
+        variant: "danger",
+        title: "No se pudo eliminar la venta",
+        description: "Se revirtieron los cambios y la venta vuelve a mostrarse en la tabla.",
+        confirmLabel: "Cerrar",
+        hideCancel: true,
+      });
     }
   };
 

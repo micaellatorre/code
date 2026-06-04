@@ -1,6 +1,7 @@
 import './globals.css'
 // import type { Metadata } from "next"
 import { AuthSessionProvider } from "@/components/auth-session-provider"
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog"
 
 const themeInitScript = `
 (function() {
@@ -52,7 +53,9 @@ export default function RootLayout({
         pantalla.
       */}
       <body className="bg-base-200 text-base-content min-h-screen">
-        <AuthSessionProvider>{children}</AuthSessionProvider>
+        <AuthSessionProvider>
+          <ConfirmDialogProvider>{children}</ConfirmDialogProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   )

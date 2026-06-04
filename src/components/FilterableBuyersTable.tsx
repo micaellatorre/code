@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import SearchBar from "@/components/SearchBar";
 import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/solid'
 import type { Role } from "@/lib/auth/roles";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ====== Tipos ======
 type SerializedBuyer = {
@@ -38,6 +39,7 @@ function normalizeBuyers(input: any[]): SerializedBuyer[] {
 // ====== Componente ======
 export default function FilterableBuyersTable({ initial }: { initial: SerializedBuyer[] }) {
   const { data: session } = useSession();
+  const confirmDialog = useConfirmDialog();
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
   const isAdmin = activeRole === "ADMIN";
   const isSeller = activeRole === "VENDEDOR";
@@ -238,8 +240,14 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
       cancelEditField(buyerId, fieldName);
     } catch (err) {
       console.error(`Failed to persist ${fieldName} update`, err);
-      alert("No se pudo guardar. Se revirtieron los cambios.");
       setBuyers((_) => normalizeBuyers(initial));
+      await confirmDialog.confirm({
+        variant: "danger",
+        title: "No se pudo guardar el cliente",
+        description: "Se revirtieron los cambios para mantener la informacion anterior.",
+        confirmLabel: "Cerrar",
+        hideCancel: true,
+      });
     } finally {
       setSavingField(null);
     }
@@ -274,21 +282,55 @@ export default function FilterableBuyersTable({ initial }: { initial: Serialized
   const deleteBuyer = async (id: string) => {
     if (!canDeleteBuyers) return;
 
-    if (!window.confirm("¿Está seguro que desea eliminar este cliente?")) return;
-    setDeletingId(id);
+    const buyer = buyers.find((b) => b.id === id);
+    let failed = false;
 
-    const snapshot = buyers;
-    setBuyers((prev) => prev.filter((b) => b.id !== id));
+    const confirmed = await confirmDialog.confirmAction({
+      variant: "danger",
+      title: "Eliminar cliente",
+      description: "Esta accion eliminara el cliente del sistema. No podra recuperarse desde esta pantalla.",
+      details: buyer
+        ? [
+            { label: "Cliente", value: `${buyer.name} ${buyer.surname ?? ""}`.trim() },
+            { label: "Telefono", value: buyer.phone ?? "Sin telefono" },
+            { label: "Instagram", value: buyer.instagram ?? "Sin Instagram" },
+          ]
+        : undefined,
+      banner: {
+        variant: "warning",
+        title: "Accion destructiva",
+        description: "Verifica que el cliente no sea necesario para consultas operativas antes de continuar.",
+      },
+      confirmLabel: "Eliminar",
+      cancelLabel: "Cerrar",
+      loadingLabel: "Eliminando...",
+      onConfirm: async () => {
+        setDeletingId(id);
 
-    try {
-      const res = await fetch(`/api/buyers/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await res.text());
-    } catch (err) {
-      console.error("Delete failed", err);
-      alert("No se pudo eliminar el cliente. Revirtiendo cambios.");
-      setBuyers(snapshot);
-    } finally {
-      setDeletingId(null);
+        const snapshot = buyers;
+        setBuyers((prev) => prev.filter((b) => b.id !== id));
+
+        try {
+          const res = await fetch(`/api/buyers/${id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error(await res.text());
+        } catch (err) {
+          console.error("Delete failed", err);
+          failed = true;
+          setBuyers(snapshot);
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
+
+    if (confirmed && failed) {
+      await confirmDialog.confirm({
+        variant: "danger",
+        title: "No se pudo eliminar el cliente",
+        description: "Se revirtieron los cambios y el cliente vuelve a mostrarse en la tabla.",
+        confirmLabel: "Cerrar",
+        hideCancel: true,
+      });
     }
   };
 

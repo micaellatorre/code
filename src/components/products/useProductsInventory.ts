@@ -5,6 +5,7 @@ import useSWR from "swr"
 import { useSession } from "next-auth/react"
 import { fromArgDateInputValue } from "@/lib/timezone"
 import type { Role } from "@/lib/auth/roles"
+import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { InventorySegment, ProductsApiResponse, SerializedProduct } from "./types"
 import { compareIphoneModels, getIphoneSeries, getSeriesSortValue, isSealedPhone, normalizeModelKey } from "./utils"
 
@@ -20,6 +21,7 @@ const fetcher = async (url: string) => {
 
 export function useProductsInventory() {
   const { data: session } = useSession()
+  const confirmDialog = useConfirmDialog()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
   const isAdmin = activeRole === "ADMIN"
   const isSeller = activeRole === "VENDEDOR"
@@ -591,8 +593,32 @@ export function useProductsInventory() {
     }
   }
 
-  function changeState(id: string, newState: string) {
+  async function changeState(id: string, newState: string) {
     if (!canEditState) return
+
+    const product = productsLocal.find((p) => p.id === id)
+    if (!product || product.state === newState) return
+
+    const confirmed = await confirmDialog.confirm({
+      variant: "warning",
+      title: "Cambiar estado del producto",
+      description: "Esta accion cambiara la disponibilidad operativa del producto seleccionado.",
+      details: [
+        { label: "Producto", value: product.modelName },
+        { label: "IMEI", value: product.imei ?? "Sin IMEI" },
+        { label: "Estado actual", value: product.state },
+        { label: "Nuevo estado", value: newState },
+        { label: "Sucursal", value: product.location ?? "Sin sucursal" },
+      ],
+      banner: {
+        variant: "warning",
+        description: "Verifica que el nuevo estado coincida con la situacion real del equipo.",
+      },
+      confirmLabel: "Cambiar estado",
+      cancelLabel: "Cerrar",
+    })
+
+    if (!confirmed) return
 
     setProductsLocal((prev) => prev.map((p) => (p.id === id ? { ...p, state: newState } : p)))
     persistStateUpdate(id, newState)
@@ -640,56 +666,128 @@ export function useProductsInventory() {
   async function deleteProduct(id: string) {
     if (!canDeleteProducts) return
 
-    const ok = window.confirm("¿Eliminar este producto? Esta acción no se puede deshacer.")
-    if (!ok) return
-    setDeletingId(id)
+    const product = productsLocal.find((p) => p.id === id)
+    let failed = false
 
-    const originalIndex = productsLocal.findIndex((p) => p.id === id)
-    const original = productsLocal[originalIndex]
+    const confirmed = await confirmDialog.confirmAction({
+      variant: "danger",
+      title: "Eliminar producto",
+      description: "Esta accion eliminara el producto del inventario. No podra recuperarse desde esta pantalla.",
+      details: product
+        ? [
+            { label: "Producto", value: product.modelName },
+            { label: "IMEI", value: product.imei ?? "Sin IMEI" },
+            { label: "Estado", value: product.state },
+            { label: "Sucursal", value: product.location ?? "Sin sucursal" },
+            { label: "Costo", value: product.costPrice ?? "0", sensitive: true },
+            { label: "Precio venta", value: product.salePrice ?? "0", sensitive: true },
+          ]
+        : undefined,
+      banner: {
+        variant: "danger",
+        title: "Accion destructiva",
+        description: "Esta operacion no puede deshacerse desde esta pantalla.",
+      },
+      confirmLabel: "Eliminar",
+      cancelLabel: "Cerrar",
+      loadingLabel: "Eliminando...",
+      onConfirm: async () => {
+        setDeletingId(id)
 
-    setProductsLocal((prev) => prev.filter((p) => p.id !== id))
+        const originalIndex = productsLocal.findIndex((p) => p.id === id)
+        const original = productsLocal[originalIndex]
 
-    try {
-      const res = await fetch(`/api/products/${id}`, { method: "DELETE" })
-      if (!res.ok) throw new Error(`Delete failed: ${res.status}`)
-      mutate()
-    } catch (err) {
-      setProductsLocal((prev) => {
-        const copy = prev.slice()
-        copy.splice(originalIndex, 0, original)
-        return copy
+        setProductsLocal((prev) => prev.filter((p) => p.id !== id))
+
+        try {
+          const res = await fetch(`/api/products/${id}`, { method: "DELETE" })
+          if (!res.ok) throw new Error(`Delete failed: ${res.status}`)
+          mutate()
+        } catch (err) {
+          setProductsLocal((prev) => {
+            const copy = prev.slice()
+            copy.splice(originalIndex, 0, original)
+            return copy
+          })
+          console.error("Failed to delete product", err)
+          failed = true
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
+
+    if (confirmed && failed) {
+      await confirmDialog.confirm({
+        variant: "danger",
+        title: "No se pudo eliminar el producto",
+        description: "Se revirtieron los cambios y el producto vuelve a mostrarse en el inventario.",
+        confirmLabel: "Cerrar",
+        hideCancel: true,
       })
-      console.error("Failed to delete product", err)
-      alert("No se pudo eliminar el producto. Intente de nuevo.")
-    } finally {
-      setDeletingId(null)
     }
   }
 
   async function duplicateProduct(id: string) {
     if (!canDuplicateProducts) return
 
-    setDuplicatingId(id)
-    try {
-      const res = await fetch(`/api/products/${id}/duplicate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const { product: newProduct } = await res.json()
+    const product = productsLocal.find((p) => p.id === id)
+    let failed = false
 
-      setProductsLocal((prev) => {
-        const index = prev.findIndex((p) => p.id === id)
-        const newProducts = [...prev]
-        newProducts.splice(index + 1, 0, newProduct)
-        return newProducts
+    const confirmed = await confirmDialog.confirmAction({
+      variant: "info",
+      title: "Duplicar producto",
+      description: "Esta accion creara una copia del producto seleccionado para acelerar la carga de inventario.",
+      details: product
+        ? [
+            { label: "Producto base", value: product.modelName },
+            { label: "IMEI", value: product.imei ?? "Sin IMEI" },
+            { label: "Estado", value: product.state },
+            { label: "Costo", value: product.costPrice ?? "0", sensitive: true },
+            { label: "Precio venta", value: product.salePrice ?? "0", sensitive: true },
+          ]
+        : undefined,
+      banner: {
+        variant: "info",
+        description: "Revisa los datos unicos del producto duplicado despues de crearlo.",
+      },
+      confirmLabel: "Duplicar",
+      cancelLabel: "Cerrar",
+      loadingLabel: "Duplicando...",
+      onConfirm: async () => {
+        setDuplicatingId(id)
+        try {
+          const res = await fetch(`/api/products/${id}/duplicate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          })
+          if (!res.ok) throw new Error(await res.text())
+          const { product: newProduct } = await res.json()
+
+          setProductsLocal((prev) => {
+            const index = prev.findIndex((p) => p.id === id)
+            const newProducts = [...prev]
+            newProducts.splice(index + 1, 0, newProduct)
+            return newProducts
+          })
+          mutate()
+        } catch (err) {
+          console.error("Failed to duplicate product", err)
+          failed = true
+        } finally {
+          setDuplicatingId(null)
+        }
+      },
+    })
+
+    if (confirmed && failed) {
+      await confirmDialog.confirm({
+        variant: "danger",
+        title: "No se pudo duplicar el producto",
+        description: "El producto no fue duplicado. Intenta nuevamente.",
+        confirmLabel: "Cerrar",
+        hideCancel: true,
       })
-      mutate()
-    } catch (err) {
-      console.error("Failed to duplicate product", err)
-      alert("No se pudo duplicar el producto. Intente de nuevo.")
-    } finally {
-      setDuplicatingId(null)
     }
   }
 

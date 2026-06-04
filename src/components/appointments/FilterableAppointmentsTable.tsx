@@ -8,6 +8,7 @@ import type { AppointmentOutcome, AppointmentStatus } from "@prisma/client"
 import type { Role } from "@/lib/auth/roles"
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE } from "@/lib/timezone"
+import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 
 type AppointmentInterestSummary = {
   id: string
@@ -92,6 +93,7 @@ function ProductTypeIcon({ type }: { type: string }) {
 
 export default function FilterableAppointmentsTable({ initial }: { initial: SerializedAppointment[] }) {
   const { data: session } = useSession()
+  const confirmDialog = useConfirmDialog()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
   const isAdmin = activeRole === "ADMIN"
 
@@ -304,21 +306,42 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
   }
 
   async function handleDelete(id: string) {
-    if (window.confirm("¿Estás seguro de que quieres eliminar esta cita?")) {
-      try {
-        const response = await fetch(`/api/appointments/${id}`, {
-          method: "DELETE",
-        })
+    const appointment = appointments.find((item) => item.id === id)
 
-        if (response.ok) {
-          setAppointments((prev) => prev.filter((a) => a.id !== id))
-        } else {
-          console.error("Failed to delete appointment")
+    await confirmDialog.confirmAction({
+      variant: "danger",
+      title: "Eliminar cita",
+      description: "Esta accion eliminara la cita de la agenda.",
+      details: appointment
+        ? [
+            { label: "Cliente", value: appointment.buyer?.name ?? "Sin cliente" },
+            { label: "Fecha", value: formatInTimeZone(appointment.scheduledAt, AR_TIME_ZONE, "dd/MM/yyyy HH:mm") },
+            { label: "Estado", value: appointment.status },
+          ]
+        : undefined,
+      banner: {
+        variant: "warning",
+        description: "La cita dejara de estar disponible para seguimiento operativo.",
+      },
+      confirmLabel: "Eliminar",
+      cancelLabel: "Cerrar",
+      loadingLabel: "Eliminando...",
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/appointments/${id}`, {
+            method: "DELETE",
+          })
+
+          if (response.ok) {
+            setAppointments((prev) => prev.filter((a) => a.id !== id))
+          } else {
+            console.error("Failed to delete appointment")
+          }
+        } catch (error) {
+          console.error("An error occurred:", error)
         }
-      } catch (error) {
-        console.error("An error occurred:", error)
       }
-    }
+    })
   }
 
   return (
