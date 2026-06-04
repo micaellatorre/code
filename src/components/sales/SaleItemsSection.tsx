@@ -2,6 +2,7 @@
 'use client';
 
 import type { SaleItemDraft } from '@/app/dashboard/sales/new/form';
+import type { SaleItemKind } from '@prisma/client';
 import { useState } from 'react';
 import { CheckIcon } from '@heroicons/react/24/solid';
 import { useSession } from 'next-auth/react';
