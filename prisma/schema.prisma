@@ -46,6 +46,10 @@ model Tenant {
   suppliers    Supplier[]
   buyers       Buyer[]
   users        User[]
+
+  tradeInBatteryRanges TradeInBatteryRange[]
+  tradeInPrices        TradeInPrice[]
+  tradeInDeductionRules TradeInDeductionRule[]
 }
 
 /// Catálogo unificado: iPhones y accesorios.
@@ -409,6 +413,7 @@ enum ProductState {
   DISPONIBLE
   FUERA_DE_STOCK
   VENDIDO
+  EN_REVISION
 }
 
 enum SaleStatus {
@@ -444,6 +449,7 @@ enum PaymentMethod {
   TRANSFERENCIA_USD
   TARJETA
   USDT
+  PLAN_CANJE
 }
 
 /// Moneda utilizada en compras/pagos.
@@ -486,4 +492,78 @@ enum UserRole {
   VENDEDOR
   STOCK
   SOCIO
+}
+
+model TradeInBatteryRange {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  label     String
+  minPct    Int
+  maxPct    Int
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  prices TradeInPrice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, isActive])
+  @@unique([tenantId, minPct, maxPct])
+}
+
+model TradeInPrice {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  modelName      String
+  capacityGB     Int
+  batteryRangeId String
+  batteryRange   TradeInBatteryRange @relation(fields: [batteryRangeId], references: [id])
+
+  referencePrice Decimal @default(0) @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, modelName, capacityGB])
+  @@unique([tenantId, modelName, capacityGB, batteryRangeId])
+}
+
+model TradeInDeductionRule {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  category  TradeInDeductionCategory
+  label     String
+  amount    Decimal @default(0) @db.Decimal(12, 2)
+  scope     TradeInDeductionScope @default(GLOBAL)
+  modelName String?
+  capacityGB Int?
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, category, isActive])
+  @@index([tenantId, scope, modelName, capacityGB])
+}
+
+enum TradeInDeductionScope {
+  GLOBAL
+  MODEL
+  MODEL_CAPACITY
+}
+
+enum TradeInDeductionCategory {
+  PANTALLA_MODULO
+  TAPA
+  CAMARA
+  FUNCIONAMIENTO
+  OTRO
 }

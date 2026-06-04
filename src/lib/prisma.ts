@@ -9,11 +9,16 @@ const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
 })
 
+const cachedPrisma = globalForPrisma.prisma
+const cachedPrismaHasCurrentSchema =
+  cachedPrisma && "tradeInBatteryRange" in cachedPrisma && "tradeInDeductionRule" in cachedPrisma
+
 const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter,
-  })
+  cachedPrismaHasCurrentSchema
+    ? cachedPrisma
+    : new PrismaClient({
+        adapter,
+      })
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma

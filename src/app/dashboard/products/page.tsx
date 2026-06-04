@@ -1,7 +1,7 @@
 // app/products/page.tsx (Server Component)
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
-import FilterableProductsTable from '@/components/FilterableProductsTable'
+import FilterableProductsTable from '@/components/products/FilterableProductsTable'
 import type { Metadata } from 'next'
 import { requireRolePage } from '@/lib/auth/auth'
 

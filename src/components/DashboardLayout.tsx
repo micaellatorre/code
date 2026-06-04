@@ -12,6 +12,7 @@ import {
   CalendarIcon,
   DevicePhoneMobileIcon,
   CurrencyDollarIcon,
+  ArrowsRightLeftIcon,
   Squares2X2Icon,
   UsersIcon,
 } from "@heroicons/react/24/solid"
@@ -60,6 +61,13 @@ export default function DashboardLayout({
         href: "/dashboard/sales",
         icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
         allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"] as Role[],
+      },
+      {
+        key: "trade-in",
+        label: "Plan Canje",
+        href: "/dashboard/trade-in",
+        icon: <ArrowsRightLeftIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
       },
     ],
     []

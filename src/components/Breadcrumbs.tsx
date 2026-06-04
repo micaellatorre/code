@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import {
   ArrowPathIcon,
+  ArrowsRightLeftIcon,
   CalendarIcon,
   CurrencyDollarIcon,
   DevicePhoneMobileIcon,
@@ -51,6 +52,13 @@ const sectionMenuItems = [
     href: "/dashboard/sales",
     icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
     allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"] as Role[],
+  },
+  {
+    key: "trade-in",
+    label: "Plan Canje",
+    href: "/dashboard/trade-in",
+    icon: <ArrowsRightLeftIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
   },
 ]
 
