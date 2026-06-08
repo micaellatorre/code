@@ -114,12 +114,14 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       const {
         scheduledAt,
         durationMinutes,
+        buyerId,
         status,
         outcome,
         noSaleReason,
         noSaleReasonOther,
         resultNotes,
         interests,
+        deposits,
       } = body
 
       // Validate required fields
@@ -137,39 +139,52 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         return NextResponse.json({ error: "Appointment not found" }, { status: 404 })
       }
 
-      // Update appointment
-      const updatedAppointment = await prisma.appointment.update({
-        where: { id },
-        data: {
-          scheduledAt: new Date(scheduledAt),
-          durationMinutes,
-          status,
-          outcome,
-          noSaleReason: outcome === 'NO_SE_CONCRETO' ? noSaleReason : null,
-          noSaleReasonOther: outcome === 'NO_SE_CONCRETO' && noSaleReason === 'OTRO' ? noSaleReasonOther : null,
-          resultNotes,
-        },
-      })
-
-      // Update interests if provided
-      if (interests && Array.isArray(interests)) {
-        // Delete existing interests
-        await prisma.appointmentInterest.deleteMany({
-          where: { appointmentId: id },
+      const updatedAppointment = await prisma.$transaction(async (tx) => {
+        const updated = await tx.appointment.update({
+          where: { id },
+          data: {
+            scheduledAt: new Date(scheduledAt),
+            durationMinutes,
+            buyerId: buyerId || null,
+            status,
+            outcome,
+            noSaleReason: outcome === 'NO_SE_CONCRETO' ? noSaleReason : null,
+            noSaleReasonOther: outcome === 'NO_SE_CONCRETO' && noSaleReason === 'OTRO' ? noSaleReasonOther : null,
+            resultNotes,
+          },
         })
 
-        // Create new interests
-        if (interests.length > 0) {
-          await prisma.appointmentInterest.createMany({
-            data: interests.map((interest: any, index: number) => ({
-              appointmentId: id,
-              productId: interest.productId,
-              notes: interest.notes,
-              priority: interest.priority || index + 1,
-            })),
+        if (interests && Array.isArray(interests)) {
+          await tx.appointmentInterest.deleteMany({
+            where: { appointmentId: id },
+          })
+
+          if (interests.length > 0) {
+            await tx.appointmentInterest.createMany({
+              data: interests.map((interest: any, index: number) => ({
+                appointmentId: id,
+                productId: interest.productId,
+                notes: interest.notes,
+                priority: interest.priority || index + 1,
+              })),
+            })
+          }
+        }
+
+        const productIds = Array.isArray(interests) ? interests.map((interest: any) => interest.productId).filter(Boolean) : []
+        const hasDeposit = Array.isArray(deposits) && deposits.some((deposit: any) => Number(deposit.amount || 0) > 0)
+
+        if (productIds.length > 0 && (hasDeposit || status === "CANCELADA")) {
+          await tx.product.updateMany({
+            where: { id: { in: productIds } },
+            data: hasDeposit
+              ? { senado: true, senadoAt: new Date() }
+              : { senado: false, senadoAt: null },
           })
         }
-      }
+
+        return updated
+      })
 
       return NextResponse.json(updatedAppointment, { status: 200 })
     }

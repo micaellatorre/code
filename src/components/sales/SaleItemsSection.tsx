@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { SaleItemDraft } from '@/app/dashboard/sales/new/form';
+import type { SaleItemDraft } from '@/components/sales/types';
 import type { SaleItemKind } from '@prisma/client';
 import { useState } from 'react';
 import { CheckIcon } from '@heroicons/react/24/solid';
@@ -117,7 +117,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
 
     return (
         <div className="card bg-base-100 border border-base-content/50 p-4">
-            <h2 className="font-bold text-lg">3. Items de Venta</h2>
+            <h2 className="font-bold text-lg">Items de Venta</h2>
 
             {items.length === 0 ? (
                 <div className="text-center p-8 border border-base-content/50 border-dashed border-base-300 rounded-box mt-4">
@@ -215,7 +215,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                             </div>
                                         </td>
                                         <td>
-                                            <button onClick={() => handleRemoveItem(item._id)} className="btn btn-ghost btn-xs" disabled={disabled}>Quitar</button>
+                                            <button onClick={() => handleRemoveItem(item._id)} className="btn btn-outline  btn-error btn-xs" disabled={disabled}>Eliminar</button>
                                         </td>
                                     </tr>
                                     );

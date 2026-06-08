@@ -1,48 +1,51 @@
-// /sales/page.tsx
-import Link from 'next/link'
-import DashboardLayout from '@/components/DashboardLayout'
-import Breadcrumbs from '@/components/Breadcrumbs'
-import FilterableSalesTable from '@/components/FilterableSalesTable'
-import prisma from '@/lib/prisma'
-import type { Metadata } from 'next'
-import { requireRolePage } from '@/lib/auth/auth'
+import DashboardLayout from "@/components/DashboardLayout"
+import Breadcrumbs from "@/components/Breadcrumbs"
+import FilterableSalesTable from "@/components/FilterableSalesTable"
+import prisma from "@/lib/prisma"
+import type { Metadata } from "next"
+import { requireRolePage } from "@/lib/auth/auth"
 
-// SEO
 export const metadata: Metadata = {
-  title: 'Ventas',
-  description: 'Listado y gestión de ventas realizadas',
+  title: "Ventas / Canjes",
+  description: "Registro de operaciones comerciales y margen de rentabilidad",
 }
 
-// Fuerza render del lado del servidor y runtime Node (Prisma)
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
-// Helper de serialización (evita BigInt/Decimal en cliente)
-function toStr(v: any) {
+function toStr(v: unknown) {
   return v == null ? null : String(v)
 }
 
 export default async function SalesPage() {
-  await requireRolePage(['ADMIN', 'VENDEDOR', 'SOCIO'])
+  const session = await requireRolePage(["ADMIN", "VENDEDOR", "SOCIO"])
+  const canSeeFinancials = session.user.activeRole === "ADMIN" || session.user.activeRole === "SOCIO"
 
-  // Trae solo lo necesario y con shape estable para el cliente
   const sales = await prisma.sale.findMany({
-    orderBy: { date: 'desc' },
+    orderBy: { date: "desc" },
     take: 200,
     include: {
       user: { select: { id: true, name: true, email: true } },
-      buyer: { select: { name: true, surname: true } },
-      payments: { select: { method: true }, orderBy: { paidAt: 'asc' } },
+      buyer: { select: { id: true, name: true, surname: true, phone: true, instagram: true, email: true } },
+      payments: { select: { id: true, method: true, currency: true, amount: true, paidAt: true, note: true }, orderBy: { paidAt: "asc" } },
+      appointments: { select: { id: true } },
       items: {
         include: {
           product: {
             select: {
+              id: true,
               modelName: true,
-              type: true,          // <- clave para el Modelo
-              capacityGB: true,    // <- heurística en el cliente
-              imei: true,          // <- heurística en el cliente
-              costPrice: true,
+              type: true,
+              capacityGB: true,
+              condition: true,
+              batteryPct: true,
+              color: true,
+              imei: true,
               salePrice: true,
-              shippingCost: true,
+              state: true,
+              stock: true,
+              stockAvailable: true,
+              costPrice: canSeeFinancials,
+              shippingCost: canSeeFinancials,
             },
           },
         },
@@ -50,63 +53,82 @@ export default async function SalesPage() {
     },
   })
 
-  const serialized = sales.map((s) => ({
-    id: s.id,
-    tenantId: s.tenantId,
-    date: s.date ? s.date.toISOString() : null,
-    customerName: s.customerName,
-    origin: s.origin,
-    // por compat: primer método si existe, pero la UI nueva usa payments aparte
-    payment: s.payments.length > 0 ? s.payments[0].method : null,
-    notes: s.notes,
-    status: s.status,
-    amountPaid: toStr(s.amountPaid),
-    balanceDue: toStr(s.balanceDue),
-    subtotal: toStr(s.subtotal),
-    extraCosts: toStr(s.extraCosts),
-    total: toStr(s.total),
-    profit: toStr(s.profit),
-    costTotal: toStr(s.costTotal),
-    createdAt: s.createdAt ? s.createdAt.toISOString() : null,
-    createdBy: s.user?.name || s.user?.email || '-',
-    createdByUser: s.user
+  const serialized = sales.map((sale) => ({
+    id: sale.id,
+    tenantId: sale.tenantId,
+    date: sale.date ? sale.date.toISOString() : null,
+    customerName: sale.customerName,
+    origin: sale.origin,
+    payment: sale.payments.length > 0 ? sale.payments[0].method : null,
+    notes: sale.notes,
+    status: sale.status,
+    amountPaid: toStr(sale.amountPaid),
+    balanceDue: toStr(sale.balanceDue),
+    subtotal: toStr(sale.subtotal),
+    extraCosts: toStr(sale.extraCosts),
+    total: toStr(sale.total),
+    profit: canSeeFinancials ? toStr(sale.profit) : null,
+    costTotal: canSeeFinancials ? toStr(sale.costTotal) : null,
+    createdAt: sale.createdAt ? sale.createdAt.toISOString() : null,
+    createdBy: sale.user?.name || sale.user?.email || "-",
+    createdByUser: sale.user
       ? {
-        id: s.user.id,
-        name: s.user.name,
-        email: s.user.email ?? '',
-      }
+          id: sale.user.id,
+          name: sale.user.name,
+          email: sale.user.email ?? "",
+        }
       : null,
-    buyer: s.buyer ? { name: s.buyer.name, surname: s.buyer.surname } : null,
-    items: s.items.map((item) => ({
+    buyer: sale.buyer
+      ? {
+          id: sale.buyer.id,
+          name: sale.buyer.name,
+          surname: sale.buyer.surname,
+          phone: sale.buyer.phone,
+          instagram: sale.buyer.instagram,
+          email: sale.buyer.email,
+        }
+      : null,
+    appointments: sale.appointments.map((appointment) => ({ id: appointment.id })),
+    payments: sale.payments.map((payment) => ({
+      id: payment.id,
+      method: payment.method,
+      currency: payment.currency,
+      amount: toStr(payment.amount),
+      paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
+      note: payment.note,
+    })),
+    items: sale.items.map((item) => ({
       id: item.id,
       saleId: item.saleId,
       productId: item.productId,
       units: item.units,
       kind: item.kind,
-      parentItemId: item.parentItemId,
       unitPrice: toStr(item.unitPrice),
-      unitCost: toStr(item.unitCost),
-      extraCost: toStr(item.extraCost),
+      unitCost: canSeeFinancials ? toStr(item.unitCost) : null,
+      extraCost: canSeeFinancials ? toStr(item.extraCost) : null,
       lineTotal: toStr(item.lineTotal),
-      lineCost: toStr(item.lineCost),
-      lineProfit: toStr(item.lineProfit),
-      createdAt: item.createdAt.toISOString(),
-      updatedAt: item.updatedAt.toISOString(),
+      lineCost: canSeeFinancials ? toStr(item.lineCost) : null,
+      lineProfit: canSeeFinancials ? toStr(item.lineProfit) : null,
       product: {
+        id: item.product.id,
         modelName: item.product.modelName,
-        type: typeof item.product.type === 'string' ? item.product.type.toUpperCase() : item.product.type,
+        type: typeof item.product.type === "string" ? item.product.type.toUpperCase() : item.product.type,
         capacityGB: item.product.capacityGB,
+        condition: item.product.condition,
+        batteryPct: item.product.batteryPct,
+        color: item.product.color,
         imei: item.product.imei,
-        costPrice: toStr(item.product.costPrice),
+        state: item.product.state,
+        stock: item.product.stock,
+        stockAvailable: item.product.stockAvailable,
         salePrice: toStr(item.product.salePrice),
-        shippingCost: item.product.shippingCost ? toStr(item.product.shippingCost) : null,
       },
     })),
   }))
 
   return (
-    <DashboardLayout >
-      <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Ventas' }]} />
+    <DashboardLayout>
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Ventas / Canjes" }]} />
       <div className="flex flex-col gap-4">
         <FilterableSalesTable initial={serialized} />
       </div>

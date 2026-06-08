@@ -44,6 +44,17 @@ interface PaymentInput {
 
 interface SaleInputBody {
   operationType?: SaleOperationType;
+  appointmentId?: string | null;
+  operationFlow?: string;
+  tradeInDevices?: {
+    modelName?: string;
+    capacityGB?: number;
+    color?: string;
+    imei?: string;
+    finalValue?: number;
+    notes?: string;
+    batteryRangeLabel?: string;
+  }[];
   date?: string;
   buyerId?: string;
   customerName?: string;
@@ -91,6 +102,7 @@ export async function POST(request: Request) {
 
   const {
     operationType = "CONFIRM_SALE",
+    appointmentId,
     date,
     buyerId,
     customerName,
@@ -98,6 +110,7 @@ export async function POST(request: Request) {
     notes,
     items,
     payments,
+    tradeInDevices,
   } = body;
 
   if (!["CONFIRM_SALE", "RESERVE"].includes(operationType)) {
@@ -157,7 +170,7 @@ export async function POST(request: Request) {
             throw apiError(`No se encontró el producto ${raw.productId}`, 400);
           }
 
-          if (prod.senado) {
+          if (prod.senado && !appointmentId) {
             throw apiError("El producto ya está señado.", 409);
           }
 
@@ -251,6 +264,47 @@ export async function POST(request: Request) {
           },
           select: { id: true },
         });
+
+        if (appointmentId && operationType === "CONFIRM_SALE") {
+          await tx.appointment.update({
+            where: { id: appointmentId },
+            data: {
+              saleId: sale.id,
+              outcome: "VENTA_CONCRETADA",
+              status: "CONCRETADA",
+            },
+          });
+        }
+
+        if (Array.isArray(tradeInDevices) && tradeInDevices.length > 0) {
+          for (const device of tradeInDevices) {
+            const finalValue = decimal(device.finalValue ?? 0);
+            if (!device.modelName || finalValue.lessThanOrEqualTo(0)) continue;
+
+            await tx.product.create({
+              data: {
+                tenantId: tenant.id,
+                type: "PHONE",
+                modelName: device.modelName,
+                capacityGB: device.capacityGB ? Number(device.capacityGB) : null,
+                color: device.color || null,
+                imei: device.imei || null,
+                costPrice: finalValue,
+                salePrice: new Prisma.Decimal(0),
+                state: "EN_REVISION",
+                stockInitial: 1,
+                stock: 1,
+                stockAvailable: 0,
+                origin: "Plan Canje",
+                notes: [
+                  device.batteryRangeLabel ? `Bateria: ${device.batteryRangeLabel}` : null,
+                  device.notes || null,
+                  `Venta origen: ${sale.id}`,
+                ].filter(Boolean).join("\n"),
+              },
+            });
+          }
+        }
 
         for (const raw of items) {
           const prod = productMap.get(String(raw.productId))!;

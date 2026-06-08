@@ -85,7 +85,7 @@ export default function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
   )
 
   return (
-    <div className="breadcrumbs relative z-[120] overflow-visible text-sm sm:mb-2">
+    <div className="breadcrumbs relative overflow-visible text-sm sm:mb-2">
       <ul>
         {items.map((item, index) => {
           const activeMenuItem = sectionMenuItems.find((menuItem) =>
@@ -95,7 +95,7 @@ export default function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
           if (index === 1) {
             return (
               <li key={`${item.label}-${index}`}>
-                <div className="dropdown dropdown-bottom relative z-[130]">
+                <div className="dropdown dropdown-bottom relative z-[95]">
                   <div
                     tabIndex={0}
                     role="button"

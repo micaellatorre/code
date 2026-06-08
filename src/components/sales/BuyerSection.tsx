@@ -139,7 +139,7 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer, disabled
     if (selectedBuyer) {
         return (
             <div className="card bg-base-100 border border-base-content/50 p-4">
-                <h2 className="font-bold text-lg">1. Datos del Comprador</h2>
+                <h2 className="font-bold text-lg">Datos del Comprador</h2>
                 <div className="flex items-center justify-between mt-2 p-2 bg-base-200 rounded-lg">
                     <div>
                         <p className="font-semibold">{selectedBuyer.name} {selectedBuyer.surname}</p>
@@ -161,7 +161,7 @@ export default function BuyerSection({ selectedBuyer, setSelectedBuyer, disabled
         <div className="card bg-base-100 border border-base-content/50 p-4">
             <div className="flex flex-row justify-between items-start">
                 <div className="flex flex-col">
-                    <h2 className="font-bold text-lg">1. Datos del Comprador</h2>
+                    <h2 className="font-bold text-lg">Datos del Comprador</h2>
                 </div>
                 {!isLoading && !showNewBuyerForm && (
                     <div className="text-center">

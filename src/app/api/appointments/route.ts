@@ -41,7 +41,9 @@ export async function POST(request: Request) {
     scheduledAt?: string;
     durationMinutes?: number | string;
     notes?: string;
+    outcome?: "PENDIENTE" | "VENTA_CONCRETADA" | "NO_SE_CONCRETO" | "SENADO" | "SENADO_EN_CAMINO" | "SENADO_EN_STOCK";
     interests?: { productId: string; notes?: string; priority?: number }[];
+    deposits?: { amount?: number | string }[];
   };
   try {
     body = await request.json();
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { buyerId, scheduledAt, durationMinutes, notes, interests } = body;
+  const { buyerId, scheduledAt, durationMinutes, notes, outcome, interests, deposits } = body;
 
   if (!buyerId) {
     return NextResponse.json(
@@ -74,6 +76,20 @@ export async function POST(request: Request) {
           throw new Error("Usuario no autenticado");
         }
 
+        const hasDeposit = Array.isArray(deposits) && deposits.some((deposit) => Number(deposit.amount || 0) > 0);
+        const productIds = interests?.map((interest) => interest.productId).filter(Boolean) ?? [];
+        let derivedOutcome = outcome || "PENDIENTE";
+
+        if (!outcome && hasDeposit && productIds.length > 0) {
+          const products = await tx.product.findMany({
+            where: { id: { in: productIds } },
+            select: { state: true },
+          });
+          if (products.some((product) => product.state === "EN_STOCK")) derivedOutcome = "SENADO_EN_STOCK";
+          else if (products.some((product) => product.state === "EN_CAMINO")) derivedOutcome = "SENADO_EN_CAMINO";
+          else derivedOutcome = "SENADO";
+        }
+
         const appointment = await tx.appointment.create({
           data: {
             userId: userId,
@@ -84,7 +100,7 @@ export async function POST(request: Request) {
               : null,
             resultNotes: notes || null,
             status: "PROGRAMADA",
-            outcome: "PENDIENTE",
+            outcome: derivedOutcome,
             interests: {
               create:
                 interests?.map((interest) => ({
@@ -95,6 +111,13 @@ export async function POST(request: Request) {
             },
           },
         });
+
+        if (hasDeposit && productIds.length > 0) {
+          await tx.product.updateMany({
+            where: { id: { in: productIds } },
+            data: { senado: true, senadoAt: new Date() },
+          });
+        }
 
         return appointment;
       }

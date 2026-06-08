@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { SaleItemDraft, PaymentDraft } from '@/app/dashboard/sales/new/form';
+import type { SaleItemDraft, PaymentDraft } from '@/components/sales/types';
 import type { Role } from '@/lib/auth/roles';
 import { useSession } from 'next-auth/react';
 import { useMemo } from 'react';
@@ -17,7 +17,6 @@ export default function TotalsBar({ items, payments }: TotalsBarProps) {
     const isAdmin = activeRole === 'ADMIN';
 
     const totals = useMemo(() => {
-        // TODO: Use big.js for precision to avoid floating point issues.
         const subtotal = items
             .filter(it => it.kind === 'NORMAL')
             .reduce((acc, it) => acc + parseFloat(it.unitPrice || '0') * it.units, 0);

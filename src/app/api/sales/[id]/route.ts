@@ -35,6 +35,10 @@ const ALLOWED_FIELDS = new Set<string>([
   "items",
   "payments",
   "userId",
+  "operationType",
+  "appointmentId",
+  "operationFlow",
+  "tradeInDevices",
 ])
 
 type Ctx = { params: Promise<{ id: string }> }

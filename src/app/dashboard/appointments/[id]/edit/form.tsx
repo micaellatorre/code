@@ -1,207 +1,248 @@
-'use client';
+"use client"
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import DashboardLayout from '@/components/DashboardLayout';
-import Breadcrumbs from '@/components/Breadcrumbs';
-import type { Buyer, Product, AppointmentStatus, AppointmentOutcome, AppointmentNoSaleReason } from '@prisma/client';
-import BuyerSection from '@/components/sales/BuyerSection';
-import AppointmentInterestSection, { AppointmentInterestDraft } from '@/components/appointments/AppointmentInterestSection';
-import { fromArgDateTimeInputValue, toArgDateTimeInputValue } from '@/lib/timezone';
-
-type AppointmentFull = {
-    id: string;
-    scheduledAt: string;
-    durationMinutes: number | null;
-    status: AppointmentStatus;
-    outcome: AppointmentOutcome;
-    noSaleReason: AppointmentNoSaleReason | null;
-    noSaleReasonOther: string | null;
-    resultNotes: string | null;
-    buyer: Buyer;
-    interests: ({ product: Product } & { productId: string; notes: string | null; priority: number | null; })[];
-};
+import { useEffect, useState } from "react"
+import type { ReactNode } from "react"
+import DashboardLayout from "@/components/DashboardLayout"
+import Breadcrumbs from "@/components/Breadcrumbs"
+import AppointmentDepositStep from "@/components/appointments/form/AppointmentDepositStep"
+import AppointmentFormStepper from "@/components/appointments/form/AppointmentFormStepper"
+import AppointmentItemsStep from "@/components/appointments/form/AppointmentItemsStep"
+import AppointmentNotesStep from "@/components/appointments/form/AppointmentNotesStep"
+import AppointmentOperationStep from "@/components/appointments/form/AppointmentOperationStep"
+import AppointmentStepCard from "@/components/appointments/form/AppointmentStepCard"
+import AppointmentStickySummary from "@/components/appointments/form/AppointmentStickySummary"
+import AppointmentSummaryStep from "@/components/appointments/form/AppointmentSummaryStep"
+import AppointmentTradeInStep from "@/components/appointments/form/AppointmentTradeInStep"
+import { type AppointmentFormInitialData, useAppointmentForm } from "@/components/appointments/form/useAppointmentForm"
 
 interface EditAppointmentFormProps {
   id: string
 }
 
-export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
-  const router = useRouter();
-  
-  const [appointment, setAppointment] = useState<AppointmentFull | null>(null);
-  const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
-  const [scheduledAt, setScheduledAt] = useState(new Date());
-  const [durationMinutes, setDurationMinutes] = useState(60);
-  const [status, setStatus] = useState<AppointmentStatus>('PROGRAMADA');
-  const [outcome, setOutcome] = useState<AppointmentOutcome>('PENDIENTE');
-  const [noSaleReason, setNoSaleReason] = useState<AppointmentNoSaleReason | null>(null);
-  const [noSaleReasonOther, setNoSaleReasonOther] = useState('');
-  const [resultNotes, setResultNotes] = useState('');
-  const [items, setItems] = useState<AppointmentInterestDraft[]>([]);
-  
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+function EditAppointmentFormContent({ initialData }: { initialData: AppointmentFormInitialData }) {
+  const form = useAppointmentForm("edit", initialData)
 
-  useEffect(() => {
-    if (!id) return;
-    const fetchAppointment = async () => {
-        setIsLoading(true);
-        try {
-            const res = await fetch(`/api/appointments/${id}`);
-            if (res.ok) {
-                const data = await res.json();
-                setAppointment(data);
-                setSelectedBuyer(data.buyer);
-                setScheduledAt(new Date(data.scheduledAt));
-                setDurationMinutes(data.durationMinutes || 60);
-                setStatus(data.status);
-                setOutcome(data.outcome);
-                setNoSaleReason(data.noSaleReason);
-                setNoSaleReasonOther(data.noSaleReasonOther || '');
-                setResultNotes(data.resultNotes || '');
-                setItems(data.interests.map((i: any) => ({ ...i, _id: i.id })));
-            } else {
-                setError('No se pudo cargar la cita.');
-            }
-        } catch (e) {
-            setError('Error de conexión.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    fetchAppointment();
-  }, [id]);
+  const steps: { key: string; title: string; summary: string; node: ReactNode }[] = []
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    setError(null);
-
-    const payload = {
-      scheduledAt: scheduledAt.toISOString(),
-      durationMinutes,
-      status,
-      outcome,
-      noSaleReason: outcome === 'NO_SE_CONCRETO' ? noSaleReason : null,
-      noSaleReasonOther: outcome === 'NO_SE_CONCRETO' && noSaleReason === 'OTRO' ? noSaleReasonOther : null,
-      resultNotes,
-      interests: items.map(it => ({
-        productId: it.productId,
-        notes: it.notes,
-        priority: it.priority,
-      })),
-    };
-
-    try {
-      const res = await fetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        router.push('/dashboard/appointments');
-      } else {
-        const errorData = await res.json();
-        setError(errorData.error || 'Ocurrió un error al actualizar la cita.');
-      }
-    } catch (e: any) {
-      setError('No se pudo conectar con el servidor.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (isLoading) {
-    return <DashboardLayout ><div className="flex justify-center items-center h-full"><span className="loading loading-lg"></span></div></DashboardLayout>;
+  if (form.planCanjeEnabled) {
+    steps.push({
+      key: "trade-in",
+      title: "Plan Canje",
+      summary: `${form.tradeInDevices.length} equipos / USD ${form.tradeInCredit.toFixed(2)}`,
+      node: (
+        <AppointmentTradeInStep
+          config={form.tradeInConfig}
+          loading={form.configLoading}
+          isAdmin={form.isAdmin}
+          devices={form.tradeInDevices}
+          editingDevice={form.editingTradeInDevice}
+          onEdit={form.setEditingTradeInDevice}
+          onCancelEdit={() => form.setEditingTradeInDevice(null)}
+          onSubmit={form.addTradeInDevice}
+          onRemove={form.removeTradeInDevice}
+          total={form.tradeInCredit}
+        />
+      ),
+    })
   }
 
-  if (error && !appointment) {
-    return <DashboardLayout ><div className="alert alert-error">{error}</div></DashboardLayout>;
+  steps.push(
+    {
+      key: "operation",
+      title: "Operacion",
+      summary: form.selectedBuyer?.name ?? "Cliente y fecha",
+      node: (
+        <AppointmentOperationStep
+          selectedBuyer={form.selectedBuyer}
+          setSelectedBuyer={form.setSelectedBuyer}
+          customerKind={form.customerKind}
+          setCustomerKind={form.setCustomerKind}
+          wholesaleNotes={form.wholesaleNotes}
+          setWholesaleNotes={form.setWholesaleNotes}
+          scheduledAt={form.scheduledAt}
+          setScheduledAt={form.setScheduledAt}
+          durationMinutes={form.durationMinutes}
+          setDurationMinutes={form.setDurationMinutes}
+        />
+      ),
+    },
+    {
+      key: "items",
+      title: "Items",
+      summary: `${form.items.length} items seleccionados`,
+      node: <AppointmentItemsStep items={form.items} setItems={form.setItems} />,
+    },
+    {
+      key: "deposit",
+      title: "Sena",
+      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin sena",
+      node: (
+        <AppointmentDepositStep
+          enabled={form.depositEnabled}
+          setEnabled={form.setDepositEnabled}
+          deposits={form.deposits}
+          addDeposit={form.addDeposit}
+          updateDeposit={form.updateDeposit}
+          removeDeposit={form.removeDeposit}
+        />
+      ),
+    },
+    {
+      key: "notes",
+      title: "Notas",
+      summary: form.notes ? "Notas cargadas" : "Sin notas",
+      node: <AppointmentNotesStep notes={form.notes} setNotes={form.setNotes} />,
+    },
+    {
+      key: "summary",
+      title: "Resumen",
+      summary: "Estado, resultado y confirmacion",
+      node: (
+        <AppointmentSummaryStep
+          mode="edit"
+          selectedBuyer={form.selectedBuyer}
+          scheduledAt={form.scheduledAt}
+          durationMinutes={form.durationMinutes}
+          items={form.items}
+          agreedTotal={form.agreedTotal}
+          depositTotal={form.depositTotal}
+          tradeInCredit={form.tradeInCredit}
+          balance={form.balance}
+          notes={form.notes}
+          status={form.status}
+          setStatus={form.setStatus}
+          outcome={form.outcome}
+          setOutcome={form.setOutcome}
+          noSaleReason={form.noSaleReason}
+          setNoSaleReason={form.setNoSaleReason}
+          noSaleReasonOther={form.noSaleReasonOther}
+          setNoSaleReasonOther={form.setNoSaleReasonOther}
+          error={form.error}
+          isSubmitting={form.isSubmitting}
+          onSubmit={form.requestSubmit}
+        />
+      ),
+    },
+  )
+
+  const stepLabels = steps.map((step) => step.title)
+
+  return (
+    <div className="space-y-4 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Editar reserva</h1>
+          <p className="mt-1 text-sm text-base-content/60">Actualiza cliente, fecha, items, resultado, Plan Canje y notas de seguimiento.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-base-content/80">Plan Canje</span>
+          <div className="join">
+            <button type="button" className={`btn btn-sm join-item ${form.planCanjeEnabled ? "btn-outline" : "btn-primary"}`} onClick={() => form.setPlanCanjeEnabled(false)}>
+              No
+            </button>
+            <button type="button" className={`btn btn-sm join-item ${form.planCanjeEnabled ? "btn-primary" : "btn-outline"}`} onClick={() => form.setPlanCanjeEnabled(true)}>
+              Si
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <AppointmentFormStepper steps={stepLabels} activeStep={form.activeStep} onStepChange={form.setActiveStep} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-3">
+          {steps.map((step, index) => (
+            <AppointmentStepCard key={step.key} index={index} title={step.title} summary={step.summary} activeStep={form.activeStep} onStepChange={form.setActiveStep}>
+              {step.node}
+            </AppointmentStepCard>
+          ))}
+        </div>
+
+        <AppointmentStickySummary
+          selectedBuyer={form.selectedBuyer}
+          items={form.items}
+          agreedTotal={form.agreedTotal}
+          depositTotal={form.depositTotal}
+          tradeInCredit={form.tradeInCredit}
+          balance={form.balance}
+          isSubmitting={form.isSubmitting}
+          onSubmit={form.requestSubmit}
+        />
+      </div>
+    </div>
+  )
+}
+
+export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
+  const [initialData, setInitialData] = useState<AppointmentFormInitialData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!id) return
+
+    async function fetchAppointment() {
+      setIsLoading(true)
+      try {
+        const response = await fetch(`/api/appointments/${id}`)
+        if (!response.ok) throw new Error("No se pudo cargar la reserva.")
+        const data = await response.json()
+        setInitialData({
+          id: data.id,
+          scheduledAt: data.scheduledAt,
+          durationMinutes: data.durationMinutes,
+          status: data.status,
+          outcome: data.outcome,
+          noSaleReason: data.noSaleReason,
+          noSaleReasonOther: data.noSaleReasonOther,
+          resultNotes: data.resultNotes,
+          buyer: data.buyer,
+          interests: (data.interests ?? []).map((interest: any) => ({
+            ...interest,
+            _id: interest.id,
+            agreedPrice: Number(interest.product?.salePrice ?? 0),
+            quantity: 1,
+            kind: "NORMAL",
+          })),
+        })
+      } catch (fetchError: any) {
+        setError(fetchError?.message || "Error de conexion.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void fetchAppointment()
+  }, [id])
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-full items-center justify-center">
+          <span className="loading loading-lg" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error || !initialData) {
+    return (
+      <DashboardLayout>
+        <div className="alert alert-error">{error || "No se pudo cargar la reserva."}</div>
+      </DashboardLayout>
+    )
   }
 
   return (
-    <DashboardLayout >
+    <DashboardLayout>
       <Breadcrumbs
         items={[
-          { label: 'Inicio', href: '/' },
-          { label: 'Citas', href: '/dashboard/appointments' },
-          { label: 'Editar Cita' },
+          { label: "Inicio", href: "/" },
+          { label: "Reservas / Citas", href: "/dashboard/appointments" },
+          { label: "Editar reserva" },
         ]}
       />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-        <div className="lg:col-span-2 flex flex-col gap-4">
-            {selectedBuyer && <BuyerSection selectedBuyer={selectedBuyer} setSelectedBuyer={() => {}} />}
-            
-            <div className="card bg-base-100 border border-base-content/50 p-4">
-                <h2 className="font-bold text-lg">Detalles de la Cita</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div className="form-control">
-                        <label className="label"><span className="label-text">Fecha y Hora</span></label>
-                        <input type="datetime-local" value={toArgDateTimeInputValue(scheduledAt)} onChange={e => setScheduledAt(fromArgDateTimeInputValue(e.target.value))} className="input input-bordered"/>
-                    </div>
-                    <div className="form-control">
-                        <label className="label"><span className="label-text">Duración (minutos)</span></label>
-                        <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(parseInt(e.target.value))} className="input input-bordered"/>
-                    </div>
-                    <div className="form-control">
-                        <label className="label"><span className="label-text">Estado</span></label>
-                        <select value={status} onChange={e => setStatus(e.target.value as AppointmentStatus)} className="select select-bordered">
-                            {['PROGRAMADA', 'CONCRETADA', 'CANCELADA', 'NO_SE_PRESENTO'].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                    </div>
-                    <div className="form-control">
-                        <label className="label"><span className="label-text">Resultado</span></label>
-                        <select value={outcome} onChange={e => setOutcome(e.target.value as AppointmentOutcome)} className="select select-bordered">
-                            {['PENDIENTE', 'VENTA_CONCRETADA', 'NO_SE_CONCRETO'].map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                    </div>
-                </div>
-                {outcome === 'NO_SE_CONCRETO' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <div className="form-control">
-                            <label className="label"><span className="label-text">Razón de no-venta</span></label>
-                            <select value={noSaleReason || ''} onChange={e => setNoSaleReason(e.target.value as AppointmentNoSaleReason)} className="select select-bordered">
-                                <option disabled value="">Seleccione un motivo</option>
-                                {['MUY_CARO', 'MODELO_NO_DISPONIBLE', 'ENCONTRO_MEJOR_OFERTA', 'LO_ESTA_PENSANDO', 'NO_SE_PRESENTO', 'OTRO'].map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                        </div>
-                        {noSaleReason === 'OTRO' && (
-                            <div className="form-control">
-                                <label className="label"><span className="label-text">Otro Motivo</span></label>
-                                <input type="text" value={noSaleReasonOther} onChange={e => setNoSaleReasonOther(e.target.value)} className="input input-bordered" />
-                            </div>
-                        )}
-                    </div>
-                )}
-                 <div className="form-control mt-4">
-                    <label className="label"><span className="label-text">Notas de la Cita / Resultado</span></label>
-                    <textarea value={resultNotes} onChange={e => setResultNotes(e.target.value)} className="textarea textarea-bordered" placeholder="Cómo fue la cita, feedback del cliente, etc."/>
-                </div>
-            </div>
-
-            <AppointmentInterestSection items={items} setItems={setItems} />
-        </div>
-
-        <div className="lg:col-span-1">
-            <div className="sticky top-4 flex flex-col gap-6">
-                <div className="card bg-base-100 border border-base-content/50">
-                    <div className="card-body">
-                        <h2 className="card-title">Actualizar Cita</h2>
-                        {error && <div className="alert alert-error text-sm">{error}</div>}
-                        <div className="card-actions justify-end mt-4">
-                            <button className="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
-                                {isSubmitting && <span className="loading loading-spinner"></span>}
-                                Guardar Cambios
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-      </div>
+      <EditAppointmentFormContent initialData={initialData} />
     </DashboardLayout>
-  );
+  )
 }

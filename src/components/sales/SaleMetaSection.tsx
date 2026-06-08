@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { SaleMeta } from '@/app/dashboard/sales/new/form';
+import type { SaleMeta } from '@/components/sales/types';
 import { toArgDateTimeInputValue, fromArgDateTimeInputValue } from '@/lib/timezone';
 
 interface SaleMetaSectionProps {
@@ -33,7 +33,7 @@ export default function SaleMetaSection({ meta, setMeta, disabled = false }: Sal
 
     return (
         <div className="card bg-base-100 border border-base-content/50 p-4">
-            <h2 className="font-bold text-lg">2. Datos de la Venta</h2>
+            <h2 className="font-bold text-lg">Datos de la Venta</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                 <div className="form-control">
                     <label className="label"><span className="label-text">Fecha de Venta</span></label>

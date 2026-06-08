@@ -1,6 +1,6 @@
 'use client'
 
-import type { SaleItemDraft } from '@/app/dashboard/sales/new/form'
+import type { SaleItemDraft } from '@/components/sales/types'
 import type { Product, ProductType, ProductStatus } from '@prisma/client'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 
@@ -293,6 +293,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                     <th>Estado</th>
                     <th>Stock Disp.</th>
                     <th>% Batería</th>
+                    <th>Precio</th>
                     <th>Cantidad</th>
                   </tr>
                 </thead>
@@ -333,8 +334,9 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                         </td>
                         <td><span className="badge badge-ghost">{currentStock}</span></td>
                         <td>{p.batteryPct != null ? `${p.batteryPct}%` : 'N/A'}</td>
+                        <td>${p.salePrice ?? '0'}</td>
                         <td>
-                          {isSelected && (
+                          {isSelected ?
                             <input
                               type="number"
                               value={selection[p.id].units}
@@ -343,7 +345,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                               min={1}
                               max={currentStock}
                             />
-                          )}
+                            :
+                            <span className="text-center">-</span>}
                         </td>
                       </tr>
                     )
