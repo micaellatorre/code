@@ -110,7 +110,7 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Ventas / Canjes", href: "/dashboard/sales" },
+          { label: "Ventas", href: "/dashboard/sales" },
           { label: "Editar Venta" },
         ]}
       />

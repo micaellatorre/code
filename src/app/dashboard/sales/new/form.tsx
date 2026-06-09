@@ -14,7 +14,7 @@ export default function NewSaleForm() {
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Ventas / Canjes", href: "/dashboard/sales" },
+          { label: "Ventas", href: "/dashboard/sales" },
           { label: "Nueva Venta" },
         ]}
       />

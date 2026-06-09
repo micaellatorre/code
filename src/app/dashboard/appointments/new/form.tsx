@@ -24,7 +24,7 @@ export default function NewAppointmentForm() {
         <Breadcrumbs
           items={[
             { label: "Inicio", href: "/" },
-            { label: "Reservas / Citas", href: "/dashboard/appointments" },
+            { label: "Citas", href: "/dashboard/appointments" },
             { label: "Reserva creada" },
           ]}
         />
@@ -157,7 +157,7 @@ export default function NewAppointmentForm() {
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Reservas / Citas", href: "/dashboard/appointments" },
+          { label: "Citas", href: "/dashboard/appointments" },
           { label: "Crear Cita" },
         ]}
       />

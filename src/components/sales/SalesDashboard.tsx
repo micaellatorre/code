@@ -100,6 +100,9 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
         count={list.filteredSales.length}
         onExport={() => list.setIsExportOpen(true)}
       />
+      <div className="flex justify-between items-center">
+        <span className="whitespace-nowrap text-sm text-base-content/60">{list.filteredSales.length} registros</span>
+      </div>
       <SalesTable
         sales={list.filteredSales}
         canSeeMargin={list.canSeeMargin}

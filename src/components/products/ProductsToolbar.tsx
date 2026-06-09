@@ -1,7 +1,7 @@
 // code/src/components/products/ProductsToolbar.tsx
 
 import Link from "next/link"
-import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid"
+import { ArrowsPointingInIcon, ArrowsPointingOutIcon, FunnelIcon, EyeIcon, EyeSlashIcon, BackspaceIcon, ArrowPathIcon } from "@heroicons/react/24/solid"
 import SearchBar from "@/components/SearchBar"
 import type { ProductsInventory } from "./useProductsInventory"
 
@@ -12,52 +12,20 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
 
   return (
     <>
-      <div className="rounded-box border border-base-content/10 bg-base-100 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/dashboard/trade-in" className="btn btn-outline btn-sm">
-            Cotizador
-          </Link>
-          <div className="join border border-base-content/10">
-            {([
-              ["PHONES", "Equipos"],
-              ["ACCESSORIES", "Accesorios"],
-              ["TRADE_INS", "Canjes Pendientes"],
-            ] as const).map(([segment, label]) => (
-              <button key={segment} type="button" className={`join-item btn btn-sm ${inventorySegment === segment ? "btn-active" : ""}`} onClick={() => selectInventorySegment(segment)}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => setDrawerOpen(true)}>
-            <FunnelIcon className="size-5" />
-            Ajustes / Filtros
-          </button>
-        </div>
-      </div>
-
-      <div className="hidden">
       <div className="flex justify-between items-center">
         <div className="flex flex-wrap flex-row items-center justify-between gap-2">
-          <h2 className="text-2xl font-bold hidden sm:block">
-            Productos
-          </h2>
-          <div className="flex flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2 items-center">
-            {viewMode === "DETAIL" ? (
-              <div className="flex flex-row items-center gap-1">
-                <span className="ml-1 text-sm text-base-content/60">Resultados {filteredProducts.length}</span>
-                <span className="text-sm text-base-content/30">de</span>
-                <span className="text-sm text-base-content/30">{totalProducts}</span>
-              </div>
-            ) : (
-              <div className="flex flex-row items-center gap-1">
-                <span className="ml-1 text-sm text-base-content/60">Grupos {groupedCounts.groups}</span>
-                <span className="text-sm text-base-content/30">| Items {groupedCounts.instances}</span>
-                <span className="text-sm text-base-content/30">| Stock {groupedCounts.totalStock}</span>
-                <span className="text-sm text-base-content/30">| Disp. {groupedCounts.totalAvail}</span>
-              </div>
-            )}
-
-            <div className="divider divider-horizontal mx-0 hidden sm:block" />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="join border border-base-content/10">
+              {([
+                ["PHONES", "Equipos"],
+                ["ACCESSORIES", "Accesorios"],
+                ["TRADE_INS", "Canjes Pendientes"],
+              ] as const).map(([segment, label]) => (
+                <button key={segment} type="button" className={`join-item btn btn-sm ${inventorySegment === segment ? "btn-active" : ""}`} onClick={() => selectInventorySegment(segment)}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="sm:ml-2 flex items-center gap-2">
               <div className="join border-[0.1em] border-base-content/10">
                 <button
@@ -79,67 +47,8 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
                 </button>
               </div>
             </div>
-
-            <div className="sm:ml-2 flex items-center gap-2">
-              <div className="join border-[0.1em] border-base-content/10 ">
-                <button
-                  type="button"
-                  className={`join-item btn btn-xs sm:btn-sm ${typeFilter === "PHONE" ? "btn-active" : ""}`}
-                  onClick={() => setTypeFilter(typeFilter === "PHONE" ? "" : "PHONE")}
-                >
-                  Teléfonos
-                </button>
-                <div className="divider divider-horizontal mx-[-4px]"></div>
-                <button
-                  type="button"
-                  className={`join-item btn btn-xs sm:btn-sm ${typeFilter === "ACCESSORY" ? "btn-active" : ""}`}
-                  onClick={() => setTypeFilter(typeFilter === "ACCESSORY" ? "" : "ACCESSORY")}
-                >
-                  Accesorios
-                </button>
-              </div>
-              {typeFilter ? (
-                <button className="btn btn-ghost btn-xs" onClick={() => setTypeFilter("")}>
-                  ✕
-                </button>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs sm:btn-sm btn-outline border border-base-content/10 flex items-center"
-              onClick={() => setIsTableExpanded(!isTableExpanded)}
-              title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
-            >
-              {isTableExpanded ? "Comprimir" : "Expandir "} Tabla
-              {isTableExpanded ? <ArrowsPointingInIcon className="size-5 sm:size-6" /> : <ArrowsPointingOutIcon className="size-5 sm:size-6" />}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-xs sm:btn-sm btn-ghost border border-base-content/10"
-              onClick={() => mutate()}
-              title="Refrescar"
-            >
-              {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Refrescar"}
-            </button>
-            {canCreateProducts ? (
-              <div className="flex items-center sm:hidden">
-                <Link href="/dashboard/products/new" className="btn btn-primary btn-sm">
-                  Nuevo Producto
-                </Link>
-              </div>
-            ) : null}
           </div>
         </div>
-
-        {canCreateProducts ? (
-          <div className="sm:flex items-center hidden">
-            <Link href="/dashboard/products/new" className="btn btn-primary">
-              Nuevo Producto
-            </Link>
-          </div>
-        ) : null}
-      </div>
       </div>
 
       {error ? (
@@ -167,71 +76,107 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
           {locations.map((location) => <option key={location} value={location}>{location}</option>)}
         </select>
         <input className="input input-bordered input-xs sm:input-sm" value={imeiSearch} onChange={(e) => setImeiSearch(e.target.value)} placeholder="Buscar / escanear IMEI" inputMode="numeric" autoComplete="off" />
-        <button type="button" className="btn btn-ghost btn-xs sm:btn-sm" onClick={() => clearFilters()}>Limpiar</button>
-        <button type="button" className="btn btn-ghost btn-xs sm:btn-sm" onClick={() => mutate()}>{isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Refrescar"}</button>
         <button type="button" className="btn btn-ghost btn-xs sm:btn-sm" onClick={() => setShowSensitiveColumns((prev) => !prev)} title={showSensitiveColumns ? "Ocultar columnas sensibles" : "Mostrar columnas sensibles"}>
           {showSensitiveColumns ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
           {showSensitiveColumns ? "Ocultar sensibles" : "Mostrar sensibles"}
         </button>
-        {canCreateProducts ? <Link href="/dashboard/products/new" className="btn btn-primary btn-xs sm:btn-sm">Nuevo producto</Link> : null}
         {hasNext ? <button type="button" className="btn btn-outline btn-xs sm:btn-sm" disabled={isLoading} onClick={() => setCursor(data?.nextCursor ?? null)}>Cargar mas</button> : null}
       </div>
 
       <div className="hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
-        <div className="flex flex-grow flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2 items-center">
-          <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} search={search} />
-          <button type="button" className="btn btn-outline btn-xs sm:btn-sm" onClick={() => setDrawerOpen(true)}>
-            <FunnelIcon className="size-5 sm:size-6" />
-            Filtros
-          </button>
-          <select
-            className="select select-bordered select-xs sm:select-sm"
-            value={orderBy}
-            onChange={(e) => setOrderBy(e.target.value)}>
-            <option value="alpha_asc">Alfabético A-Z</option>
-            <option value="alpha_desc">Alfabético Z-A</option>
-            <option value="created_desc">Más Nuevos Creados</option>
-            <option value="created_asc">Más Viejos Creados</option>
-            <option value="updated_desc">Más Nuevos Modificados</option>
-            <option value="updated_asc">Más Viejos Modificados</option>
-          </select>
-          <select
-            className="select select-bordered select-xs sm:select-sm"
-            value={stateFilter}
-            onChange={(e) => setStateFilter(e.target.value)}>
-            <option value="">Todos los estados</option>
-            {stateOptions.map((s) => (
-              <option key={s} value={s}>
-                {stateLabelMap[s] ?? s}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select select-bordered select-xs sm:select-sm"
-            value={senadoFilter}
-            onChange={(e) => setSenadoFilter(e.target.value)}
-          >
-            <option value="">Todas las señas</option>
-            <option value="false">No señados</option>
-            <option value="true">Señados</option>
-          </select>
-          <button type="button" className="btn btn-ghost btn-xs sm:btn-sm" onClick={() => clearFilters()}>
-            Limpiar
-          </button>
-          {hasNext ? (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              disabled={isLoading}
-              onClick={() => setCursor(data?.nextCursor ?? null)}
-              title="Cargar más"
-            >
-              {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Cargar más"}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 h-auto">
+          <div className="flex flex-grow flex-wrap gap-2 sm:gap-4 rounded-box bg-base-200 p-2 items-center">
+            <SearchBar placeholder="Buscar por modelo..." onSearch={setSearch} search={search} />
+            <button type="button" className="btn btn-outline btn-xs sm:btn-sm" onClick={() => setDrawerOpen(true)}>
+              <FunnelIcon className="size-5 sm:size-6" />
+              Filtros
             </button>
-          ) : null}
+            <select
+              className="select select-bordered select-xs sm:select-sm"
+              value={orderBy}
+              onChange={(e) => setOrderBy(e.target.value)}>
+              <option value="alpha_asc">Alfabético A-Z</option>
+              <option value="alpha_desc">Alfabético Z-A</option>
+              <option value="created_desc">Más Nuevos Creados</option>
+              <option value="created_asc">Más Viejos Creados</option>
+              <option value="updated_desc">Más Nuevos Modificados</option>
+              <option value="updated_asc">Más Viejos Modificados</option>
+            </select>
+            <select
+              className="select select-bordered select-xs sm:select-sm"
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value)}>
+              <option value="">Todos los estados</option>
+              {stateOptions.map((s) => (
+                <option key={s} value={s}>
+                  {stateLabelMap[s] ?? s}
+                </option>
+              ))}
+            </select>
+            <select
+              className="select select-bordered select-xs sm:select-sm"
+              value={senadoFilter}
+              onChange={(e) => setSenadoFilter(e.target.value)}
+            >
+              <option value="">Todas las señas</option>
+              <option value="false">No señados</option>
+              <option value="true">Señados</option>
+            </select>
+            <button type="button" className="btn btn-ghost btn-xs sm:btn-sm" onClick={() => clearFilters()}>
+              Limpiar
+            </button>
+            {hasNext ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={isLoading}
+                onClick={() => setCursor(data?.nextCursor ?? null)}
+                title="Cargar más"
+              >
+                {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Cargar más"}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
+      <div className="flex flex-wrap gap-2 items-center justify-between">
+        {viewMode === "DETAIL" ? (
+          <div className="flex flex-row items-center gap-1">
+            <span className="ml-1 text-sm text-base-content/60">Resultados {filteredProducts.length}</span>
+            <span className="text-sm text-base-content/30">de</span>
+            <span className="text-sm text-base-content/30">{totalProducts}</span>
+          </div>
+        ) : (
+          <div className="flex flex-row items-center gap-1">
+            <span className="ml-1 text-sm text-base-content/60">Grupos {groupedCounts.groups}</span>
+            <span className="text-sm text-base-content/30">| Items {groupedCounts.instances}</span>
+            <span className="text-sm text-base-content/30">| Stock {groupedCounts.totalStock}</span>
+            <span className="text-sm text-base-content/30">| Disp. {groupedCounts.totalAvail}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <button type="button" className="btn btn-outline btn-xs border-base-content/10 sm:btn-sm" onClick={() => setDrawerOpen(true)}>
+            <FunnelIcon className="size-5" />
+            Filtros
+          </button>
+          <button type="button" className="btn btn-outline btn-xs border-base-content/10 sm:btn-sm" onClick={() => clearFilters()}>
+            Limpiar
+            <BackspaceIcon className="size-4" />
+          </button>
+          <button type="button" className="btn btn-outline btn-xs border-base-content/10 sm:btn-sm" onClick={() => mutate()}>
+            {isLoading ? <span className="loading loading-spinner loading-xs"></span> : "Refrescar"}
+            <ArrowPathIcon className="size-5" />
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs sm:btn-sm btn-outline border border-base-content/10 flex items-center"
+            onClick={() => setIsTableExpanded(!isTableExpanded)}
+            title={isTableExpanded ? "Contraer tabla" : "Expandir tabla"}
+          >
+            {isTableExpanded ? "Comprimir" : "Expandir "} Tabla
+            {isTableExpanded ? <ArrowsPointingInIcon className="size-5 sm:size-6" /> : <ArrowsPointingOutIcon className="size-5 sm:size-6" />}
+          </button>
+        </div>
       </div>
       <div className="flex items-center gap-4">
         {(brandFilter || conditionFilter || colorFilter || capacityFilter || originFilter || stateFilter || senadoFilter || batteryMin || batteryMax) && (

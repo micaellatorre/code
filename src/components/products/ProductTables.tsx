@@ -665,7 +665,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
   function PhoneOperationalRow({ product }: { product: SerializedProduct }) {
     return (
       <tr>
-        <td>
+        {/* <td>
           <input
             type="checkbox"
             className="checkbox checkbox-xs"
@@ -673,7 +673,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             onChange={() => toggleProductSelection(product.id)}
             aria-label={`Seleccionar ${product.modelName}`}
           />
-        </td>
+        </td> */}
         <td className="font-mono text-xs">{getProductCode(product)}</td>
         <td>
           <OperationalEditableCell product={product} fieldName="modelName">{product.modelName}</OperationalEditableCell>
@@ -745,7 +745,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
         <table className="table table-zebra table-xs w-full">
           <thead>
             <tr>
-              <th>Select</th>
+              {/* <th>Select</th> */}
               <th>Codigo</th>
               <th>Modelo</th>
               {visibleImeiColumn ? <th>IMEI</th> : null}
@@ -802,19 +802,19 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
 
 
   return (
-      <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 h-[70dvh]">
+      <div className={`overflow-x-auto h-[70dvh] ${inventorySegment === "ACCESSORIES" ? "border border-base-content/10 rounded-box" : ""} `}>
         {isLoading && productsLocal.length === 0 ? (
           <div className="p-6">
             <div className="skeleton h-6 w-64 mb-3"></div>
             <div className="skeleton h-40 w-full"></div>
           </div>
         ) : inventorySegment === "PHONES" ? (
-          <div className="flex flex-col gap-3 p-3">
+          <div className="flex flex-col gap-3">
             <PhoneConditionSection sectionKey="used" title="iPhones Usados" groups={phoneSections.used} />
             <PhoneConditionSection sectionKey="sealed" title="iPhones Sellados" groups={phoneSections.sealed} />
           </div>
         ) : inventorySegment === "TRADE_INS" ? (
-          <div className="flex flex-col gap-3 p-3">
+          <div className="flex flex-col gap-3">
             {operationalProducts.length ? (
               <>
                 <PhoneConditionSection sectionKey="trade-in-used" title="Canjes Pendientes Usados" groups={phoneSections.used} />
@@ -856,7 +856,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             </tbody>
           </table>
         ) : (
-          <table className={`table table-zebra w-full table-pin-rows ${isTableExpanded ? "" : "table-xs"}`}>
+          <table className={`table table-zebra w-full  table-pin-rows ${isTableExpanded ? "" : "table-xs"}`}>
             <thead>
               <tr>
                 <th className="w-[40px]"></th>

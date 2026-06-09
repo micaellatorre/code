@@ -6,7 +6,7 @@ import FilterableAppointmentsTable from "@/components/appointments/FilterableApp
 import { requireRolePage } from "@/lib/auth/auth"
 
 export const metadata: Metadata = {
-  title: "Reservas / Citas",
+  title: "Citas",
   description: "Gestion de reservas y citas",
 }
 
@@ -104,7 +104,7 @@ export default async function AppointmentsPage() {
 
   return (
     <DashboardLayout>
-      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Reservas / Citas" }]} />
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Citas" }]} />
       <div className="flex flex-col gap-4">
         <FilterableAppointmentsTable initial={serialized} />
       </div>

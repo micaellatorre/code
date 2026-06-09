@@ -2,6 +2,7 @@
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import FilterableProductsTable from '@/components/products/FilterableProductsTable'
+import ProductsHeader from '@/components/products/ProductsHeader'
 import type { Metadata } from 'next'
 import { requireRolePage } from '@/lib/auth/auth'
 
@@ -13,12 +14,14 @@ export const metadata: Metadata = {
 }
 
 export default async function ProductsPage() {
-  await requireRolePage(['ADMIN', 'VENDEDOR', 'STOCK', 'SOCIO'])
+  const session = await requireRolePage(['ADMIN', 'VENDEDOR', 'STOCK', 'SOCIO'])
+  const canCreateProducts = ['ADMIN', 'VENDEDOR', 'STOCK'].includes(session.user.activeRole)
 
   return (
     <DashboardLayout >
       <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Productos' }]} />
       <div className="flex flex-col gap-4 h-full">
+        <ProductsHeader canCreate={canCreateProducts} />
         <FilterableProductsTable />
       </div>
     </DashboardLayout>

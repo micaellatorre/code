@@ -76,7 +76,7 @@ export default function ExportAppointmentsModal({ open, onClose, appointments }:
       const html = `
         <html><head><title>Exportar reservas</title><style>
         body{font-family:Arial,sans-serif;padding:24px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:12px;text-align:left} th{background:#f3f4f6}
-        </style></head><body><h1>Reservas / Citas</h1><p>Emitido: ${new Date().toLocaleString("es-AR")}</p>
+        </style></head><body><h1>Citas</h1><p>Emitido: ${new Date().toLocaleString("es-AR")}</p>
         <table><thead><tr>${columns.map((column) => `<th>${column}</th>`).join("")}</tr></thead>
         <tbody>${rows.map((appointment) => `<tr>${columns.map((column) => `<td>${getCell(appointment, column)}</td>`).join("")}</tr>`).join("")}</tbody></table>
         </body></html>`

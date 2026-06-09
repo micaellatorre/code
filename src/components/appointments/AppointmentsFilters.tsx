@@ -34,7 +34,7 @@ export default function AppointmentsFilters({
   filtered,
 }: AppointmentsFiltersProps) {
   return (
-    <div className="flex flex-col-reverse md:flex-col gap-3 rounded-lg bg-base-200 border border-base-300 p-3 xl:flex-row xl:items-center xl:justify-between">
+    <div className="flex flex-col-reverse md:flex-col gap-2 rounded-box bg-base-200 p-2 xl:flex-row xl:items-center xl:justify-between">
       <div className="join border border-base-400">
         {segments.map((segment) => (
           <button

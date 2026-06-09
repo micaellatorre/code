@@ -238,7 +238,7 @@ export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Reservas / Citas", href: "/dashboard/appointments" },
+          { label: "Citas", href: "/dashboard/appointments" },
           { label: "Editar reserva" },
         ]}
       />

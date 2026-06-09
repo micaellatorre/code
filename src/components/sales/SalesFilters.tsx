@@ -35,7 +35,7 @@ type SalesFiltersProps = {
 
 export default function SalesFilters(props: SalesFiltersProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-3 xl:flex-row xl:items-center">
+    <div className="flex flex-wrap gap-2 rounded-box bg-base-200 p-2 items-center">
       <input
         type="text"
         className="input input-bordered input-sm min-w-64 flex-1"
@@ -59,10 +59,6 @@ export default function SalesFilters(props: SalesFiltersProps) {
       </select>
       <input type="date" className="input input-bordered input-sm" value={props.dateFrom} onChange={(event) => props.setDateFrom(event.target.value)} aria-label="Desde" />
       <input type="date" className="input input-bordered input-sm" value={props.dateTo} onChange={(event) => props.setDateTo(event.target.value)} aria-label="Hasta" />
-      <span className="whitespace-nowrap text-sm text-base-content/60">{props.count} registros</span>
-      <button type="button" className="btn btn-outline btn-sm" onClick={props.onExport}>
-        Exportar
-      </button>
     </div>
   )
 }

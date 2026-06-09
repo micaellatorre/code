@@ -6,7 +6,7 @@ import type { Metadata } from "next"
 import { requireRolePage } from "@/lib/auth/auth"
 
 export const metadata: Metadata = {
-  title: "Ventas / Canjes",
+  title: "Ventas",
   description: "Registro de operaciones comerciales y margen de rentabilidad",
 }
 
@@ -128,7 +128,7 @@ export default async function SalesPage() {
 
   return (
     <DashboardLayout>
-      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Ventas / Canjes" }]} />
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Ventas" }]} />
       <div className="flex flex-col gap-4">
         <FilterableSalesTable initial={serialized} />
       </div>

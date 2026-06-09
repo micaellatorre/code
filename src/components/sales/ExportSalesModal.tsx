@@ -69,7 +69,7 @@ export default function ExportSalesModal({
         <html><head><title>Exportar ventas</title><style>
         body{font-family:Arial,sans-serif;padding:24px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;font-size:12px;text-align:left} th{background:#f3f4f6}
         </style></head><body>
-        <h1>Ventas / Canjes</h1><p>Emitido: ${new Date().toLocaleString("es-AR")}</p>
+        <h1>Ventas</h1><p>Emitido: ${new Date().toLocaleString("es-AR")}</p>
         <table><thead><tr>${columns.map((column) => `<th>${column}</th>`).join("")}</tr></thead>
         <tbody>${rows.map((sale) => `<tr>${columns.map((column) => `<td>${getCell(sale, column)}</td>`).join("")}</tr>`).join("")}</tbody></table>
         </body></html>`
