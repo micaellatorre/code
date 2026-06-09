@@ -5,7 +5,7 @@ import { DevicePhoneMobileIcon, ShoppingBagIcon } from "@heroicons/react/24/outl
 import type { SaleItemSummary } from "./types"
 
 function TypeIcon({ type }: { type: string }) {
-  return type.toUpperCase() === "PHONE" ? <DevicePhoneMobileIcon className="size-4 shrink-0" /> : <ShoppingBagIcon className="size-4 shrink-0" />
+  return type.toUpperCase() === "PHONE" ? <DevicePhoneMobileIcon className="size-4 shrink-0 mt-1" /> : <ShoppingBagIcon className="size-4 shrink-0 mt-1" />
 }
 
 function ItemLine({ item }: { item: SaleItemSummary }) {
@@ -33,11 +33,11 @@ function ItemLine({ item }: { item: SaleItemSummary }) {
 export default function SaleItemsCell({ items }: { items: SaleItemSummary[] }) {
   if (!items.length) return <span className="text-base-content/50">Sin items</span>
 
-  const visible = items.slice(0, 2)
-  const hidden = items.slice(2)
+  const visible = items.slice(0, 1)
+  const hidden = items.slice(1)
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 p-2 border border-base-300 rounded-lg bg-base-200 w-auto">
       {visible.map((item) => (
         <ItemLine key={item.id} item={item} />
       ))}

@@ -135,5 +135,5 @@ export function formatRelativeAppointmentTime(iso: string) {
   else if (absMs >= hour) value = `${Math.round(absMs / hour)} horas`
   else value = `${Math.max(1, Math.round(absMs / minute))} min`
 
-  return diffMs >= 0 ? `Proximo: ${value}` : `Ocurrio hace ${value}`
+  return diffMs >= 0 ? `Proximo: ${value}` : `Hace ${value}`
 }

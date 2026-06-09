@@ -78,9 +78,9 @@ export default function AppointmentTableRow({
           <AppointmentCreatedByEditor appointment={appointment} isAdmin={isAdmin} {...createdByProps} />
         </div>
       </td>
-      <td className="align-top font-medium">{formatMoney(reservedValue)}</td>
+      <td className="align-top text-lg font-medium">{formatMoney(reservedValue)}</td>
       <td className="align-top">
-        <span className="badge badge-ghost gap-1">
+        <span className="badge badge-ghost gap-1 text-nowrap">
           <CreditCardIcon className="size-3" />
           Sin seña
         </span>

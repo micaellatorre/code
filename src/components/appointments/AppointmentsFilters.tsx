@@ -34,13 +34,13 @@ export default function AppointmentsFilters({
   filtered,
 }: AppointmentsFiltersProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-3 xl:flex-row xl:items-center xl:justify-between">
-      <div className="join">
+    <div className="flex flex-col-reverse md:flex-col gap-3 rounded-lg bg-base-200 border border-base-300 p-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="join border border-base-400">
         {segments.map((segment) => (
           <button
             key={segment.value}
             type="button"
-            className={`btn join-item btn-sm ${statusSegment === segment.value ? "btn-primary" : "btn-ghost"}`}
+            className={`w-auto flex-1 btn join-item btn-sm ${statusSegment === segment.value ? "btn-primary" : "btn-ghost"}`}
             onClick={() => onStatusSegmentChange(segment.value)}
           >
             {segment.label}
@@ -71,10 +71,6 @@ export default function AppointmentsFilters({
           aria-label="Hasta"
         />
       </div>
-
-      <p className="text-sm text-base-content/60">
-        Resultados <span className="font-semibold text-base-content">{filtered}</span> de {total}
-      </p>
     </div>
   )
 }

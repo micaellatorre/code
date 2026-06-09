@@ -8,7 +8,7 @@ export default function SaleBuyerCell({ sale }: { sale: SerializedSale }) {
   const isWholesale = Boolean(sale.buyer?.email || sale.buyer?.phone)
 
   return (
-    <div className="min-w-44">
+    <div className="min-w-44 flex flex-col items-start gap-2">
       {sale.buyer?.id ? (
         <Link href={`/dashboard/buyers/${sale.buyer.id}/edit`} className="font-medium text-primary hover:underline">
           {buyerName}
@@ -16,7 +16,7 @@ export default function SaleBuyerCell({ sale }: { sale: SerializedSale }) {
       ) : (
         <p className="font-medium">{buyerName}</p>
       )}
-      <span className="badge badge-outline badge-xs mt-1">{isWholesale ? "MAY" : "MIN"}</span>
+      <span className="badge badge-neutral badge-sm mt-1">{isWholesale ? "Mayorista" : "Minorista"}</span>
     </div>
   )
 }

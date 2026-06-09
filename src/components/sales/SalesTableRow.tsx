@@ -38,13 +38,15 @@ export default function SalesTableRow(props: SalesTableRowProps) {
       <td className="align-top">
         <SaleBuyerCell sale={sale} />
       </td>
-      <td className="align-top">
+      <td className="align-top flex flex-col items-start gap-1">
         <SaleAmountCell total={sale.total} />
-        <div className={`badge badge-xs mt-1 ${getStatusBadgeClass(sale.status)}`}>{sale.status ?? "CONFIRMADA"}</div>
+        <div className={`badge badge-sm mt-1 ${getStatusBadgeClass(sale.status)}`}>{sale.status ?? "CONFIRMADA"}</div>
       </td>
-      <td className="align-top">
-        <SaleMarginCell profit={sale.profit} canSeeMargin={props.canSeeMargin} />
-      </td>
+      {props.canSeeMargin && (
+        <td className="align-top">
+          <SaleMarginCell profit={sale.profit} canSeeMargin={props.canSeeMargin} />
+        </td>
+      )}
       <td className="align-top">
         <span className="badge badge-outline">{origin}</span>
       </td>

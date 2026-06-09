@@ -6,9 +6,9 @@ import type { AppointmentInterestSummary } from "./types"
 
 function ProductTypeIcon({ type }: { type: string }) {
   return type.toUpperCase() === "PHONE" ? (
-    <DevicePhoneMobileIcon className="size-4 shrink-0" />
+    <DevicePhoneMobileIcon className="size-4 shrink-0 mt-1" />
   ) : (
-    <ShoppingBagIcon className="size-4 shrink-0" />
+    <ShoppingBagIcon className="size-4 shrink-0 mt-1" />
   )
 }
 
@@ -31,8 +31,8 @@ function ItemSummary({ interest }: { interest: AppointmentInterestSummary }) {
         <span className="block truncate font-medium">{product.modelName}</span>
         <span className="block text-xs text-base-content/60">{details.join(" · ") || "Sin detalle"}</span>
         <span className="mt-1 flex flex-wrap gap-1">
-          {product.state ? <span className="badge badge-outline badge-xs">{product.state}</span> : null}
-          {product.senado ? <span className="badge badge-warning badge-xs">Senado</span> : null}
+          {product.state ? <span className="badge badge-outline badge-sm">{product.state}</span> : null}
+          {product.senado ? <span className="badge badge-warning badge-sm">Señado</span> : null}
         </span>
       </span>
     </Link>
@@ -42,11 +42,11 @@ function ItemSummary({ interest }: { interest: AppointmentInterestSummary }) {
 export default function AppointmentItemsCell({ interests }: { interests: AppointmentInterestSummary[] }) {
   if (!interests.length) return <span className="text-base-content/50">Sin items</span>
 
-  const visible = interests.slice(0, 2)
-  const hidden = interests.slice(2)
+  const visible = interests.slice(0, 1)
+  const hidden = interests.slice(1)
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 p-2 border border-base-300 rounded-lg bg-base-200">
       {visible.map((interest) => (
         <ItemSummary key={interest.id} interest={interest} />
       ))}

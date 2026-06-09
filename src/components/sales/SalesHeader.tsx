@@ -15,7 +15,7 @@ export default function SalesHeader({ canCreate, onExport }: { canCreate: boolea
         </button>
         {canCreate ? (
           <Link href="/dashboard/sales/new" className="btn btn-primary btn-sm">
-            + Nueva Venta
+            Nueva Venta
           </Link>
         ) : null}
       </div>

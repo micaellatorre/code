@@ -24,7 +24,7 @@ export default function SalesTable(props: SalesTableProps) {
             <th>Items List</th>
             <th>Cliente</th>
             <th>Importe Venta</th>
-            <th>Margen</th>
+            {props.canSeeMargin && <th>Margen</th>}
             <th>Origen</th>
             <th>Acciones</th>
           </tr>

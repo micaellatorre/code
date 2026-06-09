@@ -65,8 +65,8 @@ export function getSaleSearchText(sale: SerializedSale) {
 
 export function getMarginBadgeClass(value: string | number | null | undefined) {
   const margin = toNumber(value)
-  if (margin > 0) return "badge-success"
-  if (margin < 0) return "badge-error"
+  if (margin > 0) return "text-success"
+  if (margin < 0) return "text-error"
   return "badge-ghost"
 }
 

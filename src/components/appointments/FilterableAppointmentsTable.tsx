@@ -35,20 +35,25 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
         total={list.appointments.length}
         filtered={list.filteredAppointments.length}
       />
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-base-content/60">
+          Resultados <span className="font-semibold text-base-content">{list.filteredAppointments.length}</span> de {list.appointments.length}
+        </p>
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          className="btn btn-outline btn-sm"
-          onClick={() => list.setIsTableExpanded(!list.isTableExpanded)}
-        >
-          {list.isTableExpanded ? "Comprimir" : "Expandir"} tabla
-          {list.isTableExpanded ? (
-            <ArrowsPointingInIcon className="size-4" />
-          ) : (
-            <ArrowsPointingOutIcon className="size-4" />
-          )}
-        </button>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => list.setIsTableExpanded(!list.isTableExpanded)}
+          >
+            {list.isTableExpanded ? "Comprimir" : "Expandir"} tabla
+            {list.isTableExpanded ? (
+              <ArrowsPointingInIcon className="size-4" />
+            ) : (
+              <ArrowsPointingOutIcon className="size-4" />
+            )}
+          </button>
+        </div>
       </div>
 
       <AppointmentsTable

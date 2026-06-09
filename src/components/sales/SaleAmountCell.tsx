@@ -3,5 +3,5 @@
 import { formatUsd } from "./salesUtils"
 
 export default function SaleAmountCell({ total }: { total: string | null }) {
-  return <span className="font-semibold">{formatUsd(total)}</span>
+  return <span className="font-semibold text-lg">{formatUsd(total)}</span>
 }
