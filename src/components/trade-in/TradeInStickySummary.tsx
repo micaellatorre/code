@@ -44,7 +44,7 @@ export default function TradeInStickySummary({
             <p className="font-semibold">Credito {formatUsd(creditTotal)}</p>
             <p className="truncate text-xs text-base-content/70">{selectedScenario ? formatTradeInDifference(selectedScenario.difference) : selectedLabel ?? "Seleccion pendiente"}</p>
           </div>
-          <button type="button" className="btn btn-primary btn-sm" onClick={onAction}>Ver</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={onAction}>Ver Cotización</button>
         </div>
       </div>
     </>

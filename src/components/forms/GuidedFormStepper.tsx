@@ -19,7 +19,7 @@ export default function GuidedFormStepper({
   onStepChange: (step: number) => void
 }) {
   return (
-    <nav className="overflow-hidden rounded-lg border border-base-300 bg-base-100 p-3">
+    <nav className="overflow-hidden">
       <ol className="grid w-full gap-2 grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
         {steps.map((step, index) => {
           const status = step.status ?? (index === activeStep ? "active" : index < activeStep ? "completed" : "pending")
@@ -41,7 +41,7 @@ export default function GuidedFormStepper({
                 onClick={() => onStepChange(index)}
               >
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  className={`flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                     status === "completed"
                       ? "bg-success text-success-content"
                       : status === "active"
