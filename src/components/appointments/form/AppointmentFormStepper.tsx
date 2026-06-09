@@ -1,13 +1,13 @@
 "use client"
 
-import GuidedFormStepper from "@/components/forms/GuidedFormStepper"
+import GuidedFormStepper, { type GuidedFormStepperStep } from "@/components/forms/GuidedFormStepper"
 
 type AppointmentFormStepperProps = {
-  steps: string[]
+  steps: (string | GuidedFormStepperStep)[]
   activeStep: number
   onStepChange: (step: number) => void
 }
 
 export default function AppointmentFormStepper({ steps, activeStep, onStepChange }: AppointmentFormStepperProps) {
-  return <GuidedFormStepper steps={steps.map((step) => ({ label: step }))} activeStep={activeStep} onStepChange={onStepChange} />
+  return <GuidedFormStepper steps={steps.map((step) => (typeof step === "string" ? { label: step } : step))} activeStep={activeStep} onStepChange={onStepChange} />
 }

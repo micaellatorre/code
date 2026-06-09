@@ -136,10 +136,10 @@ export default function SaleForm({
     },
   )
 
-  const stepLabels = steps.map((step) => step.title)
+  const stepperSteps = steps.map((step) => ({ label: step.title, summary: step.summary }))
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 sm:p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold">{mode === "create" ? "Nueva venta" : "Editar venta"}</h1>
@@ -172,7 +172,7 @@ export default function SaleForm({
         <div className="alert alert-warning py-3 text-sm">Esta venta confirmada solo puede modificarse con rol ADMIN.</div>
       ) : null}
 
-      <SaleFormStepper steps={stepLabels} activeStep={form.activeStep} onStepChange={form.setActiveStep} />
+      <SaleFormStepper steps={stepperSteps} activeStep={form.activeStep} onStepChange={form.setActiveStep} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-3">

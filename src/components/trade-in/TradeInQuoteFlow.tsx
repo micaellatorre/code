@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import GuidedFormStepper from "@/components/forms/GuidedFormStepper"
 import type { Role } from "@/lib/auth/roles"
 import { calculateQuoteScenarios, calculateTradeInCreditTotal, getSelectedQuoteScenario, formatTradeInDifference, formatUsd } from "@/lib/trade-in/calculateTradeIn"
 import InterestedProductAutocomplete from "./InterestedProductAutocomplete"
@@ -11,7 +12,6 @@ import TradeInDeviceForm from "./TradeInDeviceForm"
 import TradeInQuoteSummary from "./TradeInQuoteSummary"
 import TradeInShareBox from "./TradeInShareBox"
 import TradeInStepCard from "./TradeInStepCard"
-import TradeInStepper from "./TradeInStepper"
 import TradeInStickySummary from "./TradeInStickySummary"
 import type { InterestedProductDraft, TradeInConfigDto, TradeInDeviceDraft } from "./types"
 
@@ -59,10 +59,30 @@ export default function TradeInQuoteFlow({ role }: { role: Role }) {
   const canVisitStep4 = canVisitStep3
 
   const steps = [
-    { id: 1, label: "Entrega", status: activeStep === 1 ? "active" as const : devices.length ? "completed" as const : "pending" as const, canVisit: true },
-    { id: 2, label: "Interes", status: activeStep === 2 ? "active" as const : interestedProducts.length ? "completed" as const : "pending" as const, canVisit: canVisitStep2 },
-    { id: 3, label: "Cotizacion", status: activeStep === 3 ? "active" as const : selectedScenario ? "completed" as const : "pending" as const, canVisit: canVisitStep3 },
-    { id: 4, label: "Compartir", status: activeStep === 4 ? "active" as const : "pending" as const, canVisit: canVisitStep4 },
+    {
+      label: "Entrega",
+      summary: devices.length ? `${devices.length} equipos - ${formatUsd(creditTotal)}` : "Sin equipos",
+      status: activeStep === 1 ? "active" as const : devices.length ? "completed" as const : "pending" as const,
+      canVisit: true,
+    },
+    {
+      label: "Interes",
+      summary: interestedProducts.length ? `${interestedProducts.length} opciones` : "Sin opciones",
+      status: activeStep === 2 ? "active" as const : interestedProducts.length ? "completed" as const : "pending" as const,
+      canVisit: canVisitStep2,
+    },
+    {
+      label: "Cotizacion",
+      summary: selectedScenario ? formatTradeInDifference(selectedScenario.difference) : "Seleccion pendiente",
+      status: activeStep === 3 ? "active" as const : selectedScenario ? "completed" as const : "pending" as const,
+      canVisit: canVisitStep3,
+    },
+    {
+      label: "Compartir",
+      summary: canVisitStep4 ? "Texto listo" : "Pendiente",
+      status: activeStep === 4 ? "active" as const : "pending" as const,
+      canVisit: canVisitStep4,
+    },
   ]
 
   const goToStep = (step: number) => {
@@ -100,7 +120,7 @@ export default function TradeInQuoteFlow({ role }: { role: Role }) {
 
   return (
     <div className="pb-20 lg:pb-0">
-      <TradeInStepper steps={steps} onSelect={goToStep} />
+      <GuidedFormStepper steps={steps} activeStep={activeStep - 1} onStepChange={(step) => goToStep(step + 1)} />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">

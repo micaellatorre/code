@@ -1,8 +1,12 @@
 "use client"
 
-type GuidedFormStepperStep = {
+export type GuidedStepStatus = "completed" | "active" | "pending"
+
+export type GuidedFormStepperStep = {
   label: string
   summary?: string
+  status?: GuidedStepStatus
+  canVisit?: boolean
 }
 
 export default function GuidedFormStepper({
@@ -15,11 +19,12 @@ export default function GuidedFormStepper({
   onStepChange: (step: number) => void
 }) {
   return (
-    <nav className="rounded-lg border border-base-300 bg-base-100 p-3">
-      <ol className="grid min-w-[44rem] gap-2 md:min-w-0 md:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
+    <nav className="overflow-hidden rounded-lg border border-base-300 bg-base-100 p-3">
+      <ol className="grid w-full gap-2 grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
         {steps.map((step, index) => {
-          const status = index === activeStep ? "active" : index < activeStep ? "completed" : "pending"
+          const status = step.status ?? (index === activeStep ? "active" : index < activeStep ? "completed" : "pending")
           const statusLabel = status === "active" ? "Activo" : status === "completed" ? "Completo" : "Pendiente"
+          const canVisit = step.canVisit ?? true
 
           return (
             <li key={`${index}-${step.label}`}>
@@ -31,7 +36,8 @@ export default function GuidedFormStepper({
                     : status === "completed"
                       ? "border-success/40 bg-success/10"
                       : "border-base-300 bg-base-200/40 text-base-content/55"
-                } hover:border-primary/60`}
+                } ${canVisit ? "hover:border-primary/60" : "cursor-not-allowed opacity-60"}`}
+                disabled={!canVisit}
                 onClick={() => onStepChange(index)}
               >
                 <span
