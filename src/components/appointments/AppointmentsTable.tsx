@@ -49,7 +49,7 @@ export default function AppointmentsTable({
             <th>Items</th>
             <th>Cliente</th>
             <th>Precio pactado</th>
-            <th>Sena</th>
+            <th>Seña</th>
             <th>Retiro / Entrega</th>
             <th>Estado</th>
             <th>Resultado</th>

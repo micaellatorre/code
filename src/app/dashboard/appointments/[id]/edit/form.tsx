@@ -74,8 +74,8 @@ function EditAppointmentFormContent({ initialData }: { initialData: AppointmentF
     },
     {
       key: "deposit",
-      title: "Sena",
-      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin sena",
+      title: "Seña",
+      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin seña",
       node: (
         <AppointmentDepositStep
           enabled={form.depositEnabled}

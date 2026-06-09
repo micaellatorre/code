@@ -33,7 +33,7 @@ export default function NewAppointmentForm() {
           <p className="mt-2 text-base-content/70">
             Programada para {form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "el cliente seleccionado"}.
           </p>
-          <p className="mt-1 text-sm text-base-content/60">Sena de {form.depositTotal} registrada como dato local del flujo.</p>
+          <p className="mt-1 text-sm text-base-content/60">Seña de {form.depositTotal} registrada como dato local del flujo.</p>
           <div className="mt-6 flex justify-center gap-2">
             <Link href="/dashboard/appointments" className="btn btn-primary">
               Ver citas
@@ -99,8 +99,8 @@ export default function NewAppointmentForm() {
     },
     {
       key: "deposit",
-      title: "Sena",
-      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin sena",
+      title: "Seña",
+      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin seña",
       node: (
         <AppointmentDepositStep
           enabled={form.depositEnabled}
@@ -165,7 +165,7 @@ export default function NewAppointmentForm() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold">Crear Cita</h1>
-            <p className="mt-1 text-sm text-base-content/60">Gestiona cliente, items, sena, Plan Canje y seguimiento comercial.</p>
+            <p className="mt-1 text-sm text-base-content/60">Gestiona cliente, items, seña, Plan Canje y seguimiento comercial.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-base-content/80">Plan Canje</span>

@@ -255,7 +255,7 @@ export function useAppointmentForm(mode: AppointmentFormMode, initialData?: Appo
         { label: "Cliente", value: selectedBuyer ? `${selectedBuyer.name} ${selectedBuyer.surname ?? ""}`.trim() : "-" },
         { label: "Items", value: `${items.length}` },
         { label: "Precio acordado", value: `${agreedTotal}` },
-        { label: "Sena local", value: `${depositTotal}` },
+        { label: "Seña local", value: `${depositTotal}` },
         { label: "Plan Canje", value: planCanjeEnabled ? `${tradeInDevices.length} equipos / USD ${tradeInCredit.toFixed(2)}` : "No" },
         { label: "Saldo", value: `${balance}` },
       ],

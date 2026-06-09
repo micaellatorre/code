@@ -37,7 +37,7 @@ export default function Navbar({
   }, [error])
 
   return (
-    <header className="sticky top-0 z-[100] bg-base-100/85 backdrop-blur">
+    <header className="sticky top-0 z-[100] bg-base-100/35 backdrop-blur">
       <div className="navbar min-h-16 px-3 sm:px-4">
         <div className="flex flex-1 items-center gap-2">
           <button

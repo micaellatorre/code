@@ -160,7 +160,7 @@ export default function SaleReservationStep({
                   <p className="text-sm text-base-content/60">
                     {appointment.interests.map((interest) => interest.product.modelName).join(" · ")}
                   </p>
-                  <p className="text-xs text-base-content/50">Deposito / Sena: USD 0 · Total estimado: {formatUsd(total)}</p>
+                  <p className="text-xs text-base-content/50">Deposito / Seña: USD 0 · Total estimado: {formatUsd(total)}</p>
                 </div>
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => selectAppointment(appointment)}>
                   Seleccionar
@@ -173,7 +173,7 @@ export default function SaleReservationStep({
 
       {!appointments.length ? <p className="text-sm text-base-content/60">No hay reservas pendientes disponibles.</p> : null}
       {appointments.length && !filteredAppointments.length ? <p className="text-sm text-base-content/60">No hay reservas que coincidan con la busqueda.</p> : null}
-      <div className="alert alert-info py-3 text-sm">Las senas registradas en la reserva se conservan como contexto y se reflejan en el seguimiento comercial.</div>
+      <div className="alert alert-info py-3 text-sm">Las señas registradas en la reserva se conservan como contexto y se reflejan en el seguimiento comercial.</div>
     </div>
   )
 }

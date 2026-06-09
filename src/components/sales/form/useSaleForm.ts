@@ -155,7 +155,7 @@ export function useSaleForm({
     }
     if (modeToSubmit === "RESERVE") {
       if (payments.length === 0 || totals.totalPaid <= 0) return "Para senar, debe registrar al menos un pago mayor a 0."
-      if (totals.totalPaid > totals.total) return "La sena no puede superar el total de la venta."
+      if (totals.totalPaid > totals.total) return "La seña no puede superar el total de la venta."
     }
     return null
   }
@@ -200,7 +200,7 @@ export function useSaleForm({
 
     await confirmDialog.confirmAction({
       variant: "success",
-      title: modeToSubmit === "CONFIRM_SALE" ? "Confirmar venta" : "Registrar sena / reservar",
+      title: modeToSubmit === "CONFIRM_SALE" ? "Confirmar venta" : "Registrar seña / reservar",
       description: "Se registrara la operacion, se guardaran los pagos y se actualizara el stock correspondiente.",
       details: [
         { label: "Cliente", value: selectedBuyer ? `${selectedBuyer.name} ${selectedBuyer.surname ?? ""}`.trim() : "Consumidor Final" },
@@ -213,7 +213,7 @@ export function useSaleForm({
         { label: "Costo total", value: "Calculado por servidor", sensitive: true, visibleForRoles: ["ADMIN", "SOCIO"] },
         { label: "Ganancia", value: "Calculada por servidor", sensitive: true, visibleForRoles: ["ADMIN", "SOCIO"] },
       ],
-      confirmLabel: modeToSubmit === "CONFIRM_SALE" ? "Confirmar Venta" : "Registrar Sena",
+      confirmLabel: modeToSubmit === "CONFIRM_SALE" ? "Confirmar Venta" : "Registrar Seña",
       cancelLabel: "Volver a editar",
       loadingLabel: "Confirmando venta...",
       onConfirm: async () => {

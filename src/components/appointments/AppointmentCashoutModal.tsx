@@ -53,7 +53,7 @@ export default function AppointmentCashoutModal({ appointment, onClose }: Appoin
               <p className="font-semibold">{formatMoney(total)}</p>
             </div>
             <div className="rounded-lg border border-base-300 p-3">
-              <p className="text-xs text-base-content/50">Sena</p>
+              <p className="text-xs text-base-content/50">Seña</p>
               <p className="font-semibold">{formatMoney(deposit)}</p>
             </div>
             <div className="rounded-lg border border-base-300 p-3">

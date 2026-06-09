@@ -52,7 +52,7 @@ export default function AppointmentDepositStep({
       {enabled ? (
         <div className="space-y-3">
           <div className="alert alert-info py-3 text-sm">
-            Podes registrar una o mas senas. La seña bloquea la reserva y ayuda a priorizar el seguimiento.
+            Podes registrar una o mas señas. La seña bloquea la reserva y ayuda a priorizar el seguimiento.
           </div>
 
           {deposits.map((deposit) => (

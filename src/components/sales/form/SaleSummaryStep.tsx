@@ -87,7 +87,7 @@ export default function SaleSummaryStep({
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn btn-primary" disabled={isSubmitting} onClick={onConfirm}>Confirmar Venta</button>
-        <button type="button" className="btn btn-outline" disabled={isSubmitting} onClick={onReserve}>Registrar Sena / Reservar</button>
+        <button type="button" className="btn btn-outline" disabled={isSubmitting} onClick={onReserve}>Registrar Seña / Reservar</button>
       </div>
     </div>
   )

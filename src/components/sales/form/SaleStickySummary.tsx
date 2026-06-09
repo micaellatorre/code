@@ -49,7 +49,7 @@ export default function SaleStickySummary({
           Confirmar Venta
         </button>
         <button type="button" className="btn btn-outline" disabled={isSubmitting} onClick={onReserve}>
-          Registrar Sena / Reservar
+          Registrar Seña / Reservar
         </button>
       </div>
     </aside>
