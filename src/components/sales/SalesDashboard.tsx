@@ -85,7 +85,7 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
   return (
     <div className="space-y-4">
       <SalesHeader canCreate={list.canCreate} onExport={() => list.setIsExportOpen(true)} />
-      <SalesKpis kpis={list.kpis} canSeeMargin={list.canSeeMargin} />
+      {/* <SalesKpis kpis={list.kpis} canSeeMargin={list.canSeeMargin} /> */}
       <SalesFilters
         searchQuery={list.searchQuery}
         setSearchQuery={list.setSearchQuery}
