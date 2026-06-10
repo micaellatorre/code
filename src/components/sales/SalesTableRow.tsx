@@ -47,13 +47,13 @@ export default function SalesTableRow(props: SalesTableRowProps) {
         </div>
       </td>
       <td className="align-top">
+        <SaleSellerEditor sale={sale} isAdmin={props.isAdmin} {...props.sellerProps} />
+      </td>
+      <td className="align-top">
         <SaleItemsCell items={sale.items} />
       </td>
       <td className="align-top">
         <SaleBuyerCell sale={sale} />
-      </td>
-      <td className="align-top">
-        <SaleSellerEditor sale={sale} isAdmin={props.isAdmin} {...props.sellerProps} />
       </td>
       <td className="align-top flex flex-col items-start gap-1">
         <SaleAmountCell total={sale.total} />

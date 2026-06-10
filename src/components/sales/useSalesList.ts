@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import type { Role } from "@/lib/auth/roles"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
+import { AR_TIME_ZONE } from "@/lib/timezone"
+import { formatInTimeZone } from "date-fns-tz"
 import { displaySaleUser, getSaleOrigin, getSaleSearchText, toNumber } from "./salesUtils"
 import type { SaleOriginFilter, SalesKpisValue, SaleStatusFilter, SerializedSale, UserSearchResult } from "./types"
 
@@ -11,12 +13,14 @@ export function useSalesList(initial: SerializedSale[]) {
   const { data: session } = useSession()
   const confirmDialog = useConfirmDialog()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
+  const currentUserId = (session?.user as { id?: string } | undefined)?.id
   const canSeeMargin = activeRole === "ADMIN" || activeRole === "SOCIO"
   const canCreate = activeRole === "ADMIN" || activeRole === "VENDEDOR"
   const canCancel = activeRole === "ADMIN"
   const canEditConfirmed = activeRole === "ADMIN"
   const canEdit = activeRole === "ADMIN" || activeRole === "VENDEDOR"
   const isAdmin = activeRole === "ADMIN"
+  const isSeller = activeRole === "VENDEDOR"
 
   const [sales, setSales] = useState<SerializedSale[]>(initial)
   const [searchQuery, setSearchQuery] = useState("")
@@ -118,24 +122,28 @@ export function useSalesList(initial: SerializedSale[]) {
   }, [dateFrom, dateTo, originFilter, sales, searchQuery, statusFilter])
 
   const kpis = useMemo<SalesKpisValue>(() => {
-    const totals = filteredSales.map((sale) => toNumber(sale.total))
+    const kpiSales = filteredSales.filter((sale) => {
+      if (sale.status === "CANCELADA") return false
+      if (isSeller) return Boolean(currentUserId) && sale.createdByUser?.id === currentUserId
+      return true
+    })
+    const totals = kpiSales.map((sale) => toNumber(sale.total))
     const totalSales = totals.reduce((acc, value) => acc + value, 0)
-    const now = new Date()
-    const monthCount = filteredSales.filter((sale) => {
+    const currentMonth = formatInTimeZone(new Date(), AR_TIME_ZONE, "yyyy-MM")
+    const monthSales = kpiSales.filter((sale) => {
       if (!sale.date) return false
-      const date = new Date(sale.date)
-      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
-    }).length
+      return formatInTimeZone(new Date(sale.date), AR_TIME_ZONE, "yyyy-MM") === currentMonth
+    })
+    const monthSalesTotal = monthSales.reduce((acc, sale) => acc + toNumber(sale.total), 0)
 
     return {
       totalSales,
-      minSale: totals.length ? Math.min(...totals) : 0,
-      maxSale: totals.length ? Math.max(...totals) : 0,
-      monthCount,
+      monthSalesTotal,
+      monthCount: monthSales.length,
       averageTicket: totals.length ? totalSales / totals.length : 0,
-      grossMargin: filteredSales.reduce((acc, sale) => acc + toNumber(sale.profit), 0),
+      grossMargin: kpiSales.reduce((acc, sale) => acc + toNumber(sale.profit), 0),
     }
-  }, [filteredSales])
+  }, [currentUserId, filteredSales, isSeller])
 
   function openSellerEditor(sale: SerializedSale) {
     if (!isAdmin || isSavingSeller) return
@@ -232,6 +240,7 @@ export function useSalesList(initial: SerializedSale[]) {
     canEditConfirmed,
     activeRole,
     isAdmin,
+    isSeller,
     isExportOpen,
     setIsExportOpen,
     receiptSale,

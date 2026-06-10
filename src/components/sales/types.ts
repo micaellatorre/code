@@ -86,8 +86,7 @@ export type SaleStatusFilter = "ALL" | "CONFIRMADA" | "SENADA" | "CANCELADA"
 
 export type SalesKpisValue = {
   totalSales: number
-  minSale: number
-  maxSale: number
+  monthSalesTotal: number
   monthCount: number
   averageTicket: number
   grossMargin: number

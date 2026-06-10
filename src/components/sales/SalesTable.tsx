@@ -36,9 +36,9 @@ export default function SalesTable(props: SalesTableProps) {
         <thead>
           <tr>
             <th>Fecha</th>
+            <th>Vendedor</th>
             <th>Items List</th>
             <th>Cliente</th>
-            <th>Vendedor</th>
             <th>Importe Venta</th>
             {props.canSeeMargin && <th>Margen</th>}
             <th>Origen</th>
