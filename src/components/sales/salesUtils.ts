@@ -32,6 +32,11 @@ export function getSaleBuyerName(sale: SerializedSale) {
   return sale.customerName || "Consumidor Final"
 }
 
+export function displaySaleUser(user: SerializedSale["createdByUser"]) {
+  if (!user) return "-"
+  return user.name?.trim() || user.email
+}
+
 export function getSaleOrigin(sale: SerializedSale) {
   if (sale.appointments?.length) return "Reserva"
   const origin = sale.origin?.trim()

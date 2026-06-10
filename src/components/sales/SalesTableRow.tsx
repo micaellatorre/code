@@ -6,10 +6,12 @@ import SaleAmountCell from "./SaleAmountCell"
 import SaleBuyerCell from "./SaleBuyerCell"
 import SaleItemsCell from "./SaleItemsCell"
 import SaleMarginCell from "./SaleMarginCell"
-import type { SerializedSale } from "./types"
+import SaleSellerEditor from "./SaleSellerEditor"
+import type { SerializedSale, UserSearchResult } from "./types"
 
 type SalesTableRowProps = {
   sale: SerializedSale
+  isAdmin: boolean
   canSeeMargin: boolean
   canCancel: boolean
   canEdit: boolean
@@ -17,6 +19,18 @@ type SalesTableRowProps = {
   onReceipt: () => void
   onTransport: () => void
   onCancel: () => void
+  sellerProps: {
+    isEditing: boolean
+    isSearchingUsers: boolean
+    isSavingSeller: boolean
+    userSearchQuery: string
+    userSearchResults: UserSearchResult[]
+    editorRef: React.RefObject<HTMLDivElement>
+    onOpen: () => void
+    onClose: () => void
+    onUserSearchQueryChange: (value: string) => void
+    onSelectUser: (user: UserSearchResult) => void
+  }
 }
 
 export default function SalesTableRow(props: SalesTableRowProps) {
@@ -37,6 +51,9 @@ export default function SalesTableRow(props: SalesTableRowProps) {
       </td>
       <td className="align-top">
         <SaleBuyerCell sale={sale} />
+      </td>
+      <td className="align-top">
+        <SaleSellerEditor sale={sale} isAdmin={props.isAdmin} {...props.sellerProps} />
       </td>
       <td className="align-top flex flex-col items-start gap-1">
         <SaleAmountCell total={sale.total} />

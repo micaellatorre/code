@@ -1,11 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import type { Role } from "@/lib/auth/roles"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
-import { getSaleOrigin, getSaleSearchText, toNumber } from "./salesUtils"
-import type { SaleOriginFilter, SalesKpisValue, SaleStatusFilter, SerializedSale } from "./types"
+import { displaySaleUser, getSaleOrigin, getSaleSearchText, toNumber } from "./salesUtils"
+import type { SaleOriginFilter, SalesKpisValue, SaleStatusFilter, SerializedSale, UserSearchResult } from "./types"
 
 export function useSalesList(initial: SerializedSale[]) {
   const { data: session } = useSession()
@@ -16,6 +16,7 @@ export function useSalesList(initial: SerializedSale[]) {
   const canCancel = activeRole === "ADMIN"
   const canEditConfirmed = activeRole === "ADMIN"
   const canEdit = activeRole === "ADMIN" || activeRole === "VENDEDOR"
+  const isAdmin = activeRole === "ADMIN"
 
   const [sales, setSales] = useState<SerializedSale[]>(initial)
   const [searchQuery, setSearchQuery] = useState("")
@@ -26,6 +27,78 @@ export function useSalesList(initial: SerializedSale[]) {
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [receiptSale, setReceiptSale] = useState<SerializedSale | null>(null)
   const [transportSale, setTransportSale] = useState<SerializedSale | null>(null)
+  const [editingSellerId, setEditingSellerId] = useState<string | null>(null)
+  const [userSearchQuery, setUserSearchQuery] = useState("")
+  const [debouncedUserSearchQuery, setDebouncedUserSearchQuery] = useState("")
+  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([])
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false)
+  const [isSavingSeller, setIsSavingSeller] = useState(false)
+  const sellerEditorRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setSales(initial)
+  }, [initial])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedUserSearchQuery(userSearchQuery.trim()), 250)
+    return () => window.clearTimeout(timer)
+  }, [userSearchQuery])
+
+  useEffect(() => {
+    if (!editingSellerId || !isAdmin) {
+      setUserSearchResults([])
+      setIsSearchingUsers(false)
+      return
+    }
+
+    let ignore = false
+    const ctrl = new AbortController()
+
+    async function run() {
+      setIsSearchingUsers(true)
+      try {
+        const params = new URLSearchParams()
+        params.set("q", debouncedUserSearchQuery)
+        const response = await fetch(`/api/users/search?${params.toString()}`, {
+          method: "GET",
+          cache: "no-store",
+          signal: ctrl.signal,
+        })
+
+        if (!response.ok) throw new Error(await response.text())
+
+        const body = (await response.json()) as { results?: UserSearchResult[] }
+        if (!ignore) setUserSearchResults(Array.isArray(body.results) ? body.results : [])
+      } catch (error: any) {
+        if (!ignore && error?.name !== "AbortError") {
+          console.error("Failed to search users", error)
+          setUserSearchResults([])
+        }
+      } finally {
+        if (!ignore) setIsSearchingUsers(false)
+      }
+    }
+
+    void run()
+
+    return () => {
+      ignore = true
+      ctrl.abort()
+    }
+  }, [debouncedUserSearchQuery, editingSellerId, isAdmin])
+
+  useEffect(() => {
+    if (!editingSellerId) return
+
+    function handleClickOutside(event: MouseEvent) {
+      if (sellerEditorRef.current && !sellerEditorRef.current.contains(event.target as Node) && !isSavingSeller) {
+        closeSellerEditor()
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [editingSellerId, isSavingSeller])
 
   const filteredSales = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -63,6 +136,53 @@ export function useSalesList(initial: SerializedSale[]) {
       grossMargin: filteredSales.reduce((acc, sale) => acc + toNumber(sale.profit), 0),
     }
   }, [filteredSales])
+
+  function openSellerEditor(sale: SerializedSale) {
+    if (!isAdmin || isSavingSeller) return
+    setEditingSellerId(sale.id)
+    setUserSearchQuery("")
+    setDebouncedUserSearchQuery("")
+    setUserSearchResults([])
+  }
+
+  function closeSellerEditor() {
+    setEditingSellerId(null)
+    setUserSearchQuery("")
+    setDebouncedUserSearchQuery("")
+    setUserSearchResults([])
+  }
+
+  async function handleSelectSeller(saleId: string, user: UserSearchResult) {
+    if (!isAdmin) return
+
+    setIsSavingSeller(true)
+    try {
+      const response = await fetch(`/api/sales/${saleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      })
+
+      if (!response.ok) throw new Error(await response.text())
+
+      const updated = (await response.json()) as { sale?: SerializedSale }
+      const nextUser = updated.sale?.createdByUser ?? { id: user.id, name: user.name, email: user.email }
+
+      setSales((prev) =>
+        prev.map((sale) =>
+          sale.id === saleId
+            ? { ...sale, createdByUser: nextUser, createdBy: displaySaleUser(nextUser) }
+            : sale,
+        ),
+      )
+
+      closeSellerEditor()
+    } catch (error) {
+      console.error("Failed to update sale seller", error)
+    } finally {
+      setIsSavingSeller(false)
+    }
+  }
 
   async function cancelSale(sale: SerializedSale) {
     if (!canCancel) return
@@ -111,12 +231,35 @@ export function useSalesList(initial: SerializedSale[]) {
     canEdit,
     canEditConfirmed,
     activeRole,
+    isAdmin,
     isExportOpen,
     setIsExportOpen,
     receiptSale,
     setReceiptSale,
     transportSale,
     setTransportSale,
+    sellerEditor: {
+      editingSellerId,
+      isSearchingUsers,
+      isSavingSeller,
+      userSearchQuery,
+      userSearchResults,
+      editorRef: sellerEditorRef,
+      onOpen: openSellerEditor,
+      onClose: closeSellerEditor,
+      onUserSearchQueryChange: setUserSearchQuery,
+      onSelectUser: handleSelectSeller,
+    },
+    editingSellerId,
+    userSearchQuery,
+    setUserSearchQuery,
+    userSearchResults,
+    isSearchingUsers,
+    isSavingSeller,
+    sellerEditorRef,
+    openSellerEditor,
+    closeSellerEditor,
+    handleSelectSeller,
     cancelSale,
   }
 }

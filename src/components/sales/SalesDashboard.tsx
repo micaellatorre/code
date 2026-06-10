@@ -85,7 +85,7 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
   return (
     <div className="space-y-4">
       <SalesHeader canCreate={list.canCreate} onExport={() => list.setIsExportOpen(true)} />
-      {/* <SalesKpis kpis={list.kpis} canSeeMargin={list.canSeeMargin} /> */}
+      {list.isAdmin ? <SalesKpis kpis={list.kpis} canSeeMargin={list.canSeeMargin} /> : null}
       <SalesFilters
         searchQuery={list.searchQuery}
         setSearchQuery={list.setSearchQuery}
@@ -105,6 +105,7 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
       </div>
       <SalesTable
         sales={list.filteredSales}
+        isAdmin={list.isAdmin}
         canSeeMargin={list.canSeeMargin}
         canCancel={list.canCancel}
         canEdit={list.canEdit}
@@ -112,6 +113,7 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
         onReceipt={list.setReceiptSale}
         onTransport={list.setTransportSale}
         onCancel={list.cancelSale}
+        sellerEditor={list.sellerEditor}
       />
       <ExportSalesModal open={list.isExportOpen} onClose={() => list.setIsExportOpen(false)} sales={list.filteredSales} canSeeMargin={list.canSeeMargin} />
       <ReceiptModal sale={list.receiptSale} onClose={() => list.setReceiptSale(null)} />

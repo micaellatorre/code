@@ -737,6 +737,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 function serializeSale(sale: any) {
   return {
     ...sale,
+    createdBy: sale.user?.name || sale.user?.email || "-",
+    createdByUser: sale.user
+      ? {
+          id: sale.user.id,
+          name: sale.user.name,
+          email: sale.user.email ?? "",
+        }
+      : null,
     subtotal: sale.subtotal != null ? String(sale.subtotal) : null,
     extraCosts: sale.extraCosts != null ? String(sale.extraCosts) : null,
     total: sale.total != null ? String(sale.total) : null,
