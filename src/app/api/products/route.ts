@@ -77,6 +77,31 @@ const PRODUCT_SELECT = {
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>
 
+async function getConfiguredTenantId() {
+  const tenantId = process.env.DEFAULT_TENANT_ID?.trim()
+  if (!tenantId) return undefined
+
+  const tenant = await prisma.tenant.findFirst({ where: { id: tenantId }, select: { id: true } })
+  return tenant?.id ?? tenantId
+}
+
+async function resolveProductTenantId(sessionTenantId: string | null | undefined) {
+  if (sessionTenantId) return sessionTenantId
+
+  const configuredTenantId = await getConfiguredTenantId()
+  if (configuredTenantId) {
+    const configuredTenantProducts = await prisma.product.count({ where: { tenantId: configuredTenantId } })
+    if (configuredTenantProducts > 0) return configuredTenantId
+  }
+
+  const productWithTenant = await prisma.product.findFirst({
+    select: { tenantId: true },
+    orderBy: { createdAt: "desc" },
+  })
+
+  return productWithTenant?.tenantId ?? configuredTenantId
+}
+
 /**
  * GET /api/products?state=EN_STOCK&type=PHONE&q=iPhone&limit=50&cursor=<productId>
  * Returns: { products: SerializedProduct[], nextCursor: string | null, totalProducts: number }
@@ -91,7 +116,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
 
-    const tenantId = process.env.DEFAULT_TENANT_ID
+    const tenantId = await resolveProductTenantId(auth.session.user.tenantId)
     if (!tenantId) {
       return NextResponse.json({ error: "DEFAULT_TENANT_ID not set" }, { status: 500 })
     }
@@ -203,7 +228,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const tenantId = body.tenantId ?? process.env.DEFAULT_TENANT_ID
+    const tenantId = body.tenantId ?? (await resolveProductTenantId(auth.session.user.tenantId))
     if (!tenantId) {
       return NextResponse.json({ error: "DEFAULT_TENANT_ID not set" }, { status: 500 })
     }

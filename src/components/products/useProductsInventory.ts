@@ -16,7 +16,8 @@ const fetcher = async (url: string) => {
     cache: "no-store",
   })
   if (!res.ok) throw new Error(await res.text())
-  return (await res.json()) as ProductsApiResponse
+  const body = (await res.json()) as ProductsApiResponse
+  return body
 }
 
 export function useProductsInventory() {
@@ -44,7 +45,7 @@ export function useProductsInventory() {
   // server-backed filters (hit the API)
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("PHONE")
-  const [stateFilter, setStateFilter] = useState<string>("EN_STOCK")
+  const [stateFilter, setStateFilter] = useState<string>("")
   const [senadoFilter, setSenadoFilter] = useState<string>("")
 
   // client-side filters (work on already-fetched page)
@@ -112,8 +113,6 @@ export function useProductsInventory() {
 
   useEffect(() => {
     if (!data) return
-    // cursor pagination: append; first page: replace
-    console.log(data)
     setProductsLocal((prev) => {
       if (!cursor) return data.products
       const seen = new Set(prev.map((p) => p.id))
@@ -121,7 +120,7 @@ export function useProductsInventory() {
       for (const p of data.products) if (!seen.has(p.id)) merged.push(p)
       return merged
     })
-  }, [data, cursor])
+  }, [apiUrl, data, cursor, totalProducts])
 
   // enums + labels
   const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "DISPONIBLE", "FUERA_DE_STOCK", "VENDIDO"] as const

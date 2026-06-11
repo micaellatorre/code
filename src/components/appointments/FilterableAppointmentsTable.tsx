@@ -6,6 +6,7 @@ import AppointmentsHeader from "./AppointmentsHeader"
 import AppointmentsKpis from "./AppointmentsKpis"
 import AppointmentsTable from "./AppointmentsTable"
 import AppointmentCashoutModal from "./AppointmentCashoutModal"
+import BulkAppointmentsDialog from "./BulkAppointmentsDialog"
 import ExportAppointmentsModal from "./ExportAppointmentsModal"
 import { useAppointmentsList } from "./useAppointmentsList"
 import type { SerializedAppointment } from "./types"
@@ -40,7 +41,17 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
           Resultados <span className="font-semibold text-base-content">{list.filteredAppointments.length}</span> de {list.appointments.length}
         </p>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          {list.canManageAppointments && list.selectedAppointmentIds.size > 0 ? (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => list.setIsBulkDialogOpen(true)}
+            >
+              Modificar Lote
+              <span className="badge badge-sm">{list.selectedAppointmentIds.size}</span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-outline btn-sm"
@@ -60,10 +71,16 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
         appointments={list.filteredAppointments}
         isExpanded={list.isTableExpanded}
         isAdmin={list.isAdmin}
+        canManageAppointments={list.canManageAppointments}
+        selectedAppointmentIds={list.selectedAppointmentIds}
         savingOutcomeId={list.savingOutcomeId}
+        savingStatusId={list.savingStatusId}
         editingOutcomeId={list.editingOutcomeId}
+        onToggleSelected={list.toggleAppointmentSelection}
+        onToggleAllVisible={list.toggleAllVisibleAppointments}
         setEditingOutcomeId={list.setEditingOutcomeId}
         onUpdateOutcome={list.handleUpdateOutcome}
+        onUpdateStatus={list.handleUpdateStatus}
         onDelete={list.handleDelete}
         onCashout={list.setCashoutAppointment}
         createdBy={{
@@ -81,6 +98,14 @@ export default function FilterableAppointmentsTable({ initial }: { initial: Seri
       />
 
       <ExportAppointmentsModal open={list.isExportModalOpen} onClose={() => list.setIsExportModalOpen(false)} appointments={list.filteredAppointments} />
+      <BulkAppointmentsDialog
+        open={list.isBulkDialogOpen}
+        appointments={list.selectedAppointments}
+        loading={list.isBulkSaving}
+        onClose={() => list.setIsBulkDialogOpen(false)}
+        onUpdateStatus={list.handleBulkUpdateStatus}
+        onDelete={list.handleBulkDelete}
+      />
       <AppointmentCashoutModal appointment={list.cashoutAppointment} onClose={() => list.setCashoutAppointment(null)} />
     </div>
   )

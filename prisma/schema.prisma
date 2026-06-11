@@ -94,32 +94,48 @@ model Product {
   @@index([tenantId, modelName, capacityGB, condition])
 }
 
-/// Entidad Comprador (cliente final) para analytics y campañas.
 model Buyer {
-  id        String    @id @default(cuid())
-  tenantId  String
-  tenant    Tenant    @relation(fields: [tenantId], references: [id])
-  // Datos mínimos; ampliar cuando sea necesario
-  name      String
-  surname   String?
-  dob       DateTime? // fecha de nacimiento
-  phone     String?
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  type BuyerType @default(MINORISTA)
+
+  name String
+  surname String?
+  businessName String?
+  dni String?
+  cuit String?
+  dob DateTime?
+  province String?
+  city String?
+  postalCode String?
+
+  notes String?
+
+  email String?
   instagram String?
-  email     String?
-  cuit      String?
-  dni       String?
+  phone String?
+  addressStreet String?
+  addressNumber String?
+
+  sales Sale[]
+
+  appointments Appointment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sales Sale[]
-
-  // NUEVO
-  appointments Appointment[]
-
+  @@index([tenantId, type])
   @@index([tenantId, name])
+  @@index([tenantId, surname])
+  @@index([tenantId, businessName])
+  @@index([tenantId, dni])
+  @@index([tenantId, cuit])
   @@index([tenantId, instagram])
   @@index([tenantId, phone])
+  @@index([tenantId, email])
+  @@index([tenantId, province, city])
 }
 
 /// Venta encabezado.
@@ -566,4 +582,9 @@ enum TradeInDeductionCategory {
   CAMARA
   FUNCIONAMIENTO
   OTRO
+}
+
+enum BuyerType {
+  MINORISTA
+  MAYORISTA
 }

@@ -12,44 +12,10 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
 
   return (
     <>
-      <div className="flex justify-between items-center">
+      {/* <div className="flex justify-between items-center">
         <div className="flex flex-wrap flex-row items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="join border border-base-content/10">
-              {([
-                ["PHONES", "Equipos"],
-                ["ACCESSORIES", "Accesorios"],
-                ["TRADE_INS", "Canjes Pendientes"],
-              ] as const).map(([segment, label]) => (
-                <button key={segment} type="button" className={`join-item btn btn-sm ${inventorySegment === segment ? "btn-active" : ""}`} onClick={() => selectInventorySegment(segment)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="sm:ml-2 flex items-center gap-2">
-              <div className="join border-[0.1em] border-base-content/10">
-                <button
-                  type="button"
-                  className={`join-item btn btn-xs sm:btn-sm ${viewMode === "DETAIL" ? "btn-active" : ""}`}
-                  onClick={() => setViewMode("DETAIL")}
-                  title="Detalle de Stock"
-                >
-                  Detalle
-                </button>
-                <div className="divider divider-horizontal mx-[-4px]"></div>
-                <button
-                  type="button"
-                  className={`join-item btn btn-xs sm:btn-sm ${viewMode === "GENERAL" ? "btn-active" : ""}`}
-                  onClick={() => setViewMode("GENERAL")}
-                  title="Stock General"
-                >
-                  General
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
+      </div> */}
 
       {error ? (
         <div role="alert" className="alert alert-error">
@@ -58,6 +24,39 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
       ) : null}
 
       <div className="flex flex-wrap gap-2 rounded-box bg-base-200 p-2 items-center">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="join border border-base-400">
+            {([
+              ["PHONES", "Equipos"],
+              ["ACCESSORIES", "Accesorios"],
+              ["TRADE_INS", "Canjes"],
+            ] as const).map(([segment, label]) => (
+              <button key={segment} type="button" className={`w-auto flex-1 btn join-item btn-sm text-nowrap ${inventorySegment === segment ? "btn-primary" : "btn-ghost"}`} onClick={() => selectInventorySegment(segment)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="sm:ml-2 flex items-center gap-2">
+            <div className="join border-[0.1em] border-base-content/10">
+              <button
+                type="button"
+                className={`join-item btn btn-xs sm:btn-sm ${viewMode === "DETAIL" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setViewMode("DETAIL")}
+                title="Detalle de Stock"
+              >
+                Detalle
+              </button>
+              <button
+                type="button"
+                className={`join-item btn btn-xs sm:btn-sm ${viewMode === "GENERAL" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setViewMode("GENERAL")}
+                title="Stock General"
+              >
+                General
+              </button>
+            </div>
+          </div>
+        </div>
         <SearchBar placeholder="Buscar productos..." onSearch={setSearch} search={search} />
         <select className="select select-bordered select-xs sm:select-sm" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
           <option value="">Todos los estados</option>
@@ -80,7 +79,6 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
           {showSensitiveColumns ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
           {showSensitiveColumns ? "Ocultar sensibles" : "Mostrar sensibles"}
         </button>
-        {hasNext ? <button type="button" className="btn btn-outline btn-xs sm:btn-sm" disabled={isLoading} onClick={() => setCursor(data?.nextCursor ?? null)}>Cargar mas</button> : null}
       </div>
 
       <div className="hidden">
@@ -142,9 +140,10 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
       <div className="flex flex-wrap gap-2 items-center justify-between">
         {viewMode === "DETAIL" ? (
           <div className="flex flex-row items-center gap-1">
-            <span className="ml-1 text-sm text-base-content/60">Resultados {filteredProducts.length}</span>
+            <span className="ml-1 text-sm text-base-content/60">Resultados {isLoading ? <span className="loading loading-spinner loading-xs"></span> : filteredProducts.length}</span>
             <span className="text-sm text-base-content/30">de</span>
-            <span className="text-sm text-base-content/30">{totalProducts}</span>
+            <span className="text-sm text-base-content/60">{totalProducts}</span>
+              {hasNext ? <button type="button" className="ml-2 btn btn-outline btn-xs sm:btn-sm" disabled={isLoading} onClick={() => setCursor(data?.nextCursor ?? null)}>Cargar más</button> : null}
           </div>
         ) : (
           <div className="flex flex-row items-center gap-1">
@@ -154,6 +153,7 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
             <span className="text-sm text-base-content/30">| Disp. {groupedCounts.totalAvail}</span>
           </div>
         )}
+
         <div className="flex items-center gap-2">
           <button type="button" className="btn btn-outline btn-xs border-base-content/10 sm:btn-sm" onClick={() => setDrawerOpen(true)}>
             <FunnelIcon className="size-5" />

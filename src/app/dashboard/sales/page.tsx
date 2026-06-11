@@ -25,7 +25,7 @@ export default async function SalesPage() {
     take: 200,
     include: {
       user: { select: { id: true, name: true, email: true } },
-      buyer: { select: { id: true, name: true, surname: true, phone: true, instagram: true, email: true } },
+      buyer: { select: { id: true, type: true, name: true, surname: true, businessName: true, phone: true, instagram: true, email: true } },
       payments: { select: { id: true, method: true, currency: true, amount: true, paidAt: true, note: true }, orderBy: { paidAt: "asc" } },
       appointments: { select: { id: true } },
       items: {
@@ -81,8 +81,10 @@ export default async function SalesPage() {
     buyer: sale.buyer
       ? {
           id: sale.buyer.id,
+          type: sale.buyer.type,
           name: sale.buyer.name,
           surname: sale.buyer.surname,
+          businessName: sale.buyer.businessName,
           phone: sale.buyer.phone,
           instagram: sale.buyer.instagram,
           email: sale.buyer.email,

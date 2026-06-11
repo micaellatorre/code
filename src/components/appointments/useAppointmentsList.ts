@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
-import type { AppointmentOutcome } from "@prisma/client"
+import type { AppointmentOutcome, AppointmentStatus } from "@prisma/client"
 import type { Role } from "@/lib/auth/roles"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import { toArgDateInputValue } from "@/lib/timezone"
@@ -26,8 +26,10 @@ export function useAppointmentsList(initial: SerializedAppointment[]) {
   const confirmDialog = useConfirmDialog()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
   const isAdmin = activeRole === "ADMIN"
+  const canManageAppointments = activeRole === "ADMIN" || activeRole === "VENDEDOR"
 
   const [appointments, setAppointments] = useState<SerializedAppointment[]>(initial)
+  const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<Set<string>>(() => new Set())
   const [searchQuery, setSearchQuery] = useState("")
   const [statusSegment, setStatusSegment] = useState<AppointmentStatusSegment>("active")
   const [dateFrom, setDateFrom] = useState("")
@@ -35,6 +37,9 @@ export function useAppointmentsList(initial: SerializedAppointment[]) {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(toArgDateInputValue(new Date()))
   const [isTableExpanded, setIsTableExpanded] = useState(false)
   const [savingOutcomeId, setSavingOutcomeId] = useState<string | null>(null)
+  const [savingStatusId, setSavingStatusId] = useState<string | null>(null)
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
+  const [isBulkSaving, setIsBulkSaving] = useState(false)
   const [editingOutcomeId, setEditingOutcomeId] = useState<string | null>(null)
   const [cashoutAppointment, setCashoutAppointment] = useState<SerializedAppointment | null>(null)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
@@ -50,6 +55,14 @@ export function useAppointmentsList(initial: SerializedAppointment[]) {
   useEffect(() => {
     setAppointments(initial)
   }, [initial])
+
+  useEffect(() => {
+    const validIds = new Set(appointments.map((appointment) => appointment.id))
+    setSelectedAppointmentIds((prev) => {
+      const next = new Set([...prev].filter((id) => validIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [appointments])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedUserSearchQuery(userSearchQuery.trim()), 250)
@@ -153,6 +166,36 @@ export function useAppointmentsList(initial: SerializedAppointment[]) {
     )
   }, [appointments])
 
+  const selectedAppointments = useMemo(
+    () => appointments.filter((appointment) => selectedAppointmentIds.has(appointment.id)),
+    [appointments, selectedAppointmentIds],
+  )
+
+  function toggleAppointmentSelection(id: string) {
+    setSelectedAppointmentIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllVisibleAppointments() {
+    setSelectedAppointmentIds((prev) => {
+      const next = new Set(prev)
+      const visibleIds = filteredAppointments.map((appointment) => appointment.id)
+      const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => next.has(id))
+
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id))
+      } else {
+        visibleIds.forEach((id) => next.add(id))
+      }
+
+      return next
+    })
+  }
+
   function openCreatedByEditor(appointment: SerializedAppointment) {
     if (!isAdmin || isSavingCreatedBy) return
     setEditingCreatedById(appointment.id)
@@ -228,6 +271,86 @@ export function useAppointmentsList(initial: SerializedAppointment[]) {
     }
   }
 
+  async function handleUpdateStatus(appointment: SerializedAppointment, status: AppointmentStatus) {
+    if (!canManageAppointments || status === appointment.status) return
+
+    setSavingStatusId(appointment.id)
+
+    try {
+      const response = await fetch(`/api/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduledAt: appointment.scheduledAt,
+          durationMinutes: appointment.durationMinutes,
+          status,
+          outcome: appointment.outcome,
+          noSaleReason: appointment.noSaleReason,
+          noSaleReasonOther: appointment.noSaleReasonOther,
+          resultNotes: appointment.resultNotes,
+        }),
+      })
+
+      if (!response.ok) throw new Error(await response.text())
+
+      setAppointments((prev) => prev.map((item) => (item.id === appointment.id ? { ...item, status } : item)))
+    } catch (error) {
+      console.error("Failed to update appointment status", error)
+    } finally {
+      setSavingStatusId(null)
+    }
+  }
+
+  async function handleBulkUpdateStatus(status: AppointmentStatus) {
+    if (!canManageAppointments || selectedAppointmentIds.size === 0) return
+
+    setIsBulkSaving(true)
+    try {
+      const ids = Array.from(selectedAppointmentIds)
+      const idsToUpdate = new Set(ids)
+      const response = await fetch("/api/appointments/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, status }),
+      })
+
+      if (!response.ok) throw new Error(await response.text())
+
+      setAppointments((prev) => prev.map((appointment) => (idsToUpdate.has(appointment.id) ? { ...appointment, status } : appointment)))
+      setSelectedAppointmentIds(new Set())
+      setIsBulkDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to bulk update appointments", error)
+    } finally {
+      setIsBulkSaving(false)
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!canManageAppointments || selectedAppointmentIds.size === 0) return
+
+    setIsBulkSaving(true)
+    try {
+      const ids = Array.from(selectedAppointmentIds)
+      const idsToDelete = new Set(ids)
+      const response = await fetch("/api/appointments/bulk", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      })
+
+      if (!response.ok) throw new Error(await response.text())
+
+      setAppointments((prev) => prev.filter((appointment) => !idsToDelete.has(appointment.id)))
+      setSelectedAppointmentIds(new Set())
+      setIsBulkDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to bulk delete appointments", error)
+    } finally {
+      setIsBulkSaving(false)
+    }
+  }
+
   async function handleDelete(id: string) {
     const appointment = appointments.find((item) => item.id === id)
 
@@ -274,11 +397,23 @@ export function useAppointmentsList(initial: SerializedAppointment[]) {
     isTableExpanded,
     setIsTableExpanded,
     savingOutcomeId,
+    savingStatusId,
     editingOutcomeId,
     setEditingOutcomeId,
     handleUpdateOutcome,
+    handleUpdateStatus,
     handleDelete,
     isAdmin,
+    canManageAppointments,
+    selectedAppointmentIds,
+    selectedAppointments,
+    toggleAppointmentSelection,
+    toggleAllVisibleAppointments,
+    isBulkDialogOpen,
+    setIsBulkDialogOpen,
+    isBulkSaving,
+    handleBulkUpdateStatus,
+    handleBulkDelete,
     editingCreatedById,
     userSearchQuery,
     setUserSearchQuery,

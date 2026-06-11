@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { CreditCardIcon, PencilIcon, ShoppingCartIcon, TrashIcon } from "@heroicons/react/24/outline"
-import type { AppointmentOutcome } from "@prisma/client"
+import type { AppointmentOutcome, AppointmentStatus } from "@prisma/client"
 import {
   formatAppointmentDate,
   formatMoney,
@@ -20,11 +20,16 @@ import type { SerializedAppointment, UserSearchResult } from "./types"
 type AppointmentTableRowProps = {
   appointment: SerializedAppointment
   isAdmin: boolean
+  canManageAppointments: boolean
+  isSelected: boolean
   isEditingOutcome: boolean
   isSavingOutcome: boolean
+  isSavingStatus: boolean
+  onToggleSelected: () => void
   onEditOutcome: () => void
   onCancelOutcome: () => void
   onUpdateOutcome: (outcome: AppointmentOutcome) => void
+  onUpdateStatus: (status: AppointmentStatus) => void
   onDelete: () => void
   onCashout: () => void
   createdByProps: {
@@ -44,11 +49,16 @@ type AppointmentTableRowProps = {
 export default function AppointmentTableRow({
   appointment,
   isAdmin,
+  canManageAppointments,
+  isSelected,
   isEditingOutcome,
   isSavingOutcome,
+  isSavingStatus,
+  onToggleSelected,
   onEditOutcome,
   onCancelOutcome,
   onUpdateOutcome,
+  onUpdateStatus,
   onDelete,
   onCashout,
   createdByProps,
@@ -56,7 +66,16 @@ export default function AppointmentTableRow({
   const reservedValue = getAppointmentReservedValue(appointment)
 
   return (
-    <tr className="hover">
+    <tr className={`hover ${isSelected ? "bg-primary/5" : ""}`}>
+      <td className="align-top">
+        <input
+          type="checkbox"
+          className="checkbox checkbox-sm"
+          checked={isSelected}
+          onChange={onToggleSelected}
+          aria-label={`Seleccionar cita ${appointment.id}`}
+        />
+      </td>
       <td className="align-top">
         <div className="min-w-32">
           <p className="font-medium">{formatAppointmentDate(appointment.scheduledAt)}</p>
@@ -90,7 +109,12 @@ export default function AppointmentTableRow({
         <p className="text-xs text-base-content/50">{formatAppointmentDate(appointment.scheduledAt, "dd/MM/yyyy")}</p>
       </td>
       <td className="align-top">
-        <AppointmentStatusBadge status={appointment.status} />
+        <AppointmentStatusBadge
+          status={appointment.status}
+          canEdit={canManageAppointments}
+          isSaving={isSavingStatus}
+          onChange={onUpdateStatus}
+        />
       </td>
       <td className="align-top">
         <AppointmentOutcomeEditor

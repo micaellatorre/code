@@ -1,51 +1,41 @@
-// /buyers/page.tsx
-import DashboardLayout from '@/components/DashboardLayout'
-import Breadcrumbs from '@/components/Breadcrumbs'
-import FilterableBuyersTable from '@/components/FilterableBuyersTable'
-import prisma from '@/lib/prisma'
-import type { Metadata } from 'next'
-import { requireRolePage } from '@/lib/auth/auth'
+import DashboardLayout from "@/components/DashboardLayout"
+import Breadcrumbs from "@/components/Breadcrumbs"
+import FilterableBuyersTable from "@/components/FilterableBuyersTable"
+import prisma from "@/lib/prisma"
+import type { Metadata } from "next"
+import { requireRolePage } from "@/lib/auth/auth"
+import { serializeBuyer } from "@/lib/buyers"
 
-// SEO
 export const metadata: Metadata = {
-  title: 'Clientes',
-  description: 'Listado y gestión de clientes.',
+  title: "Clientes",
+  description: "Listado y gestion de clientes.",
 }
 
-// Fuerza render del lado del servidor y runtime Node (Prisma)
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
-// Helper de serialización (evita BigInt/Decimal en cliente)
-function toStr(v: any) {
-  return v == null ? null : String(v)
+async function getDefaultTenantId() {
+  const tenantId = process.env.DEFAULT_TENANT_ID
+  if (!tenantId) return undefined
+
+  const tenant = await prisma.tenant.findFirst({ where: { id: tenantId } })
+  return tenant?.id ?? tenantId
 }
 
 export default async function ClientsPage() {
-  await requireRolePage(['ADMIN', 'VENDEDOR'])
+  const session = await requireRolePage(["ADMIN", "VENDEDOR"])
+  const tenantId = session.user.tenantId ?? (await getDefaultTenantId())
 
   const buyers = await prisma.buyer.findMany({
-    orderBy: { createdAt: 'desc' },
+    where: tenantId ? { tenantId } : undefined,
+    orderBy: { createdAt: "desc" },
     take: 200,
   })
 
-  const serialized = buyers.map((b) => ({
-    id: b.id,
-    tenantId: b.tenantId,
-    name: b.name,
-    surname: b.surname,
-    dob: b.dob ? b.dob.toISOString() : null,
-    phone: b.phone,
-    instagram: b.instagram,
-    email: b.email,
-    cuit: b.cuit,
-    dni: b.dni,
-    createdAt: b.createdAt ? b.createdAt.toISOString() : null,
-    updatedAt: b.updatedAt ? b.updatedAt.toISOString() : null,
-  }))
+  const serialized = buyers.map(serializeBuyer)
 
   return (
-    <DashboardLayout >
-      <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Clientes' }]} />
+    <DashboardLayout>
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Clientes" }]} />
       <div className="flex flex-col gap-4">
         <FilterableBuyersTable initial={serialized} />
       </div>

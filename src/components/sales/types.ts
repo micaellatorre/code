@@ -1,4 +1,4 @@
-import type { Buyer, Currency, PaymentMethod, Product, SaleItemKind, SaleStatus } from "@prisma/client"
+import type { Buyer, BuyerType, Currency, PaymentMethod, Product, SaleItemKind, SaleStatus } from "@prisma/client"
 import type { Role } from "@/lib/auth/roles"
 import type { TradeInDeviceDraft } from "@/components/trade-in/types"
 
@@ -10,8 +10,10 @@ export type SaleUserSummary = {
 
 export type SaleBuyerSummary = {
   id?: string
+  type?: BuyerType | string
   name: string
   surname: string | null
+  businessName?: string | null
   phone?: string | null
   instagram?: string | null
   email?: string | null
