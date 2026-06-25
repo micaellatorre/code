@@ -20,6 +20,8 @@ const fetcher = async (url: string) => {
   return body
 }
 
+const DEFAULT_STATE_FILTER = "EN_STOCK"
+
 export function useProductsInventory() {
   const { data: session } = useSession()
   const confirmDialog = useConfirmDialog()
@@ -45,7 +47,7 @@ export function useProductsInventory() {
   // server-backed filters (hit the API)
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("PHONE")
-  const [stateFilter, setStateFilter] = useState<string>("")
+  const [stateFilter, setStateFilter] = useState<string>(DEFAULT_STATE_FILTER)
   const [senadoFilter, setSenadoFilter] = useState<string>("")
 
   // client-side filters (work on already-fetched page)
@@ -289,7 +291,7 @@ export function useProductsInventory() {
     setOriginFilter("")
     setLocationFilter("")
     setImeiSearch("")
-    setStateFilter("")
+    setStateFilter(DEFAULT_STATE_FILTER)
     setSenadoFilter("")
   }
 
