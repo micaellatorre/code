@@ -201,6 +201,11 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     return stockMap
   }, [products, existingItems])
 
+  const unavailableCount = useMemo(
+    () => products.filter((p) => (availableStock.get(p.id) ?? 0) <= 0 && !selection[p.id]).length,
+    [products, availableStock, selection],
+  )
+
   const handleToggleSelection = (product: ApiProduct, isSelected: boolean) => {
     const newSelection = { ...selection }
     if (isSelected) {
@@ -298,13 +303,22 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((p) => {
+                  {products.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-sm text-base-content/60">
+                        No se encontraron productos para esos filtros.
+                      </td>
+                    </tr>
+                  ) : products.map((p) => {
                     const currentStock = availableStock.get(p.id) || 0
                     const isSelected = !!selection[p.id]
-                    if (currentStock <= 0 && !isSelected) return null
+                    const isUnavailable = currentStock <= 0 && !isSelected
 
                     return (
-                      <tr key={p.id} className={isSelected ? 'bg-success/20' : ''}>
+                      <tr
+                        key={p.id}
+                        className={`${isSelected ? 'bg-success/20' : ''} ${isUnavailable ? 'opacity-50' : ''}`}
+                      >
                         <td>
                           <input
                             type="checkbox"
@@ -316,7 +330,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                         </td>
                         <td>
                           {p.imei ? (
-                            <span className="textp-base-content/40">{p.imei.slice(-4)}</span>
+                            <span className="text-base-content/40">{p.imei.slice(-4)}</span>
                           ) : (
                             'N/A'
                           )}
@@ -332,7 +346,11 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                             {p.state.replace(/_/g, ' ')}
                           </span>
                         </td>
-                        <td><span className="badge badge-ghost">{currentStock}</span></td>
+                        <td>
+                          <span className={`badge badge-ghost ${isUnavailable ? 'badge-error' : ''}`}>
+                            {currentStock}
+                          </span>
+                        </td>
                         <td>{p.batteryPct != null ? `${p.batteryPct}%` : 'N/A'}</td>
                         <td>${p.salePrice ?? '0'}</td>
                         <td>
@@ -355,7 +373,10 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
               </table>
 
               <div className="flex items-center justify-between gap-2 mt-3">
-                <div className="text-xs opacity-60">Mostrando {products.length}{hasMore ? '+' : ''} productos</div>
+                <div className="text-xs opacity-60">
+                  Mostrando {products.length}{hasMore ? '+' : ''} productos
+                  {unavailableCount > 0 ? ` (${unavailableCount} sin stock disponible)` : ''}
+                </div>
                 <button className="btn btn-sm btn-outline" disabled={!hasMore || isLoading} onClick={fetchMore}>
                   {isLoading ? <span className="loading loading-spinner loading-sm"></span> : 'Cargar más'}
                 </button>

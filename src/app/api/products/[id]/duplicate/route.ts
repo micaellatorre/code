@@ -44,6 +44,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       id: _id,
       createdAt: _ca,
       updatedAt: _ua,
+      stockInitial: _si,
       stock: _s,
       stockAvailable: _sa,
       senado: _senado,
@@ -51,14 +52,18 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       ...dataToCopy
     } = productToCopy
 
+    const defaultStock = productToCopy.type === "PHONE" ? 1 : 0
+
     const newProduct = await prisma.product.create({
       data: {
         ...dataToCopy,
         modelName: `${productToCopy.modelName} Copia #${nextCopyNumber}`,
+        imei: productToCopy.type === "PHONE" ? null : productToCopy.imei,
         senado: false,
         senadoAt: null,
-        stock: 0,
-        stockAvailable: 0,
+        stockInitial: defaultStock,
+        stock: defaultStock,
+        stockAvailable: defaultStock,
       },
     })
 
