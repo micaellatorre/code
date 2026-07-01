@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { DevicePhoneMobileIcon, ShoppingBagIcon } from "@heroicons/react/24/outline"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import type { SaleItemSummary } from "./types"
 
 function TypeIcon({ type }: { type: string }) {
@@ -15,8 +16,15 @@ function ItemLine({ item }: { item: SaleItemSummary }) {
     product.color,
     product.condition,
     product.batteryPct ? `${product.batteryPct}% bat.` : null,
-    product.imei ? `IMEI ${product.imei.slice(-4)}` : null,
     product.type?.toUpperCase() === "ACCESSORY" ? `x${item.units}` : null,
+  ].filter(Boolean)
+  const detailNodes = [
+    ...details,
+    product.imei ? (
+      <span key="imei" className="inline-flex items-baseline gap-1">
+        IMEI <ImeiDisplay imei={product.imei} />
+      </span>
+    ) : null,
   ].filter(Boolean)
 
   return (
@@ -24,7 +32,16 @@ function ItemLine({ item }: { item: SaleItemSummary }) {
       <TypeIcon type={product.type ?? ""} />
       <span className="min-w-0">
         <span className="block truncate font-medium">{product.modelName}</span>
-        <span className="block text-xs text-base-content/60">{details.join(" · ") || "Sin detalle"}</span>
+        <span className="block text-xs text-base-content/60">
+          {detailNodes.length
+            ? detailNodes.map((detail, index) => (
+                <span key={index}>
+                  {index > 0 ? " - " : null}
+                  {detail}
+                </span>
+              ))
+            : "Sin detalle"}
+        </span>
       </span>
     </Link>
   )

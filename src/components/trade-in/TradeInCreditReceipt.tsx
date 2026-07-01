@@ -1,6 +1,7 @@
 "use client"
 
 import { formatUsd } from "@/lib/trade-in/calculateTradeIn"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import type { TradeInDeviceDraft } from "./types"
 
 export default function TradeInCreditReceipt({
@@ -23,8 +24,16 @@ export default function TradeInCreditReceipt({
           <div key={device.id} className="rounded-lg border border-dashed border-base-300 bg-base-200/40 p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold">{device.modelName} · {device.capacityGB} GB</p>
-                <p className="text-xs text-base-content/60">{device.batteryRangeLabel}{device.color ? ` · ${device.color}` : ""}{device.imei ? ` · IMEI ${device.imei}` : ""}</p>
+                <p className="font-semibold">{device.modelName} - {device.capacityGB} GB</p>
+                <p className="flex flex-wrap items-baseline gap-x-1 text-xs text-base-content/60">
+                  <span>{device.batteryRangeLabel}</span>
+                  {device.color ? <span>- {device.color}</span> : null}
+                  {device.imei ? (
+                    <span className="inline-flex items-baseline gap-1">
+                      - IMEI <ImeiDisplay imei={device.imei} />
+                    </span>
+                  ) : null}
+                </p>
               </div>
               <div className="text-right font-semibold">{formatUsd(device.finalValue)}</div>
             </div>

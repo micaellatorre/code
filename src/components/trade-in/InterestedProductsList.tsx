@@ -1,6 +1,7 @@
 "use client"
 
 import { calculateQuoteScenarios, formatTradeInDifference, formatUsd } from "@/lib/trade-in/calculateTradeIn"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import type { InterestedProductDraft } from "./types"
 
 export default function InterestedProductsList({
@@ -39,7 +40,13 @@ export default function InterestedProductsList({
                 <input className="radio radio-primary radio-sm mt-1" type="radio" checked={selected} onChange={() => onSelect(product.id)} />
                 <span className="min-w-0">
                   <span className="block font-semibold">{product.modelName} - {product.capacityGB ?? "-"} GB</span>
-                  <span className="block text-xs text-base-content/60">{product.batteryPct ?? "-"}% - {product.color ?? "Sin color"} - #{product.imei ?? "Sin IMEI"}</span>
+                  <span className="flex flex-wrap items-baseline gap-x-1 text-xs text-base-content/60">
+                    <span>{product.batteryPct ?? "-"}%</span>
+                    <span>- {product.color ?? "Sin color"}</span>
+                    <span className="inline-flex items-baseline gap-1">
+                      - #<ImeiDisplay imei={product.imei} fallback="Sin IMEI" />
+                    </span>
+                  </span>
                 </span>
               </label>
               <button type="button" className="btn btn-xs btn-outline" onClick={() => onRemove(product.id)}>Eliminar</button>

@@ -3,6 +3,7 @@
 import type { Product } from "@prisma/client"
 import Link from "next/link"
 import { useState } from "react"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import ProductSelectionModal from "../sales/ProductSelectionModal"
 
 export type AppointmentInterestDraft = {
@@ -108,7 +109,7 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
               <tbody>
                 {items.map((item) => (
                   <tr key={item._id}>
-                    <td>{item.product.imei ? item.product.imei.slice(-4) : "N/A"}</td>
+                    <td><ImeiDisplay imei={item.product.imei} fallback="N/A" /></td>
                     <td>
                       <Link
                         href={`/dashboard/products/${item.productId}/edit`}

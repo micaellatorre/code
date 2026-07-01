@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { useConfirmDialog } from '@/components/ui/confirm-dialog'
+import ImeiDisplay from '@/components/common/ImeiDisplay'
 
 interface EditProductFormProps {
   id: string
@@ -110,7 +111,7 @@ export default function EditProductForm({ id }: EditProductFormProps) {
       description: "Esta accion eliminara el producto del inventario. No podra recuperarse desde esta pantalla.",
       details: [
         { label: "Producto", value: form.modelName || "Sin modelo" },
-        { label: "IMEI", value: form.imei || "Sin IMEI" },
+        { label: "IMEI", value: <ImeiDisplay imei={form.imei} fallback="Sin IMEI" /> },
         { label: "Tipo", value: form.type },
         { label: "Sucursal", value: form.location || "Sin sucursal" },
         { label: "Costo", value: form.costPrice || "0", sensitive: true },

@@ -23,7 +23,7 @@ export default function TradeInStepCard({ stepNumber, title, description, status
         <span className="min-w-0 flex-1 flex justify-between flex-row">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">{title}</span>
-            <span className={`badge badge-sm ${status === "active" ? "badge-primary" : status === "completed" ? "badge-success" : "badge-ghost"}`}>{status === "active" ? "Activo" : status === "completed" ? "Completo" : "Pendiente"}</span>
+            <span className={`text-nowrap badge badge-sm ${status === "active" ? "badge-primary" : status === "completed" ? "badge-success" : "badge-ghost"}`}>{status === "active" ? "Activo" : status === "completed" ? "Completo" : "Pendiente"}</span>
           </span>
           {isActive && description ? <span className="mt-1 block text-sm text-base-content/70">{description}</span> : null}
           {!isActive && summary ? <span className="mt-1 block text-sm text-base-content/60">{summary}</span> : null}

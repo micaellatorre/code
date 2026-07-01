@@ -1,11 +1,12 @@
 // code/src/components/products/useProductsInventory.ts
 
-import { useEffect, useMemo, useState } from "react"
+import { createElement, useEffect, useMemo, useState } from "react"
 import useSWR from "swr"
 import { useSession } from "next-auth/react"
 import { fromArgDateInputValue } from "@/lib/timezone"
 import type { Role } from "@/lib/auth/roles"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import type { InventorySegment, ProductsApiResponse, SerializedProduct } from "./types"
 import { compareIphoneModels, getIphoneSeries, getSeriesSortValue, isSealedPhone, normalizeModelKey } from "./utils"
 
@@ -606,7 +607,7 @@ export function useProductsInventory() {
       description: "Esta accion cambiara la disponibilidad operativa del producto seleccionado.",
       details: [
         { label: "Producto", value: product.modelName },
-        { label: "IMEI", value: product.imei ?? "Sin IMEI" },
+        { label: "IMEI", value: createElement(ImeiDisplay, { imei: product.imei, fallback: "Sin IMEI" }) },
         { label: "Estado actual", value: product.state },
         { label: "Nuevo estado", value: newState },
         { label: "Sucursal", value: product.location ?? "Sin sucursal" },
@@ -677,7 +678,7 @@ export function useProductsInventory() {
       details: product
         ? [
             { label: "Producto", value: product.modelName },
-            { label: "IMEI", value: product.imei ?? "Sin IMEI" },
+            { label: "IMEI", value: createElement(ImeiDisplay, { imei: product.imei, fallback: "Sin IMEI" }) },
             { label: "Estado", value: product.state },
             { label: "Sucursal", value: product.location ?? "Sin sucursal" },
             { label: "Costo", value: product.costPrice ?? "0", sensitive: true },
@@ -742,7 +743,7 @@ export function useProductsInventory() {
       details: product
         ? [
             { label: "Producto base", value: product.modelName },
-            { label: "IMEI", value: product.imei ?? "Sin IMEI" },
+            { label: "IMEI", value: createElement(ImeiDisplay, { imei: product.imei, fallback: "Sin IMEI" }) },
             { label: "Estado", value: product.state },
             { label: "Costo", value: product.costPrice ?? "0", sensitive: true },
             { label: "Precio venta", value: product.salePrice ?? "0", sensitive: true },

@@ -1,6 +1,7 @@
 'use client'
 
 import type { SaleItemDraft } from '@/components/sales/types'
+import ImeiDisplay from '@/components/common/ImeiDisplay'
 import type { Product, ProductType, ProductStatus } from '@prisma/client'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 
@@ -329,11 +330,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                           />
                         </td>
                         <td>
-                          {p.imei ? (
-                            <span className="text-base-content/40">{p.imei.slice(-4)}</span>
-                          ) : (
-                            'N/A'
-                          )}
+                          <ImeiDisplay imei={p.imei} className="text-base-content/40" fallback="N/A" />
                         </td>
                         <td>
                           <div className="font-bold">{p.modelName}</div>
@@ -342,7 +339,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                           </div>
                         </td>
                         <td>
-                          <span className={`badge badge-sm ${getStateBadgeClass(p.state)}`}>
+                          <span className={`text-nowrap badge badge-sm ${getStateBadgeClass(p.state)}`}>
                             {p.state.replace(/_/g, ' ')}
                           </span>
                         </td>

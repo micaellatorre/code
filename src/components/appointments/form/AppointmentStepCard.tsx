@@ -35,7 +35,7 @@ export default function AppointmentStepCard({
         <span className="min-w-0 flex-1 flex justify-between flex-row">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">{title}</span>
-            <span className={`badge badge-sm ${isDone ? "badge-success" : isActive ? "badge-primary" : "badge-ghost"}`}>
+            <span className={`text-nowrap badge badge-sm ${isDone ? "badge-success" : isActive ? "badge-primary" : "badge-ghost"}`}>
               {isDone ? "Completo" : isActive ? "Activo" : "Pendiente"}
             </span>
           </span>

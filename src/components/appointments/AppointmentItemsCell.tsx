@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { DevicePhoneMobileIcon, ShoppingBagIcon } from "@heroicons/react/24/outline"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import type { AppointmentInterestSummary } from "./types"
 
 function ProductTypeIcon({ type }: { type: string }) {
@@ -18,7 +19,14 @@ function ItemSummary({ interest }: { interest: AppointmentInterestSummary }) {
     product.capacityGB ? `${product.capacityGB}GB` : null,
     product.color,
     product.batteryPct ? `${product.batteryPct}% bat.` : null,
-    product.imei ? `IMEI ${product.imei.slice(-4)}` : null,
+  ].filter(Boolean)
+  const detailNodes = [
+    ...details,
+    product.imei ? (
+      <span key="imei" className="inline-flex items-baseline gap-1">
+        IMEI <ImeiDisplay imei={product.imei} />
+      </span>
+    ) : null,
   ].filter(Boolean)
 
   return (
@@ -29,10 +37,19 @@ function ItemSummary({ interest }: { interest: AppointmentInterestSummary }) {
       <ProductTypeIcon type={String(product.type ?? "")} />
       <span className="min-w-0">
         <span className="block truncate font-medium">{product.modelName}</span>
-        <span className="block text-xs text-base-content/60">{details.join(" · ") || "Sin detalle"}</span>
+        <span className="block text-xs text-base-content/60">
+          {detailNodes.length
+            ? detailNodes.map((detail, index) => (
+                <span key={index}>
+                  {index > 0 ? " - " : null}
+                  {detail}
+                </span>
+              ))
+            : "Sin detalle"}
+        </span>
         <span className="mt-1 flex flex-wrap gap-1">
           {product.state ? <span className="badge badge-outline badge-sm">{product.state}</span> : null}
-          {product.senado ? <span className="badge badge-warning badge-sm">Señado</span> : null}
+          {product.senado ? <span className="badge badge-warning badge-sm">Senado</span> : null}
         </span>
       </span>
     </Link>

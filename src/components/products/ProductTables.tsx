@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CheckIcon, ChevronDownIcon, DocumentDuplicateIcon, EyeIcon, EyeSlashIcon, PencilIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/solid"
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE, toArgDateInputValue } from "@/lib/timezone"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import type { SerializedProduct } from "./types"
 import type { ProductsInventory } from "./useProductsInventory"
 import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } from "./utils"
@@ -12,7 +13,50 @@ import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } f
 type ProductTablesProps = { inventory: ProductsInventory }
 
 export default function ProductTables({ inventory }: ProductTablesProps) {
-  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup } = inventory
+  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, startEditField, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup } = inventory
+  const [copiedImeiProductId, setCopiedImeiProductId] = React.useState<string | null>(null)
+  const copiedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+    }
+  }, [])
+
+  async function copyImeiToClipboard(imei?: string | null) {
+    const normalized = imei?.trim()
+    if (!normalized || typeof window === "undefined") return false
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(normalized)
+      } else {
+        const textarea = document.createElement("textarea")
+        textarea.value = normalized
+        textarea.setAttribute("readonly", "")
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        textarea.style.pointerEvents = "none"
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand("copy")
+        document.body.removeChild(textarea)
+      }
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function handleCopyImei(product: SerializedProduct) {
+    const copied = await copyImeiToClipboard(product.imei)
+    if (!copied) return
+
+    setCopiedImeiProductId(product.id)
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+    copiedTimerRef.current = setTimeout(() => setCopiedImeiProductId(null), 1300)
+  }
 
   function renderSensitiveColumnsToggle() {
     const label = showSensitiveColumns ? "Ocultar columnas sensibles" : "Mostrar columnas sensibles"
@@ -23,6 +67,57 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
           {showSensitiveColumns ? <EyeSlashIcon className="size-4" /> : <EyeIcon className="size-4" />}
         </button>
       </th>
+    )
+  }
+
+  function ImeiCellActions({ product }: { product: SerializedProduct }) {
+    const copied = copiedImeiProductId === product.id
+    const canEditImei = canEditField("imei")
+    const hasImei = Boolean(product.imei?.trim())
+    const actionWrapperClass = "inline-flex max-w-0 scale-90 overflow-hidden opacity-0 transition-all duration-200 ease-out group-hover:max-w-6 group-hover:scale-100 group-hover:opacity-100 group-focus-within:max-w-6 group-focus-within:scale-100 group-focus-within:opacity-100"
+
+    return (
+      <div className="group inline-flex items-center gap-0 whitespace-nowrap transition-[gap] duration-200 hover:gap-1 focus-within:gap-1">
+        <ImeiDisplay imei={product.imei} copyOnClick={false} />
+
+        {hasImei ? (
+          <span className={actionWrapperClass}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs btn-square"
+              title={copied ? "Copiado" : "Copiar IMEI"}
+              aria-label={copied ? "IMEI copiado" : "Copiar IMEI"}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                void handleCopyImei(product)
+              }}
+            >
+              <DocumentDuplicateIcon className="size-3.5" />
+            </button>
+          </span>
+        ) : null}
+
+        {canEditImei ? (
+          <span className={actionWrapperClass}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs btn-square"
+              title="Editar IMEI"
+              aria-label="Editar IMEI"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                startEditField(product.id, "imei", product.imei)
+              }}
+            >
+              <PencilIcon className="size-3.5" />
+            </button>
+          </span>
+        ) : null}
+
+        {copied ? <span className="text-nowrap text-[0.7rem] text-success">Copiado</span> : null}
+      </div>
     )
   }
 
@@ -163,9 +258,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                 </div>
               </div>
             ) : (
-              <span {...editableCellProps(p.id, "imei", p.imei)}>
-                {p.imei || "-"}
-              </span>
+              <ImeiCellActions product={p} />
             )}
           </td>
         ) : null}
@@ -196,10 +289,10 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               </div>
             </div>
           ) : (
-            <span {...editableCellProps(p.id, "modelName", p.modelName)}>
+            <span  {...editableCellProps(p.id, "modelName", p.modelName)}>
               {p.notes ? (
                 <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ""}>
-                  <span className="underline decoration-dotted">{p.modelName}</span>
+                  <span className="underline decoration-dotted cursor-help text-nowrap">{p.modelName}</span>
                 </div>
               ) : (
                 p.modelName
@@ -276,7 +369,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             </div>
           ) : (
             <span {...editableCellProps(p.id, "color", p.color)}>
-              {p.color ?? "-"}
+              <span className="text-nowrap">{p.color ?? "-"}</span>
             </span>
           )}
         </td>
@@ -545,7 +638,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
 
         <td>
           <span
-            className={`badge badge-sm ${p.senado ? "badge-secondary" : "badge-ghost"}`}
+            className={`badge badge-sm whitespace-nowrap ${p.senado ? "badge-secondary" : "badge-ghost"}`}
             title={p.senadoAt ? `Señado el ${formatInTimeZone(new Date(p.senadoAt), AR_TIME_ZONE, "dd/MM/yyyy HH:mm")}` : undefined}
           >
             {p.senado ? "Señado" : "Libre"}
@@ -560,7 +653,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                 role="button"
                 className="flex flex-row flex-nowrap gap-2 items-center cursor-pointer btn btn-xs btn-ghost py-2"
               >
-                <span className={`badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
+                <span className={`text-nowrap badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
                 <ChevronDownIcon className="h-4 w-4" />
               </div>
               <ul tabIndex={-1} className="fixed dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 !z-[1000]">
@@ -579,7 +672,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               </ul>
             </div>
           ) : (
-            <span className={`badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
+            <span className={`text-nowrap badge badge-sm ${stateColorMap[p.state] ?? "badge-ghost"}`}>{p.state}</span>
           )}
         </td>
 
@@ -676,21 +769,47 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
         </td> */}
         <td className="font-mono text-xs">{getProductCode(product)}</td>
         <td>
-          <OperationalEditableCell product={product} fieldName="modelName">{product.modelName}</OperationalEditableCell>
+          <OperationalEditableCell product={product} fieldName="modelName">
+            <span className={product.notes ? "underline decoration-dotted cursor-help text-nowrap" : ""} title={product.notes ?? ""}>
+              {product.modelName}
+            </span>
+          </OperationalEditableCell>
         </td>
         {visibleImeiColumn ? (
           <td className="font-mono text-xs">
-            <OperationalEditableCell product={product} fieldName="imei">{product.imei || "-"}</OperationalEditableCell>
+            {canEditField("imei") && isEditing(product.id, "imei") ? (
+              <input
+                autoFocus
+                type="text"
+                value={getEditingValue(product.id, "imei")}
+                onChange={(e) => updateEditingValue(product.id, "imei", e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitEditField(product.id, "imei")
+                  if (e.key === "Escape") cancelEditField(product.id, "imei")
+                }}
+                onBlur={() => commitEditField(product.id, "imei")}
+                className="input input-xs min-w-[72px]"
+                disabled={savingField?.productId === product.id && savingField?.fieldName === "imei"}
+              />
+            ) : (
+              <ImeiCellActions product={product} />
+            )}
           </td>
         ) : null}
         <td>
-          <OperationalEditableCell product={product} fieldName="capacityGB">{product.capacityGB ?? "-"} GB</OperationalEditableCell>
+          <OperationalEditableCell product={product} fieldName="capacityGB">
+            <span className='text-nowrap'>{product.capacityGB ?? "-"} GB</span>
+          </OperationalEditableCell>
         </td>
         <td>
-          <OperationalEditableCell product={product} fieldName="color">{product.color ?? "-"}</OperationalEditableCell>
+          <OperationalEditableCell product={product} fieldName="color">
+            <span className='text-nowrap'>{product.color ?? "-"}</span>
+          </OperationalEditableCell>
         </td>
         <td>
-          <OperationalEditableCell product={product} fieldName="batteryPct">{product.batteryPct ?? "-"}%</OperationalEditableCell>
+          <OperationalEditableCell product={product} fieldName="batteryPct">
+            <span className='text-nowrap'>{product.batteryPct ?? "-"}%</span>
+          </OperationalEditableCell>
         </td>
         <td>
           <OperationalEditableCell product={product} fieldName="condition">
@@ -700,7 +819,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
         <td>
           {canEditState ? (
             <select
-              className="select select-bordered select-xs"
+              className="w-36 select select-bordered select-xs"
               value={product.state}
               disabled={savingStateId === product.id}
               onChange={(e) => changeState(product.id, e.target.value)}
@@ -708,22 +827,28 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               {stateOptions.map((state) => <option key={state} value={state}>{stateLabelMap[state] ?? state}</option>)}
             </select>
           ) : (
-            <span className={`badge badge-sm ${stateColorMap[product.state] ?? "badge-ghost"}`}>{stateLabelMap[product.state] ?? product.state}</span>
+            <span className={`text-nowrap badge badge-sm ${stateColorMap[product.state] ?? "badge-ghost"}`}>{stateLabelMap[product.state] ?? product.state}</span>
           )}
         </td>
         {visibleLocationColumn ? (
           <td>
-            <OperationalEditableCell product={product} fieldName="location">{product.location || "-"}</OperationalEditableCell>
+            <OperationalEditableCell product={product} fieldName="location">
+              <span className='text-nowrap'>{product.location || "-"}</span>
+            </OperationalEditableCell>
           </td>
         ) : null}
         {visibleCostColumn ? (
           <td>
-            <OperationalEditableCell product={product} fieldName="costPrice">$ {formatDecimal(product.costPrice)}</OperationalEditableCell>
+            <OperationalEditableCell product={product} fieldName="costPrice">$ 
+              <span className='text-nowrap'>{formatDecimal(product.costPrice)}</span>
+            </OperationalEditableCell>
           </td>
         ) : null}
         {visibleSalePriceColumn ? (
           <td>
-            <OperationalEditableCell product={product} fieldName="salePrice">$ {formatDecimal(product.salePrice)}</OperationalEditableCell>
+            <OperationalEditableCell product={product} fieldName="salePrice">$ 
+              <span className='text-nowrap'>{formatDecimal(product.salePrice)}</span>
+            </OperationalEditableCell>
           </td>
         ) : null}
         {hasProductActions ? (

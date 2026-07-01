@@ -52,7 +52,7 @@ export default function UserSessionMenu({ menu = "nav" }: { menu?: "nav" | "side
                 Real: {roleLabels[session.user.role]}
               </span>
 
-              <span className={`badge badge-sm ${isSimulating ? "badge-warning" : "badge-outline"}`}>
+              <span className={`text-nowrap badge badge-sm ${isSimulating ? "badge-warning" : "badge-outline"}`}>
                 Activo: {roleLabels[session.user.activeRole]}
               </span>
 

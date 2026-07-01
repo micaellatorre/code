@@ -8,6 +8,7 @@ import { CheckIcon } from '@heroicons/react/24/solid';
 import { useSession } from 'next-auth/react';
 import type { Role } from '@/lib/auth/roles';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
+import ImeiDisplay from '@/components/common/ImeiDisplay';
 import ProductSelectionModal from './ProductSelectionModal';
 
 interface SaleItemsSectionProps {
@@ -93,7 +94,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
             description: 'Esta accion actualizara el costo usado para calcular el resultado de la venta.',
             details: [
                 { label: 'Producto', value: item.product.modelName },
-                { label: 'IMEI', value: item.product.imei ?? 'Sin IMEI' },
+                { label: 'IMEI', value: <ImeiDisplay imei={item.product.imei} fallback="Sin IMEI" /> },
                 { label: 'Costo actual', value: `$${item.unitCost || '0'}`, sensitive: true },
                 { label: 'Nuevo costo', value: `$${normalizedCost}`, sensitive: true },
             ],
@@ -148,7 +149,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
 
                                     return (
                                     <tr key={item._id}>
-                                        <td>{item.product.imei ? item.product.imei.slice(-4) : '-'}</td>
+                                        <td><ImeiDisplay imei={item.product.imei} /></td>
                                         <td>{item.product.modelName}</td>
                                         <td>{item.product.batteryPct ? item.product.batteryPct : '-'}</td>
                                         {isAdmin ? (
@@ -178,7 +179,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                                 </div>
                                             </td>
                                         ) : null}
-                                        <td>
+                                        <td className="text-center">
                                             <span className={`text-nowrap badge badge-sm ${getStateBadgeClass(String(item.product.state))}`}>
                                                 {String(item.product.state).replace(/_/g, ' ')}
                                             </span>

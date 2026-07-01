@@ -28,7 +28,7 @@ export default function SaleStepCard({
         <span className="min-w-0 flex-1 flex justify-between flex-row">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">{title}</span>
-            <span className={`badge badge-sm ${done ? "badge-success" : active ? "badge-primary" : "badge-ghost"}`}>
+            <span className={`text-nowrap badge badge-sm ${done ? "badge-success" : active ? "badge-primary" : "badge-ghost"}`}>
               {done ? "Completo" : active ? "Activo" : "Pendiente"}
             </span>
           </span>

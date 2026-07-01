@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { formatUsd } from "@/lib/trade-in/calculateTradeIn"
+import ImeiDisplay from "@/components/common/ImeiDisplay"
 import type { EligibleProductDto } from "./types"
 import { parseApiMoney } from "./utils"
 
@@ -58,7 +59,11 @@ export default function InterestedProductAutocomplete({ onAdd }: { onAdd: (produ
           <button key={product.id} type="button" className="flex w-full items-center justify-between gap-3 border-b border-base-300 p-3 text-left last:border-b-0 hover:bg-base-200" onClick={() => onAdd(product)}>
             <span>
               <span className="block font-medium">{product.modelName} - {product.capacityGB ?? "-"} GB - {product.batteryPct ?? "-"}% - {product.color ?? "Sin color"}</span>
-              <span className="block text-xs text-base-content/60"># {product.imei ?? "Sin IMEI"} - {product.state} {product.senado ? <span className="badge badge-warning badge-xs ml-1">Reservado</span> : null}</span>
+              <span className="flex flex-wrap items-baseline gap-x-1 text-xs text-base-content/60">
+                # <ImeiDisplay imei={product.imei} fallback="Sin IMEI" />
+                <span>- {product.state}</span>
+                {product.senado ? <span className="badge badge-warning badge-xs ml-1">Reservado</span> : null}
+              </span>
             </span>
             <span className="shrink-0 font-semibold">{formatUsd(parseApiMoney(product.salePrice))}</span>
           </button>
