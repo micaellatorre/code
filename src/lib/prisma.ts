@@ -11,7 +11,12 @@ const adapter = new PrismaPg({
 
 const cachedPrisma = globalForPrisma.prisma
 const cachedPrismaHasCurrentSchema =
-  cachedPrisma && "tradeInBatteryRange" in cachedPrisma && "tradeInDeductionRule" in cachedPrisma
+  cachedPrisma &&
+  "tradeInBatteryRange" in cachedPrisma &&
+  "tradeInDeductionRule" in cachedPrisma &&
+  "auditLog" in cachedPrisma &&
+  "cashMovement" in cachedPrisma &&
+  "serviceOrder" in cachedPrisma
 
 const prisma =
   cachedPrismaHasCurrentSchema

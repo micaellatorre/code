@@ -2,7 +2,7 @@
 import prisma from "@/lib/prisma";
 import { requireRoleApi } from "@/lib/auth/auth";
 import { NextResponse } from "next/server";
-import { Prisma, ProductState, SaleItemKind, SaleStatus } from "@prisma/client";
+import { Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client";
 
 type SaleOperationType = "CONFIRM_SALE" | "RESERVE";
 
@@ -376,6 +376,25 @@ export async function POST(request: Request) {
           prod.stockAvailable = updated.stockAvailable;
           prod.state = nextState ?? updated.state;
         }
+
+        await tx.auditLog.create({
+          data: {
+            tenantId: tenant.id,
+            actorUserId: auth.session.user.id,
+            actorRole: auth.session.user.activeRole as UserRole,
+            action: operationType === "RESERVE" ? "RESERVATION_CREATED" : "SALE_CONFIRMED",
+            module: operationType === "RESERVE" ? "RESERVATION" : "SALE",
+            entityType: "Sale",
+            entityId: sale.id,
+            detail: operationType === "RESERVE" ? "Reserva creada desde ventas" : "Venta confirmada",
+            metadata: {
+              total: total.toString(),
+              amountPaid: totalPaid.toString(),
+              balanceDue: balanceDue.toString(),
+              items: items.length,
+            },
+          },
+        });
 
         return { saleId: sale.id };
       },

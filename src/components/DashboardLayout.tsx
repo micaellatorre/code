@@ -15,6 +15,7 @@ import {
   ArrowsRightLeftIcon,
   Squares2X2Icon,
   UsersIcon,
+  CircleStackIcon,
 } from "@heroicons/react/24/solid"
 
 export default function DashboardLayout({
@@ -61,6 +62,13 @@ export default function DashboardLayout({
         href: "/dashboard/sales",
         icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
         allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"] as Role[],
+      },
+      {
+        key: "database",
+        label: "Base Datos",
+        href: "/dashboard/database",
+        icon: <CircleStackIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "SOCIO", "VENDEDOR", "STOCK"] as Role[],
       },
       {
         key: "trade-in",

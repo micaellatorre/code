@@ -11,6 +11,7 @@ import {
   CurrencyDollarIcon,
   DevicePhoneMobileIcon,
   UsersIcon,
+  CircleStackIcon
 } from '@heroicons/react/24/solid'
 import type { Role } from '@/lib/auth/roles'
 
@@ -52,6 +53,13 @@ const sectionMenuItems = [
     href: "/dashboard/sales",
     icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
     allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"] as Role[],
+  },
+  {
+    key: "database",
+    label: "Base de Datos",
+    href: "/dashboard/database",
+    icon: <CircleStackIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN", "SOCIO"] as Role[],
   },
   {
     key: "trade-in",

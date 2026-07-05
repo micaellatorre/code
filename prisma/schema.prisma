@@ -26,8 +26,16 @@ model User {
   updatedAt   DateTime  @default(now()) @updatedAt
   lastLoginAt DateTime?
 
-  appointments Appointment[]
-  sales        Sale[]
+  appointments         Appointment[]
+  sales                Sale[]             @relation("SaleCreatedBy")
+  closedSales          Sale[]             @relation("SaleCloser")
+  reservations         Reservation[]
+  serviceOrders        ServiceOrder[]     @relation("ServiceOrderTechnician")
+  createdServiceOrders ServiceOrder[]     @relation("ServiceOrderCreatedBy")
+  auditLogs            AuditLog[]         @relation("AuditLogActor")
+  cashMovements        CashMovement[]
+  cashTransfers        CashTransfer[]
+  closerCommissions    CloserCommission[] @relation("CloserCommissionCloser")
 }
 
 /// Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
@@ -38,17 +46,26 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  products     Product[]
-  sales        Sale[]
-  orders       WholesaleOrder[]
-  costProfiles CostProfile[]
-  purchases    Purchase[]
-  suppliers    Supplier[]
-  buyers       Buyer[]
-  users        User[]
+  products              Product[]
+  sales                 Sale[]
+  orders                WholesaleOrder[]
+  costProfiles          CostProfile[]
+  purchases             Purchase[]
+  suppliers             Supplier[]
+  buyers                Buyer[]
+  users                 User[]
+  branches              Branch[]
+  reservations          Reservation[]
+  serviceOrders         ServiceOrder[]
+  auditLogs             AuditLog[]
+  cashAccounts          CashAccount[]
+  cashMovements         CashMovement[]
+  cashTransfers         CashTransfer[]
+  closerCommissionPlans CloserCommissionPlan[]
+  closerCommissions     CloserCommission[]
 
-  tradeInBatteryRanges TradeInBatteryRange[]
-  tradeInPrices        TradeInPrice[]
+  tradeInBatteryRanges  TradeInBatteryRange[]
+  tradeInPrices         TradeInPrice[]
   tradeInDeductionRules TradeInDeductionRule[]
 }
 
@@ -79,6 +96,8 @@ model Product {
   stock          Int           @default(1) // stock actual
   stockAvailable Int           @default(1) // stock disponible para venta
   location       String? // opcional, para saber dónde está el producto, después se puede usar para filtrar por ubicación y agregar un modelo Sede con datos de ubiacion, contacto, direccion, etc.
+  branchId       String?
+  branch         Branch?       @relation(fields: [branchId], references: [id])
   origin         String? // "Proveedor Alex", "Compra en ML", "Trade-in Apple", "Plan Canje", etc.
   notes          String?
 
@@ -89,9 +108,12 @@ model Product {
 
   // NUEVO: productos marcados como “de interés” en citas
   appointmentInterests AppointmentInterest[]
+  reservationItems     ReservationItem[]
+  serviceOrders        ServiceOrder[]
 
   @@index([tenantId, type, modelName])
   @@index([tenantId, modelName, capacityGB, condition])
+  @@index([branchId])
 }
 
 model Buyer {
@@ -101,27 +123,29 @@ model Buyer {
 
   type BuyerType @default(MINORISTA)
 
-  name String
-  surname String?
+  name         String
+  surname      String?
   businessName String?
-  dni String?
-  cuit String?
-  dob DateTime?
-  province String?
-  city String?
-  postalCode String?
+  dni          String?
+  cuit         String?
+  dob          DateTime?
+  province     String?
+  city         String?
+  postalCode   String?
 
   notes String?
 
-  email String?
-  instagram String?
-  phone String?
+  email         String?
+  instagram     String?
+  phone         String?
   addressStreet String?
   addressNumber String?
 
   sales Sale[]
 
-  appointments Appointment[]
+  appointments  Appointment[]
+  reservations  Reservation[]
+  serviceOrders ServiceOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -145,7 +169,15 @@ model Sale {
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   userId String?
-  user   User?   @relation(fields: [userId], references: [id])
+  user   User?   @relation("SaleCreatedBy", fields: [userId], references: [id])
+
+  closerId String?
+  closer   User?   @relation("SaleCloser", fields: [closerId], references: [id])
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  saleType SaleType?
 
   date         DateTime @default(now())
   customerName String? // libre si no hay Buyer (legacy)
@@ -156,8 +188,9 @@ model Sale {
   buyerId String?
   buyer   Buyer?  @relation(fields: [buyerId], references: [id])
 
-  items    SaleItem[]
-  payments Payment[]
+  items             SaleItem[]
+  payments          Payment[]
+  closerCommissions CloserCommission[]
 
   // NUEVO: citas que terminaron en esta venta (en la práctica suele ser 0 o 1)
   appointments Appointment[]
@@ -167,16 +200,20 @@ model Sale {
   balanceDue Decimal    @default(0) @db.Decimal(12, 2)
 
   // Totales (recomendado recalcular en servidor)
-  subtotal   Decimal  @db.Decimal(12, 2) // Σ (NORMAL line: units*unitPrice)
-  costTotal  Decimal  @default(0) @db.Decimal(12, 2) // Σ (items.unitCost)
-  extraCosts Decimal  @db.Decimal(12, 2) // Σ (IN_TOTAL items + extraCost de CostProfile en PHONE)
-  total      Decimal  @db.Decimal(12, 2) // subtotal + extraCosts
-  profit     Decimal  @db.Decimal(12, 2) // total - costo_total
-  createdAt  DateTime @default(now())
+  subtotal     Decimal       @db.Decimal(12, 2) // Σ (NORMAL line: units*unitPrice)
+  costTotal    Decimal       @default(0) @db.Decimal(12, 2) // Σ (items.unitCost)
+  extraCosts   Decimal       @db.Decimal(12, 2) // Σ (IN_TOTAL items + extraCost de CostProfile en PHONE)
+  total        Decimal       @db.Decimal(12, 2) // subtotal + extraCosts
+  profit       Decimal       @db.Decimal(12, 2) // total - costo_total
+  createdAt    DateTime      @default(now())
+  reservations Reservation[]
 
   @@index([tenantId, date])
   @@index([buyerId])
   @@index([status])
+  @@index([closerId])
+  @@index([branchId])
+  @@index([saleType])
 }
 
 /// Renglón de una venta.
@@ -235,11 +272,13 @@ model Payment {
   saleId String
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
-  method   PaymentMethod
-  currency Currency      @default(USD) // es mas complejo porque puede estar en diferentes currencies, pero lo ideal seria llevar los payments con currency != USD a su valor equivalente en USD
-  amount   Decimal       @db.Decimal(12, 2)
-  paidAt   DateTime      @default(now())
-  note     String?
+  method       PaymentMethod
+  currency     Currency      @default(USD) // es mas complejo porque puede estar en diferentes currencies, pero lo ideal seria llevar los payments con currency != USD a su valor equivalente en USD
+  amount       Decimal       @db.Decimal(12, 2)
+  exchangeRate Decimal?      @db.Decimal(12, 4)
+  amountUsd    Decimal?      @db.Decimal(12, 2)
+  paidAt       DateTime      @default(now())
+  note         String?
 
   createdAt DateTime @default(now())
 
@@ -323,15 +362,19 @@ model Purchase {
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   supplier   Supplier @relation(fields: [supplierId], references: [id])
 
-  date        DateTime       @default(now())
-  downPayment Decimal?       @db.Decimal(12, 2) // seña o adelanto
-  currency    Currency       @default(USD)
-  totalCost   Decimal        @db.Decimal(12, 2)
+  date        DateTime          @default(now())
+  downPayment Decimal?          @db.Decimal(12, 2) // seña o adelanto
+  currency    Currency          @default(USD)
+  totalCost   Decimal           @db.Decimal(12, 2)
+  branchId    String?
+  branch      Branch?           @relation(fields: [branchId], references: [id])
   notes       String?
-  createdAt   DateTime       @default(now())
+  createdAt   DateTime          @default(now())
   items       PurchaseItem[]
+  payments    PurchasePayment[]
 
   @@index([tenantId, supplierId, date])
+  @@index([branchId])
 }
 
 /// Ítem de una compra: cuántas unidades de un producto se compraron y a qué costo.
@@ -406,6 +449,348 @@ model AppointmentInterest {
 
   @@unique([appointmentId, productId])
   @@index([productId])
+}
+
+model Branch {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  code String
+  name String
+
+  province String?
+  city     String?
+  address  String?
+  phone    String?
+  email    String?
+
+  isActive Boolean @default(true)
+
+  products  Product[]
+  sales     Sale[]
+  purchases Purchase[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+}
+
+model PurchasePayment {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  method   PaymentMethod
+  currency Currency
+  amount   Decimal       @db.Decimal(12, 2)
+
+  exchangeRate Decimal? @db.Decimal(12, 4)
+  amountUsd    Decimal? @db.Decimal(12, 2)
+
+  paidAt DateTime @default(now())
+  note   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([purchaseId, paidAt])
+}
+
+model Reservation {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  buyerId String?
+  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  convertedSaleId String?
+  convertedSale   Sale?   @relation(fields: [convertedSaleId], references: [id])
+
+  reservedAt DateTime  @default(now())
+  pickupAt   DateTime?
+
+  agreedTotal Decimal? @db.Decimal(12, 2)
+  amountPaid  Decimal? @db.Decimal(12, 2)
+  balanceDue  Decimal? @db.Decimal(12, 2)
+
+  status ReservationStatus @default(ACTIVE)
+
+  notes String?
+
+  items    ReservationItem[]
+  payments ReservationPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, reservedAt])
+  @@index([tenantId, status])
+  @@index([buyerId])
+  @@index([convertedSaleId])
+}
+
+model ReservationItem {
+  id            String      @id @default(cuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  itemName   String
+  imeiSerial String?
+  quantity   Int      @default(1)
+  unitPrice  Decimal? @db.Decimal(12, 2)
+  gifts      Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([reservationId])
+  @@index([productId])
+}
+
+model ReservationPayment {
+  id            String      @id @default(cuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  method   PaymentMethod
+  currency Currency
+  amount   Decimal       @db.Decimal(12, 2)
+
+  exchangeRate Decimal? @db.Decimal(12, 4)
+  amountUsd    Decimal? @db.Decimal(12, 2)
+
+  paidAt DateTime @default(now())
+  note   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([reservationId, paidAt])
+}
+
+model ServiceOrder {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  type ServiceOrderType
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  buyerId String?
+  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
+
+  modelName          String
+  imeiSerial         String?
+  failureDescription String
+
+  technicianId String?
+  technician   User?   @relation("ServiceOrderTechnician", fields: [technicianId], references: [id])
+
+  createdById String?
+  createdBy   User?   @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id])
+
+  costAmount  Decimal? @db.Decimal(12, 2)
+  priceAmount Decimal? @db.Decimal(12, 2)
+  currency    Currency @default(USD)
+
+  status ServiceOrderStatus @default(RECEIVED)
+
+  receivedAt  DateTime  @default(now())
+  startedAt   DateTime?
+  readyAt     DateTime?
+  deliveredAt DateTime?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, receivedAt])
+  @@index([tenantId, status])
+  @@index([productId])
+  @@index([buyerId])
+  @@index([technicianId])
+}
+
+model AuditLog {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  actorUserId String?
+  actorUser   User?   @relation("AuditLogActor", fields: [actorUserId], references: [id])
+
+  actorRole UserRole?
+
+  executedByAdminInSimulation Boolean   @default(false)
+  simulatedRole               UserRole?
+
+  action AuditAction
+  module AuditModule
+
+  entityType String
+  entityId   String?
+
+  detail String
+
+  oldValue Json?
+  newValue Json?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, module, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model CashAccount {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  code     String
+  name     String
+  type     CashAccountType
+  currency Currency
+  isActive Boolean         @default(true)
+
+  movements     CashMovement[]
+  transfersFrom CashTransfer[] @relation("CashTransferFrom")
+  transfersTo   CashTransfer[] @relation("CashTransferTo")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+}
+
+model CashMovement {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  accountId String
+  account   CashAccount @relation(fields: [accountId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  direction CashMovementDirection
+  category  CashMovementCategory
+  detail    String
+  amount    Decimal               @db.Decimal(12, 2)
+  currency  Currency
+
+  exchangeRate Decimal? @db.Decimal(12, 4)
+  amountUsd    Decimal? @db.Decimal(12, 2)
+
+  sourceType CashMovementSource
+  sourceId   String?
+
+  transferId String?
+  transfer   CashTransfer? @relation(fields: [transferId], references: [id])
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, category, occurredAt])
+  @@index([accountId, occurredAt])
+  @@index([sourceType, sourceId])
+  @@index([transferId])
+}
+
+model CashTransfer {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  fromAccountId String
+  fromAccount   CashAccount @relation("CashTransferFrom", fields: [fromAccountId], references: [id])
+
+  toAccountId String
+  toAccount   CashAccount @relation("CashTransferTo", fields: [toAccountId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  fromAmount   Decimal  @db.Decimal(12, 2)
+  toAmount     Decimal  @db.Decimal(12, 2)
+  exchangeRate Decimal? @db.Decimal(12, 4)
+  detail       String?
+
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  movements CashMovement[]
+
+  @@index([tenantId, occurredAt])
+  @@index([fromAccountId, occurredAt])
+  @@index([toAccountId, occurredAt])
+}
+
+model CloserCommissionPlan {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name     String
+  base     CloserCommissionBase
+  ratePct  Decimal              @db.Decimal(5, 2)
+  isActive Boolean              @default(true)
+
+  commissions CloserCommission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, isActive])
+}
+
+model CloserCommission {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id])
+
+  closerId String
+  closer   User   @relation("CloserCommissionCloser", fields: [closerId], references: [id])
+
+  planId String?
+  plan   CloserCommissionPlan? @relation(fields: [planId], references: [id])
+
+  baseAmount Decimal  @db.Decimal(12, 2)
+  ratePct    Decimal  @db.Decimal(5, 2)
+  amount     Decimal  @db.Decimal(12, 2)
+  currency   Currency @default(USD)
+
+  status   CommissionStatus @default(PENDING)
+  earnedAt DateTime         @default(now())
+  paidAt   DateTime?
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, earnedAt])
+  @@index([saleId])
+  @@index([closerId, earnedAt])
+  @@index([status])
 }
 
 // ====================== Enums =========================
@@ -510,6 +895,117 @@ enum UserRole {
   SOCIO
 }
 
+enum SaleType {
+  MINORISTA
+  MAYORISTA
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONVERTED
+  CANCELLED
+  EXPIRED
+}
+
+enum ServiceOrderType {
+  STOCK
+  CUSTOMER
+}
+
+enum ServiceOrderStatus {
+  RECEIVED
+  IN_WORKSHOP
+  IN_PROGRESS
+  WAITING_PARTS
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  BRANCH_TRANSFER
+  PRICE_CHANGE
+  STOCK_CHANGE
+  LOGIN
+  SALE_CONFIRMED
+  SALE_CANCELLED
+  RESERVATION_CREATED
+  RESERVATION_RELEASED
+  PAYMENT_CREATED
+  CASH_IN
+  CASH_OUT
+  CONVERSION
+}
+
+enum AuditModule {
+  AUTH
+  PRODUCT
+  SALE
+  PURCHASE
+  RESERVATION
+  SERVICE
+  CASH
+  BUYER
+  APPOINTMENT
+  EXPENSE
+  COST_PROFILE
+  USER
+  COMMISSION
+}
+
+enum CashAccountType {
+  CASH
+  BANK
+  DIGITAL_WALLET
+  CRYPTO
+  OTHER
+}
+
+enum CashMovementDirection {
+  INCOME
+  EXPENSE
+}
+
+enum CashMovementCategory {
+  SALE_PAYMENT
+  RESERVATION_DEPOSIT
+  PURCHASE_PAYMENT
+  EXPENSE
+  SERVICE_PAYMENT
+  COMMISSION_PAYMENT
+  TRANSFER
+  CONVERSION
+  ADJUSTMENT
+  REVERSAL
+}
+
+enum CashMovementSource {
+  SALE_PAYMENT
+  RESERVATION_PAYMENT
+  PURCHASE_PAYMENT
+  EXPENSE
+  SERVICE_ORDER
+  CLOSER_COMMISSION
+  TRANSFER
+  MANUAL
+}
+
+enum CloserCommissionBase {
+  SALE_TOTAL
+  SALE_PROFIT
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
 model TradeInBatteryRange {
   id       String @id @default(cuid())
   tenantId String
@@ -526,8 +1022,8 @@ model TradeInBatteryRange {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId, isActive])
   @@unique([tenantId, minPct, maxPct])
+  @@index([tenantId, isActive])
 }
 
 model TradeInPrice {
@@ -545,8 +1041,8 @@ model TradeInPrice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId, modelName, capacityGB])
   @@unique([tenantId, modelName, capacityGB, batteryRangeId])
+  @@index([tenantId, modelName, capacityGB])
 }
 
 model TradeInDeductionRule {
@@ -554,14 +1050,14 @@ model TradeInDeductionRule {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  category  TradeInDeductionCategory
-  label     String
-  amount    Decimal @default(0) @db.Decimal(12, 2)
-  scope     TradeInDeductionScope @default(GLOBAL)
-  modelName String?
+  category   TradeInDeductionCategory
+  label      String
+  amount     Decimal                  @default(0) @db.Decimal(12, 2)
+  scope      TradeInDeductionScope    @default(GLOBAL)
+  modelName  String?
   capacityGB Int?
-  isActive  Boolean @default(true)
-  sortOrder Int     @default(0)
+  isActive   Boolean                  @default(true)
+  sortOrder  Int                      @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
