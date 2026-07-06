@@ -7,6 +7,7 @@ import { useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import Navbar from "./Navbar"
 import UserSessionMenu from "./UserSessionMenu"
+import BranchContextSwitcher from "@/components/branches/BranchContextSwitcher"
 import type { Role } from "@/lib/auth/roles"
 import {
   CalendarIcon,
@@ -16,6 +17,11 @@ import {
   Squares2X2Icon,
   UsersIcon,
   CircleStackIcon,
+  MapPinIcon,
+  WrenchScrewdriverIcon,
+  UserGroupIcon,
+  ShoppingCartIcon,
+  BuildingStorefrontIcon,
 } from "@heroicons/react/24/solid"
 
 export default function DashboardLayout({
@@ -34,6 +40,20 @@ export default function DashboardLayout({
         href: "/dashboard",
         icon: <Squares2X2Icon className="size-5 shrink-0" />,
         allowedRoles: ["ADMIN", "SOCIO"] as Role[],
+      },
+      {
+        key: "purchases",
+        label: "Compras",
+        href: "/dashboard/purchases",
+        icon: <ShoppingCartIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN"] as Role[],
+      },
+      {
+        key: "suppliers",
+        label: "Proveedores",
+        href: "/dashboard/suppliers",
+        icon: <BuildingStorefrontIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "STOCK"] as Role[],
       },
       {
         key: "buyers",
@@ -69,6 +89,27 @@ export default function DashboardLayout({
         href: "/dashboard/database",
         icon: <CircleStackIcon className="size-5 shrink-0" />,
         allowedRoles: ["ADMIN", "SOCIO", "VENDEDOR", "STOCK"] as Role[],
+      },
+      {
+        key: "branches",
+        label: "Sucursales",
+        href: "/dashboard/branches",
+        icon: <MapPinIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN", "SOCIO"] as Role[],
+      },
+      {
+        key: "users",
+        label: "Mi Equipo",
+        href: "/dashboard/users",
+        icon: <UserGroupIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN"] as Role[],
+      },
+      {
+        key: "service-orders",
+        label: "Servicio Técnico",
+        href: "/dashboard/service-orders",
+        icon: <WrenchScrewdriverIcon className="size-5 shrink-0" />,
+        allowedRoles: ["ADMIN"] as Role[],
       },
       {
         key: "trade-in",
@@ -223,7 +264,8 @@ export default function DashboardLayout({
             })}
           </ul>
         </nav>
-        <div className="border-t border-base-300 px-2 py-2">
+        <div className="space-y-2 border-t border-base-300 px-2 py-2">
+          {!collapsed ? <BranchContextSwitcher /> : null}
           <UserSessionMenu menu="side" />
         </div>
       </aside>

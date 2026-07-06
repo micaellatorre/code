@@ -2,6 +2,7 @@
 
 import SalesTableRow from "./SalesTableRow"
 import type { SerializedSale, UserSearchResult } from "./types"
+import type { BranchOption } from "@/components/branches/BranchAutocomplete"
 
 type SalesTableProps = {
   sales: SerializedSale[]
@@ -25,10 +26,15 @@ type SalesTableProps = {
     onUserSearchQueryChange: (value: string) => void
     onSelectUser: (saleId: string, user: UserSearchResult) => void
   }
+  branchEditor: {
+    branches: BranchOption[]
+    savingBranchSaleId: string | null
+    onSelectBranch: (saleId: string, branchId: string) => void
+  }
 }
 
 export default function SalesTable(props: SalesTableProps) {
-  const emptyColSpan = props.canSeeMargin ? 8 : 7
+  const emptyColSpan = props.canSeeMargin ? 9 : 8
 
   return (
     <div className="overflow-x-auto rounded-lg border border-base-300 bg-base-100">
@@ -37,6 +43,7 @@ export default function SalesTable(props: SalesTableProps) {
           <tr>
             <th>Fecha</th>
             <th>Vendedor</th>
+            <th>Sucursal</th>
             <th>Items List</th>
             <th>Cliente</th>
             <th>Importe Venta</th>
@@ -69,6 +76,11 @@ export default function SalesTable(props: SalesTableProps) {
                 onClose: props.sellerEditor.onClose,
                 onUserSearchQueryChange: props.sellerEditor.onUserSearchQueryChange,
                 onSelectUser: (user) => props.sellerEditor.onSelectUser(sale.id, user),
+              }}
+              branchProps={{
+                branches: props.branchEditor.branches,
+                isSaving: props.branchEditor.savingBranchSaleId === sale.id,
+                onSelectBranch: (branchId) => props.branchEditor.onSelectBranch(sale.id, branchId),
               }}
             />
           ))}

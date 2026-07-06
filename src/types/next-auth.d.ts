@@ -9,6 +9,7 @@ declare module "next-auth" {
       role: Role
       activeRole: Role
       tenantId?: string | null
+      currentBranchId?: string | null
       isActive: boolean
       isSimulatingRole: boolean
     }
@@ -21,6 +22,7 @@ declare module "next-auth/jwt" {
     role?: Role
     activeRole?: Role
     tenantId?: string | null
+    currentBranchId?: string | null
     isActive?: boolean
   }
 }

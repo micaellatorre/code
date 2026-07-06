@@ -11,7 +11,12 @@ import {
   CurrencyDollarIcon,
   DevicePhoneMobileIcon,
   UsersIcon,
-  CircleStackIcon
+  CircleStackIcon,
+  MapPinIcon,
+  UserGroupIcon,
+  WrenchScrewdriverIcon,
+  ShoppingCartIcon,
+  BuildingStorefrontIcon
 } from '@heroicons/react/24/solid'
 import type { Role } from '@/lib/auth/roles'
 
@@ -26,6 +31,20 @@ export interface BreadcrumbItem {
 }
 
 const sectionMenuItems = [
+  {
+    key: "purchases",
+    label: "Compras",
+    href: "/dashboard/purchases",
+    icon: <ShoppingCartIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN"] as Role[],
+  },
+  {
+    key: "suppliers",
+    label: "Proveedores",
+    href: "/dashboard/suppliers",
+    icon: <BuildingStorefrontIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN", "STOCK"] as Role[],
+  },
   {
     key: "buyers",
     label: "Clientes",
@@ -60,6 +79,27 @@ const sectionMenuItems = [
     href: "/dashboard/database",
     icon: <CircleStackIcon className="size-5 shrink-0" />,
     allowedRoles: ["ADMIN", "SOCIO"] as Role[],
+  },
+  {
+    key: "branches",
+    label: "Sucursales",
+    href: "/dashboard/branches",
+    icon: <MapPinIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN"] as Role[],
+  },
+  {
+    key: "users",
+    label: "Mi Equipo",
+    href: "/dashboard/users",
+    icon: <UserGroupIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN"] as Role[],
+  },
+  {
+    key: "service-orders",
+    label: "Servicio Técnico",
+    href: "/dashboard/service-orders",
+    icon: <WrenchScrewdriverIcon className="size-5 shrink-0" />,
+    allowedRoles: ["ADMIN"] as Role[],
   },
   {
     key: "trade-in",

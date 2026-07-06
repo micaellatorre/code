@@ -4,6 +4,7 @@ import FilterableSalesTable from "@/components/FilterableSalesTable"
 import prisma from "@/lib/prisma"
 import type { Metadata } from "next"
 import { requireRolePage } from "@/lib/auth/auth"
+import { resolveSessionTenantId } from "@/lib/tenant"
 
 export const metadata: Metadata = {
   title: "Ventas",
@@ -18,13 +19,17 @@ function toStr(v: unknown) {
 
 export default async function SalesPage() {
   const session = await requireRolePage(["ADMIN", "VENDEDOR", "SOCIO"])
+  const tenantId = await resolveSessionTenantId(session.user.tenantId)
+  if (!tenantId) throw new Error("Tenant no disponible")
   const canSeeFinancials = session.user.activeRole === "ADMIN" || session.user.activeRole === "SOCIO"
 
   const sales = await prisma.sale.findMany({
+    where: { tenantId },
     orderBy: { date: "desc" },
     take: 200,
     include: {
       user: { select: { id: true, name: true, email: true } },
+      branch: { select: { id: true, code: true, name: true } },
       buyer: { select: { id: true, type: true, name: true, surname: true, businessName: true, phone: true, instagram: true, email: true } },
       payments: { select: { id: true, method: true, currency: true, amount: true, paidAt: true, note: true }, orderBy: { paidAt: "asc" } },
       appointments: { select: { id: true } },
@@ -56,6 +61,8 @@ export default async function SalesPage() {
   const serialized = sales.map((sale) => ({
     id: sale.id,
     tenantId: sale.tenantId,
+    branchId: sale.branchId,
+    branch: sale.branch,
     date: sale.date ? sale.date.toISOString() : null,
     customerName: sale.customerName,
     origin: sale.origin,

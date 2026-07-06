@@ -1,9 +1,11 @@
 // code/src/app/api/sales/[id]/route.ts
 
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma, ProductState, SaleItemKind, SaleStatus } from "@prisma/client"
+import { Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
+import { createAuditLog } from "@/lib/domain/audit"
+import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
 
 export const runtime = "nodejs"
 
@@ -35,6 +37,9 @@ const ALLOWED_FIELDS = new Set<string>([
   "items",
   "payments",
   "userId",
+  "branchId",
+  "closerId",
+  "saleType",
   "operationType",
   "appointmentId",
   "operationFlow",
@@ -121,6 +126,7 @@ function saleInclude() {
   return {
     buyer: true,
     user: { select: { id: true, name: true, email: true } },
+    branch: { select: { id: true, code: true, name: true } },
     items: { include: { product: true } },
     payments: { orderBy: { paidAt: "asc" as const } },
   }
@@ -158,12 +164,35 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.payment.deleteMany({ where: { saleId: id } })
-      await tx.saleItem.deleteMany({ where: { saleId: id } })
-      await tx.sale.delete({ where: { id } })
+      const sale = await tx.sale.findUnique({ where: { id }, include: { items: { include: { product: true } } } })
+      if (!sale) throw new Error("Venta no encontrada")
+      if (sale.status === "CANCELADA") return
+
+      if (sale.status === "CONFIRMADA") {
+        for (const item of sale.items) {
+          const nextStock = item.product.stock + item.units
+          const nextAvailable = item.product.stockAvailable + item.units
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: nextStock,
+              stockAvailable: nextAvailable,
+              state: item.product.state === "VENDIDO" || item.product.state === "FUERA_DE_STOCK" ? "EN_STOCK" : item.product.state,
+            },
+          })
+        }
+      }
+
+      if (sale.status === "SENADA") {
+        for (const item of sale.items) {
+          await tx.product.update({ where: { id: item.productId }, data: { senado: false, senadoAt: null } })
+        }
+      }
+
+      await tx.sale.update({ where: { id }, data: { status: "CANCELADA" } })
     })
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, mode: "cancelled" })
   } catch (e: unknown) {
     const error = e as Error
     return NextResponse.json(
@@ -216,6 +245,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         where: { id },
         include: {
           buyer: true,
+          branch: { select: { id: true, name: true } },
           items: true,
           payments: true,
         },
@@ -296,6 +326,39 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           }
 
           saleData.user = { connect: { id: targetUser.id } }
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, "branchId")) {
+        if (!canManuallyAssignEntityBranch(auth.session.user.activeRole)) {
+          throw new Error("No tenes permisos para cambiar la sucursal de una venta.")
+        }
+        const branchId = body.branchId == null || String(body.branchId).trim() === "" ? null : String(body.branchId)
+        if (!branchId) {
+          saleData.branch = { disconnect: true }
+        } else {
+          const branch = await tx.branch.findFirst({ where: { id: branchId, tenantId: sale.tenantId, isActive: true }, select: { id: true } })
+          if (!branch) throw new Error("Sucursal no disponible")
+          saleData.branch = { connect: { id: branch.id } }
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, "closerId")) {
+        const closerId = body.closerId == null || String(body.closerId).trim() === "" ? null : String(body.closerId)
+        if (!closerId) {
+          saleData.closer = { disconnect: true }
+        } else {
+          const closer = await tx.user.findFirst({ where: { id: closerId, tenantId: sale.tenantId, isActive: true }, select: { id: true } })
+          if (!closer) throw new Error("Closer no disponible")
+          saleData.closer = { connect: { id: closer.id } }
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(body, "saleType")) {
+        if (body.saleType === "MINORISTA" || body.saleType === "MAYORISTA" || body.saleType == null || body.saleType === "") {
+          saleData.saleType = body.saleType ? String(body.saleType) as any : null
+        } else {
+          throw new Error("Tipo de venta invalido")
         }
       }
 
@@ -699,6 +762,21 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         include: saleInclude(),
       })
 
+      if (Object.prototype.hasOwnProperty.call(body, "branchId") && sale.branchId !== updatedSale.branchId) {
+        await createAuditLog({
+          tenantId: sale.tenantId,
+          actorUserId: auth.session.user.id,
+          actorRole: auth.session.user.activeRole as UserRole,
+          action: "UPDATE",
+          module: "SALE",
+          entityType: "Sale",
+          entityId: sale.id,
+          detail: `Cambio de sucursal de venta: ${sale.branch?.name ?? "Sin sucursal"} -> ${updatedSale.branch?.name ?? "Sin sucursal"}`,
+          oldValue: { branchId: sale.branchId, branchName: sale.branch?.name ?? null },
+          newValue: { branchId: updatedSale.branchId, branchName: updatedSale.branch?.name ?? null },
+        }, tx)
+      }
+
       return updatedSale
     })
 
@@ -715,6 +793,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     const status =
       error?.message?.includes("solo puede modificarse") ||
+      error?.message?.includes("permisos") ||
       error?.message?.includes("Tenant no disponible")
         ? 403
         : error?.message?.includes("no encontrada") ||

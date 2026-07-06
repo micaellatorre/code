@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowDownTrayIcon,
@@ -28,8 +29,26 @@ import type {
 import { databaseTabLabels } from "@/lib/database/config"
 
 const tabs: DatabaseTabKey[] = ["cash", "retail", "wholesale", "purchases", "reservations", "closers", "service", "audit", "buyers"]
-const exportFields = ["cash", "retail", "wholesale", "purchases", "reservations", "service", "audit"] as const
+const exportFields = ["cash", "retail", "wholesale", "purchases", "reservations", "service", "audit", "buyers"] as const
 type ExportField = (typeof exportFields)[number]
+
+const tabActions: Partial<Record<DatabaseTabKey, Array<{ label: string; href: string; primary?: boolean }>>> = {
+  cash: [
+    { label: "+ Movimiento", href: "/dashboard/cash/new", primary: true },
+    { label: "Convertir moneda", href: "/dashboard/cash/transfer" },
+    { label: "Cuentas", href: "/dashboard/cash/accounts" },
+  ],
+  retail: [{ label: "+ Nueva venta", href: "/dashboard/sales/new", primary: true }],
+  wholesale: [{ label: "+ Nueva venta mayorista", href: "/dashboard/sales/new?saleType=MAYORISTA", primary: true }],
+  purchases: [
+    { label: "+ Nueva compra", href: "/dashboard/purchases/new", primary: true },
+    { label: "Gestionar proveedores", href: "/dashboard/suppliers" },
+  ],
+  reservations: [{ label: "+ Nueva reserva", href: "/dashboard/reservations/new", primary: true }],
+  closers: [{ label: "Configurar comisiones", href: "/dashboard/commissions", primary: true }],
+  service: [{ label: "+ Nueva orden", href: "/dashboard/service-orders/new", primary: true }],
+  buyers: [{ label: "+ Nuevo cliente", href: "/dashboard/buyers/new", primary: true }],
+}
 
 type Props = {
   data: DatabaseReadModel
@@ -104,10 +123,11 @@ function isWholesaleRow(row: DatabaseRetailSaleRow | DatabaseWholesaleSaleRow): 
 
 function SalesLikeTable({ rows, wholesale, canSeeFinancials }: { rows: Array<DatabaseRetailSaleRow | DatabaseWholesaleSaleRow>; wholesale?: boolean; canSeeFinancials: boolean }) {
   return (
-    <TableShell empty="No hay ventas en el periodo." colSpan={wholesale ? 10 : 7} hasRows={rows.length > 0}>
+    <TableShell empty="No hay ventas en el periodo." colSpan={wholesale ? 11 : 8} hasRows={rows.length > 0}>
       <thead>
         <tr>
           <th>Fecha</th>
+          <th>Sucursal</th>
           <th>Cliente</th>
           <th>Item / IMEI</th>
           {wholesale ? <th>P. acordado</th> : <th>Precio / abonado</th>}
@@ -124,6 +144,7 @@ function SalesLikeTable({ rows, wholesale, canSeeFinancials }: { rows: Array<Dat
               <div className="font-medium">{formatDate(row.date)}</div>
               <div className="text-xs text-base-content/50">{row.seller}</div>
             </td>
+            <td>{row.branch}</td>
             <td>{row.customer}</td>
             <td>
               <div className="font-medium">{row.itemSummary}</div>
@@ -222,7 +243,7 @@ function GenericTable({ rows, tab, canSeeFinancials }: { rows: DatabaseReadModel
     return (
       <TableShell empty="No hay guardados o reservas en el periodo." colSpan={8} hasRows={reservationRows.length > 0}>
         <thead><tr><th>Hora / fecha</th><th>Cliente</th><th>Item</th><th>Cuando pasa</th><th>P. acordado</th><th>Seña USD</th><th>Regalos</th><th>Estado</th></tr></thead>
-        <tbody>{reservationRows.map((row) => <tr key={`${row.source}-${row.id}`}><td>{formatDate(row.reservedAt)}</td><td>{row.customer}<div className="text-xs text-base-content/50">{row.source}</div></td><td>{row.item}</td><td>{formatDate(row.pickupAt)}</td><td>{formatMoney(row.agreedPrice)}</td><td>{row.depositUsd == null ? "-" : formatMoney(row.depositUsd)}</td><td>{row.gifts ?? "-"}</td><td><StatusBadge value={row.status} /></td></tr>)}</tbody>
+        <tbody>{reservationRows.map((row) => <tr key={`${row.source}-${row.id}`}><td>{formatDate(row.reservedAt)}</td><td>{row.customer}<div className="text-xs text-base-content/50">{row.source}</div></td><td>{row.source === "RESERVATION" ? <Link className="link link-primary" href={`/dashboard/reservations/${row.id}`}>{row.item}</Link> : row.item}</td><td>{formatDate(row.pickupAt)}</td><td>{formatMoney(row.agreedPrice)}</td><td>{row.depositUsd == null ? "-" : formatMoney(row.depositUsd)}</td><td>{row.gifts ?? "-"}</td><td><StatusBadge value={row.status} /></td></tr>)}</tbody>
       </TableShell>
     )
   }
@@ -250,9 +271,9 @@ function GenericTable({ rows, tab, canSeeFinancials }: { rows: DatabaseReadModel
   if (tab === "buyers") {
     const buyerRows = rows as DatabaseBuyerRow[]
     return (
-      <TableShell empty="No hay compradores con operaciones en el periodo." colSpan={8} hasRows={buyerRows.length > 0}>
-        <thead><tr><th>Nombre</th><th>Tipo</th><th>Instagram</th><th>Telefono</th><th>Ultima compra</th><th>Operaciones</th><th>Total comprado</th><th>Saldo</th></tr></thead>
-        <tbody>{buyerRows.map((row) => <tr key={row.id}><td className="font-medium">{row.name}</td><td><StatusBadge value={row.type} /></td><td>{row.instagram ?? "-"}</td><td>{row.phone ?? "-"}</td><td>{formatDate(row.lastPurchaseAt, false)}</td><td>{row.operations}</td><td>{formatMoney(row.totalPurchased)}</td><td>{formatMoney(row.balanceDue)}</td></tr>)}</tbody>
+      <TableShell empty="No hay compradores con operaciones en el periodo." colSpan={10} hasRows={buyerRows.length > 0}>
+        <thead><tr><th>Nombre</th><th>Tipo</th><th>Provincia</th><th>Suc. registro</th><th>Instagram</th><th>Telefono</th><th>Ultima compra</th><th>Operaciones</th><th>Total comprado</th><th>Saldo</th></tr></thead>
+        <tbody>{buyerRows.map((row) => <tr key={row.id}><td className="font-medium">{row.name}</td><td><StatusBadge value={row.type} /></td><td>{row.province ?? "-"}</td><td>{row.registeredBranch ?? "-"}</td><td>{row.instagram ?? "-"}</td><td>{row.phone ?? "-"}</td><td>{formatDate(row.lastPurchaseAt, false)}</td><td>{row.operations}</td><td>{formatMoney(row.totalPurchased)}</td><td>{formatMoney(row.balanceDue)}</td></tr>)}</tbody>
       </TableShell>
     )
   }
@@ -436,6 +457,16 @@ export default function DatabaseModule({ data, range, activeTab, period, dateFro
           <span>{range.label} · {filteredRows.length} registros</span>
         </div>
       </div>
+
+      {tabActions[activeTab]?.length ? (
+        <div className="flex flex-wrap gap-2">
+          {tabActions[activeTab]?.map((action) => (
+            <Link key={action.href} href={action.href} className={`btn btn-sm ${action.primary ? "btn-primary" : "btn-outline"}`}>
+              {action.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       <GenericTable rows={filteredRows} tab={activeTab} canSeeFinancials={canSeeFinancials} />
       <ExportDatabaseModal open={exportOpen} onClose={() => setExportOpen(false)} range={range} reporter={reporter} activeTab={activeTab} />

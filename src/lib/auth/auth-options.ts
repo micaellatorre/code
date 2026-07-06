@@ -52,6 +52,7 @@ export const authOptions: NextAuthOptions = {
         token.uid = dbUser.id
         token.role = dbUser.role
         token.tenantId = dbUser.tenantId
+        token.currentBranchId = dbUser.currentBranchId
         token.isActive = dbUser.isActive
 
         if (!token.activeRole) {
@@ -87,6 +88,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as Role
         session.user.activeRole = (token.activeRole as Role) ?? (token.role as Role)
         session.user.tenantId = token.tenantId ?? null
+        session.user.currentBranchId = token.currentBranchId ?? null
         session.user.isActive = Boolean(token.isActive)
         session.user.isSimulatingRole =
           session.user.role === "ADMIN" && session.user.activeRole !== "ADMIN"

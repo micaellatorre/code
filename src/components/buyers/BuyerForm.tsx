@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { BuyerType } from "@prisma/client"
 import { fromArgDateInputValue } from "@/lib/timezone"
+import { POSTAL_CODE_ERROR_MESSAGE } from "@/lib/domain/argentina/provinces"
 import { BUYER_TYPE_LABELS } from "./buyerTypes"
 import { normalizeInstagram } from "./buyerUtils"
 
@@ -16,6 +17,8 @@ export type BuyerFormInitialData = {
   businessName: string | null
   dob: string | null
   province: string | null
+  provinceId: string | null
+  registeredBranchId: string | null
   city: string | null
   postalCode: string | null
   notes: string | null
@@ -35,6 +38,8 @@ type BuyerFormState = {
   businessName: string
   dob: string
   province: string
+  provinceId: string
+  registeredBranchId: string
   city: string
   postalCode: string
   notes: string
@@ -46,6 +51,9 @@ type BuyerFormState = {
   cuit: string
   dni: string
 }
+
+type ProvinceOption = { id: string; name: string; code: string }
+type BranchOption = { id: string; name: string; code: string; isActive?: boolean }
 
 type BuyerFormProps = {
   mode: "create" | "edit"
@@ -60,6 +68,8 @@ function initialState(initialData?: BuyerFormInitialData): BuyerFormState {
     businessName: initialData?.businessName ?? "",
     dob: initialData?.dob ? initialData.dob.slice(0, 10) : "",
     province: initialData?.province ?? "",
+    provinceId: initialData?.provinceId ?? "",
+    registeredBranchId: initialData?.registeredBranchId ?? "",
     city: initialData?.city ?? "",
     postalCode: initialData?.postalCode ?? "",
     notes: initialData?.notes ?? "",
@@ -90,6 +100,7 @@ async function readApiError(response: Response) {
 function validate(form: BuyerFormState) {
   if (!form.name.trim()) return "El nombre es obligatorio."
   if (!form.surname.trim()) return "El apellido es obligatorio."
+  if (form.postalCode.trim() && !/^(?:\d{4}|[A-Z]\d{4}[A-Z]{3})$/i.test(form.postalCode.trim())) return POSTAL_CODE_ERROR_MESSAGE
 
   if (form.type === "MINORISTA") {
     if (!form.dni.trim()) return "El DNI es obligatorio para clientes minoristas."
@@ -111,13 +122,17 @@ function buildPayload(form: BuyerFormState) {
     phone: nullableText(form.phone),
     email: nullableText(form.email),
     instagram: normalizeInstagram(form.instagram),
+    provinceId: nullableText(form.provinceId),
+    registeredBranchId: nullableText(form.registeredBranchId),
+    province: nullableText(form.province),
+    city: nullableText(form.city),
+    postalCode: nullableText(form.postalCode),
+    addressStreet: nullableText(form.addressStreet),
+    addressNumber: nullableText(form.addressNumber),
   }
 
   if (form.type === "MINORISTA") {
-    return {
-      ...base,
-      dni: nullableText(form.dni),
-    }
+    return { ...base, dni: nullableText(form.dni) }
   }
 
   return {
@@ -125,11 +140,6 @@ function buildPayload(form: BuyerFormState) {
     businessName: nullableText(form.businessName),
     cuit: nullableText(form.cuit),
     dni: nullableText(form.dni),
-    province: nullableText(form.province),
-    city: nullableText(form.city),
-    postalCode: nullableText(form.postalCode),
-    addressStreet: nullableText(form.addressStreet),
-    addressNumber: nullableText(form.addressNumber),
   }
 }
 
@@ -138,6 +148,23 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
   const [form, setForm] = useState<BuyerFormState>(() => initialState(initialData))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [provinces, setProvinces] = useState<ProvinceOption[]>([])
+  const [branches, setBranches] = useState<BranchOption[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      fetch("/api/provinces").then((response) => response.json()).catch(() => ({ provinces: [] })),
+      fetch("/api/branches").then((response) => response.json()).catch(() => ({ branches: [] })),
+    ]).then(([provincePayload, branchPayload]) => {
+      if (cancelled) return
+      setProvinces(Array.isArray(provincePayload.provinces) ? provincePayload.provinces : [])
+      setBranches(Array.isArray(branchPayload.branches) ? branchPayload.branches : [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function update<K extends keyof BuyerFormState>(key: K, value: BuyerFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -231,13 +258,28 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
                 <TextField label="DNI *" value={form.dni} onChange={(value) => update("dni", value)} disabled={isSubmitting} />
               )}
               <TextField type="date" label="Fecha de nacimiento" value={form.dob} onChange={(value) => update("dob", value)} disabled={isSubmitting} />
-              {isWholesale ? (
-                <>
-                  <TextField label="Provincia" value={form.province} onChange={(value) => update("province", value)} disabled={isSubmitting} />
-                  <TextField label="Localidad" value={form.city} onChange={(value) => update("city", value)} disabled={isSubmitting} />
-                  <TextField label="Codigo postal" value={form.postalCode} onChange={(value) => update("postalCode", value)} disabled={isSubmitting} />
-                </>
-              ) : null}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-base-300 bg-base-100 p-4">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">Ubicacion comercial</h2>
+              <p className="text-sm text-base-content/60">Provincia normalizada y sucursal de registro.</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <SelectField label="Provincia" value={form.provinceId} onChange={(value) => update("provinceId", value)} disabled={isSubmitting}>
+                <option value="">Sin provincia</option>
+                {provinces.map((province) => <option key={province.id} value={province.id}>{province.name}</option>)}
+              </SelectField>
+              <SelectField label="Sucursal de registro" value={form.registeredBranchId} onChange={(value) => update("registeredBranchId", value)} disabled={isSubmitting}>
+                <option value="">Sin sucursal</option>
+                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              </SelectField>
+              <TextField label="Localidad" value={form.city} onChange={(value) => update("city", value)} disabled={isSubmitting} />
+              <TextField label="Codigo postal" value={form.postalCode} onChange={(value) => update("postalCode", value.toUpperCase())} disabled={isSubmitting} />
+              <TextField label="Domicilio calle" value={form.addressStreet} onChange={(value) => update("addressStreet", value)} disabled={isSubmitting} />
+              <TextField label="Domicilio numero" value={form.addressNumber} onChange={(value) => update("addressNumber", value)} disabled={isSubmitting} />
             </div>
           </section>
 
@@ -251,12 +293,6 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
               <TextField label="Telefono" value={form.phone} onChange={(value) => update("phone", value)} disabled={isSubmitting} />
               <TextField type="email" label="Email" value={form.email} onChange={(value) => update("email", value)} disabled={isSubmitting} />
               <TextField label="Instagram" value={form.instagram} onChange={(value) => update("instagram", value)} disabled={isSubmitting} />
-              {isWholesale ? (
-                <>
-                  <TextField label="Domicilio calle" value={form.addressStreet} onChange={(value) => update("addressStreet", value)} disabled={isSubmitting} />
-                  <TextField label="Domicilio numero" value={form.addressNumber} onChange={(value) => update("addressNumber", value)} disabled={isSubmitting} />
-                </>
-              ) : null}
             </div>
           </section>
 
@@ -291,6 +327,10 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
               <dt className="text-base-content/60">Documento</dt>
               <dd className="font-medium text-right">{isWholesale ? form.cuit || "Pendiente" : form.dni || "Pendiente"}</dd>
             </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-base-content/60">Sucursal</dt>
+              <dd className="font-medium text-right">{branches.find((branch) => branch.id === form.registeredBranchId)?.name ?? "Pendiente"}</dd>
+            </div>
           </dl>
           <button type="submit" className="btn btn-primary mt-4 w-full" disabled={isSubmitting}>
             {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
@@ -299,6 +339,31 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
         </aside>
       </div>
     </form>
+  )
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  disabled,
+  children,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <label className="form-control">
+      <span className="label">
+        <span className="label-text">{label}</span>
+      </span>
+      <select className="select select-bordered" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+        {children}
+      </select>
+    </label>
   )
 }
 

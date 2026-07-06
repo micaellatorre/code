@@ -1,17 +1,25 @@
 "use client"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import BranchAutocomplete, { type BranchOption } from '@/components/branches/BranchAutocomplete'
 
 export const dynamic = 'force-dynamic'
 
 export default function NewProductForm() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.activeRole === "ADMIN"
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [currentBranch, setCurrentBranch] = useState<BranchOption | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
     modelName: '',
     location: '',
+    branchId: '',
     origin: '',
     brand: '',
     imei: '',
@@ -28,6 +36,16 @@ export default function NewProductForm() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  useEffect(() => {
+    fetch('/api/users/me/branches')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        setBranches(data?.branches ?? [])
+        setCurrentBranch(data?.currentBranch ?? null)
+        if (data?.currentBranch) setForm((prev) => ({ ...prev, branchId: prev.branchId || data.currentBranch.id }))
+      })
+  }, [])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined
@@ -37,9 +55,11 @@ export default function NewProductForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError(null)
     const payload: any = {
       modelName: form.modelName,
       location: form.location || null,
+      branchId: form.branchId || null,
       origin: form.origin || null,
       brand: form.brand || null,
       imei: form.imei || null,
@@ -63,7 +83,8 @@ export default function NewProductForm() {
       if (res.ok) {
         router.push('/dashboard/products')
       } else {
-        console.error('Error al crear producto')
+        const payload = await res.json().catch(() => null)
+        setError(payload?.error ?? 'Error al crear producto')
       }
     } finally {
       setIsSubmitting(false)
@@ -80,6 +101,7 @@ export default function NewProductForm() {
         ]}
       />
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        {error ? <div className="alert alert-error lg:col-span-3 text-sm">{error}</div> : null}
         <div className='lg:col-span-2 flex flex-col gap-4'>
           <fieldset className="card bg-base-100 border border-base-content/50 lg:col-span-1 p-4 space-y-2">
             <h2 className="text-lg font-bold mb-1">1. Datos del producto</h2>
@@ -93,8 +115,23 @@ export default function NewProductForm() {
               </div>
               <div className="form-control w-full">
                 <label className="label"><span className="label-text">Ubicación</span></label>
-                <input type="text" name="location" value={form.location} onChange={handleChange} required className="input input-bordered" />
-                <span className="label-text-alt mt-1 text-base-content/50 italic">Ubicación física del producto</span>
+                <input type="text" name="location" value={form.location} onChange={handleChange} className="input input-bordered" />
+                <span className="label-text-alt mt-1 text-base-content/50 italic">Fallback legacy si no se elige sucursal</span>
+              </div>
+            </div>
+            <div className='flex flex-row w-full gap-4'>
+              <div className="form-control w-full">
+                {isAdmin ? (
+                  <>
+                    <BranchAutocomplete value={form.branchId || null} branches={branches} onChange={(branchId) => setForm((prev) => ({ ...prev, branchId }))} />
+                    <span className="label-text-alt mt-1 text-base-content/50">Ubicacion fisica inicial del producto.</span>
+                  </>
+                ) : (
+                  <>
+                    <label className="label"><span className="label-text">Sucursal</span></label>
+                    <div className="rounded-lg border border-base-300 bg-base-200 px-3 py-2 text-sm">{currentBranch?.name ?? "Sin sucursal actual"}</div>
+                  </>
+                )}
               </div>
             </div>
             <div className='flex flex-row w-full gap-4'>

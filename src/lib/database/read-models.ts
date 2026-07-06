@@ -45,6 +45,7 @@ export type DatabaseRetailSaleRow = {
   id: string
   date: string
   seller: string
+  branch: string
   customer: string
   itemSummary: string
   itemMeta: string | null
@@ -68,6 +69,8 @@ export type DatabasePurchaseRow = {
   id: string
   date: string
   supplier: string
+  supplierProvince: string | null
+  supplierCity: string | null
   model: string
   imeiSerial: string | null
   code: string
@@ -130,6 +133,8 @@ export type DatabaseBuyerRow = {
   id: string
   name: string
   type: string
+  province: string | null
+  registeredBranch: string | null
   instagram: string | null
   phone: string | null
   lastPurchaseAt: string | null
@@ -314,6 +319,7 @@ export async function getDatabaseReadModel(params: {
       orderBy: { date: "desc" },
       include: {
         buyer: { select: { id: true, type: true, name: true, surname: true, businessName: true } },
+        branch: { select: { name: true } },
         user: { select: { id: true, name: true, email: true } },
         payments: { orderBy: { paidAt: "asc" } },
         items: {
@@ -327,7 +333,7 @@ export async function getDatabaseReadModel(params: {
       where: { tenantId: params.tenantId, date: whereDate },
       orderBy: { date: "desc" },
       include: {
-        supplier: { select: { name: true } },
+        supplier: { select: { name: true, city: true, provinceRef: { select: { name: true } } } },
         payments: { orderBy: { paidAt: "asc" } },
         items: {
           include: {
@@ -375,6 +381,8 @@ export async function getDatabaseReadModel(params: {
       orderBy: { updatedAt: "desc" },
       take: 300,
       include: {
+        provinceRef: { select: { name: true } },
+        registeredBranch: { select: { name: true } },
         sales: {
           where: { date: whereDate, status: { not: "CANCELADA" } },
           select: { date: true, total: true, balanceDue: true },
@@ -404,6 +412,7 @@ export async function getDatabaseReadModel(params: {
       id: sale.id,
       date: sale.date.toISOString(),
       seller: displayUser(sale.user),
+      branch: sale.branch?.name ?? "-",
       customer: buyerName(sale.buyer, sale.customerName),
       itemSummary: item.summary,
       itemMeta: item.meta,
@@ -444,6 +453,8 @@ export async function getDatabaseReadModel(params: {
       id: purchase.id,
       date: purchase.date.toISOString(),
       supplier: purchase.supplier.name,
+      supplierProvince: purchase.supplier.provinceRef?.name ?? null,
+      supplierCity: purchase.supplier.city,
       model: firstItem?.product.modelName ?? "Compra sin items",
       imeiSerial: firstItem?.product.imei ?? null,
       code: productCode(index),
@@ -579,6 +590,8 @@ export async function getDatabaseReadModel(params: {
       id: buyer.id,
       name: buyerName(buyer),
       type: buyer.type,
+      province: buyer.provinceRef?.name ?? buyer.province,
+      registeredBranch: buyer.registeredBranch?.name ?? null,
       instagram: buyer.instagram,
       phone: buyer.phone,
       lastPurchaseAt: lastPurchase?.toISOString() ?? null,

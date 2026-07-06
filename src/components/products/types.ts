@@ -24,6 +24,8 @@ type SerializedProduct = {
   stockAvailable: number
   notes: string | null
   location: string | null
+  branchId: string | null
+  branch?: { id: string; code: string; name: string } | null
   origin: string | null
   createdAt: string | null
   updatedAt: string | null

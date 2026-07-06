@@ -81,6 +81,7 @@ export default function BuyersTableRow({ buyer, canEdit, canDelete, isDeleting, 
       <td className="align-top">
         <div className="min-w-44 space-y-1">
           {location ? <p className="font-medium">{location}</p> : null}
+          {buyer.registeredBranch ? <p className="text-xs text-base-content/60">Registro: {buyer.registeredBranch.name}</p> : null}
           {buyer.postalCode ? <p className="text-xs text-base-content/60">CP {buyer.postalCode}</p> : null}
           {address ? <p className="text-xs text-base-content/60">{address}</p> : null}
           {!location && !buyer.postalCode && !address ? <span className="text-base-content/50">—</span> : null}

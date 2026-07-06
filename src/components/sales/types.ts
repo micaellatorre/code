@@ -61,6 +61,8 @@ export type SalePaymentSummary = {
 export type SerializedSale = {
   id: string
   tenantId: string
+  branchId: string | null
+  branch?: { id: string; code: string; name: string } | null
   date: string | null
   customerName: string | null
   origin: string | null
@@ -135,6 +137,8 @@ export type CustomerKind = "retail" | "wholesale"
 
 export type SaleFormInitialData = {
   id: string
+  branchId?: string | null
+  branch?: { id: string; code: string; name: string } | null
   buyer: Buyer | null
   meta: SaleMeta
   items: SaleItemDraft[]

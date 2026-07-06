@@ -1,198 +1,501 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/DashboardLayout'
-import Breadcrumbs from '@/components/Breadcrumbs'
-import { fromArgDateInputValue, toArgDateInputValue } from '@/lib/timezone'
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import DashboardLayout from "@/components/DashboardLayout"
+import Breadcrumbs from "@/components/Breadcrumbs"
+import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
+import { toArgDateInputValue } from "@/lib/timezone"
 
-interface Supplier {
+type PurchaseKind = "PHONE" | "ACCESSORY"
+type ConditionValue = "A_PLUS" | "OEM" | "ASIS" | "ASIS_PLUS" | "SEALED"
+type CurrencyValue = "USD" | "ARS" | "USDT"
+type PaymentMethodValue = "EFECTIVO_PESOS" | "EFECTIVO_USD" | "TRANSFERENCIA_ARS" | "TRANSFERENCIA_USD" | "TARJETA" | "USDT"
+
+type SupplierOption = {
   id: string
   name: string
 }
-interface Product {
+
+type PurchaseItemForm = {
   id: string
+  type: PurchaseKind
   modelName: string
-  costPrice: any
+  relatedModel: string
+  color: string
+  capacityGB: string
+  physicalState: "NEW" | "USED"
+  condition: ConditionValue
+  batteryPct: string
+  quantity: number
+  unitCost: string
+  salePrice: string
+  notes: string
+  imeis: string[]
+  unitNotes: string[]
 }
 
-interface NewPurchaseFormProps {
-  id?: string
+type PaymentForm = {
+  id: string
+  method: PaymentMethodValue
+  currency: CurrencyValue
+  amount: string
+  exchangeRate: string
+  note: string
+}
+
+type SuccessPayload = {
+  purchase: { id: string }
+  productIds: string[]
+  summary: {
+    currency: CurrencyValue
+    totalCost: string
+    totalUnits: number
+    productCount: number
+    paymentStatus: "PAID" | "PARTIAL" | "CURRENT_ACCOUNT"
+  }
+}
+
+function makeId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
+}
+
+function newItem(type: PurchaseKind): PurchaseItemForm {
+  return {
+    id: makeId(),
+    type,
+    modelName: "",
+    relatedModel: "",
+    color: "",
+    capacityGB: "",
+    physicalState: "USED",
+    condition: type === "PHONE" ? "ASIS" : "ASIS",
+    batteryPct: "",
+    quantity: 1,
+    unitCost: "",
+    salePrice: "",
+    notes: "",
+    imeis: type === "PHONE" ? [""] : [],
+    unitNotes: type === "PHONE" ? [""] : [],
+  }
+}
+
+function newPayment(): PaymentForm {
+  return { id: makeId(), method: "EFECTIVO_USD", currency: "USD", amount: "", exchangeRate: "", note: "" }
+}
+
+function normalizeItemQuantity(item: PurchaseItemForm, quantity: number): PurchaseItemForm {
+  const nextQuantity = Math.max(1, quantity)
+  if (item.type !== "PHONE") return { ...item, quantity: nextQuantity }
+  return {
+    ...item,
+    quantity: nextQuantity,
+    imeis: Array.from({ length: nextQuantity }, (_, index) => item.imeis[index] ?? ""),
+    unitNotes: Array.from({ length: nextQuantity }, (_, index) => item.unitNotes[index] ?? ""),
+  }
+}
+
+function amountUsd(payment: PaymentForm) {
+  const amount = Number(payment.amount || 0)
+  if (!Number.isFinite(amount)) return 0
+  if (payment.currency === "USD" || payment.currency === "USDT") return amount
+  const rate = Number(payment.exchangeRate || 0)
+  return rate > 0 ? amount / rate : 0
+}
+
+function paymentStatusLabel(status: SuccessPayload["summary"]["paymentStatus"]) {
+  if (status === "PAID") return "COMPRA SALDADA TOTALMENTE"
+  if (status === "PARTIAL") return "SALDO PENDIENTE"
+  return "EN CUENTA CORRIENTE"
 }
 
 export default function NewPurchaseForm() {
-  const router = useRouter()
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [products, setProducts] = useState<Product[]>([])
+  const [kind, setKind] = useState<PurchaseKind>("PHONE")
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
+  const [supplierFeedback, setSupplierFeedback] = useState<string | null>(null)
   const [form, setForm] = useState({
-    supplierId: '',
+    supplierId: "",
+    branchId: "",
     date: toArgDateInputValue(new Date()),
-    currency: 'USD',
-    downPayment: '',
-    notes: '',
+    currency: "USD" as CurrencyValue,
+    notes: "",
   })
-  const [items, setItems] = useState<{
-    productId: string
-    units: number
-    unitCost: number
-  }[]>([])
-  const [itemForm, setItemForm] = useState({ productId: '', units: '', unitCost: '' })
+  const [items, setItems] = useState<PurchaseItemForm[]>([newItem("PHONE")])
+  const [payments, setPayments] = useState<PaymentForm[]>([])
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<SuccessPayload | null>(null)
 
   useEffect(() => {
-    async function fetchData() {
-      const supRes = await fetch('/api/suppliers')
-      const prodRes = await fetch('/api/products')
-      if (supRes.ok) {
-        setSuppliers(await supRes.json())
-      }
-      if (prodRes.ok) {
-        setProducts(await prodRes.json())
-      }
-    }
-    fetchData()
+    fetch("/api/users/me/branches")
+      .then((response) => response.json())
+      .then((payload) => {
+        const nextBranches = Array.isArray(payload.branches) ? payload.branches : []
+        setBranches(nextBranches)
+        const currentId = payload.currentBranch?.id ?? nextBranches[0]?.id ?? ""
+        setForm((prev) => ({ ...prev, branchId: prev.branchId || currentId }))
+      })
+      .catch(() => setBranches([]))
   }, [])
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+  useEffect(() => {
+    if (!form.branchId) {
+      setSuppliers([])
+      setForm((prev) => ({ ...prev, supplierId: "" }))
+      return
+    }
+    fetch(`/api/suppliers?branchId=${encodeURIComponent(form.branchId)}&pageSize=100`)
+      .then((response) => response.json())
+      .then((payload) => {
+        const nextSuppliers = Array.isArray(payload.suppliers) ? payload.suppliers.map((supplier: SupplierOption) => ({ id: supplier.id, name: supplier.name })) : []
+        setSuppliers(nextSuppliers)
+        setForm((prev) => {
+          if (!prev.supplierId || nextSuppliers.some((supplier: SupplierOption) => supplier.id === prev.supplierId)) return prev
+          setSupplierFeedback("Selecciona un proveedor con cobertura para esta sucursal.")
+          return { ...prev, supplierId: "" }
+        })
+      })
+      .catch(() => setSuppliers([]))
+  }, [form.branchId])
+
+  const total = useMemo(() => items.reduce((acc, item) => acc + Number(item.unitCost || 0) * item.quantity, 0), [items])
+  const paidUsd = useMemo(() => payments.reduce((acc, payment) => acc + amountUsd(payment), 0), [payments])
+  const totalUnits = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items])
+
+  function switchKind(nextKind: PurchaseKind) {
+    setKind(nextKind)
+    setItems([newItem(nextKind)])
+    setError(null)
   }
 
-  const handleItemChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setItemForm((prev) => ({ ...prev, [name]: value }))
+  function updateItem(itemId: string, patch: Partial<PurchaseItemForm>) {
+    setItems((prev) => prev.map((item) => item.id === itemId ? { ...item, ...patch } : item))
   }
 
-  const addItem = () => {
-    if (!itemForm.productId || !itemForm.units || !itemForm.unitCost) return
-    setItems((prev) => [...prev, { productId: itemForm.productId, units: Number(itemForm.units), unitCost: Number(itemForm.unitCost) }])
-    setItemForm({ productId: '', units: '', unitCost: '' })
+  function updateItemQuantity(itemId: string, quantity: number) {
+    setItems((prev) => prev.map((item) => item.id === itemId ? normalizeItemQuantity(item, quantity) : item))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const totalCost = items.reduce((acc, i) => acc + i.units * i.unitCost, 0)
-    const payload = {
+  function updateImei(itemId: string, index: number, value: string) {
+    setItems((prev) => prev.map((item) => {
+      if (item.id !== itemId) return item
+      const imeis = item.imeis.map((imei, imeiIndex) => imeiIndex === index ? value : imei)
+      return { ...item, imeis }
+    }))
+  }
+
+  function updateUnitNote(itemId: string, index: number, value: string) {
+    setItems((prev) => prev.map((item) => {
+      if (item.id !== itemId) return item
+      const unitNotes = item.unitNotes.map((note, noteIndex) => noteIndex === index ? value : note)
+      return { ...item, unitNotes }
+    }))
+  }
+
+  function buildPayload() {
+    return {
       supplierId: form.supplierId,
-      date: form.date ? fromArgDateInputValue(form.date).toISOString() : new Date().toISOString(),
+      branchId: form.branchId,
+      date: form.date,
       currency: form.currency,
-      downPayment: form.downPayment ? Number(form.downPayment) : null,
-      totalCost,
-      notes: form.notes,
-      items,
+      notes: form.notes || null,
+      items: items.map((item) => item.type === "PHONE" ? {
+        type: "PHONE" as const,
+        modelName: item.modelName,
+        color: item.color || null,
+        capacityGB: item.capacityGB ? Number(item.capacityGB) : null,
+        physicalState: item.physicalState,
+        condition: item.condition,
+        batteryPct: item.batteryPct ? Number(item.batteryPct) : null,
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+        salePrice: item.salePrice || 0,
+        notes: item.notes || null,
+        imeis: item.imeis,
+        unitNotes: item.unitNotes,
+      } : {
+        type: "ACCESSORY" as const,
+        modelName: item.modelName,
+        relatedModel: item.relatedModel || null,
+        color: item.color || null,
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+        salePrice: item.salePrice || 0,
+        notes: item.notes || null,
+      }),
+      payments: payments.map((payment) => ({
+        method: payment.method,
+        currency: payment.currency,
+        amount: payment.amount,
+        exchangeRate: payment.exchangeRate || null,
+        note: payment.note || null,
+      })),
     }
-    const res = await fetch('/api/purchases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+  }
+
+  async function submit() {
+    setSaving(true)
+    setError(null)
+    const response = await fetch("/api/purchases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildPayload()),
     })
-    if (res.ok) {
-      router.push('/dashboard/purchases')
-    } else {
-      console.error('Error al crear compra')
+    const payload = await response.json().catch(() => null)
+    setSaving(false)
+    if (!response.ok) {
+      setError(payload?.error ?? "Error al registrar compra")
+      setConfirmOpen(false)
+      return
     }
+    setSuccess(payload as SuccessPayload)
+    setConfirmOpen(false)
+  }
+
+  if (success) {
+    const isPhone = kind === "PHONE"
+    return (
+      <DashboardLayout>
+        <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Compras", href: "/dashboard/purchases" }, { label: "Nueva compra" }]} />
+        <div className="mx-auto max-w-2xl rounded border border-success/30 bg-success/5 p-6 text-center">
+          <h1 className="text-2xl font-bold">Compra registrada con exito</h1>
+          <p className="mt-2 text-base-content/70">
+            {isPhone
+              ? `${success.summary.totalUnits} equipos ingresados al inventario`
+              : `${success.summary.totalUnits} unidades ingresadas al stock bulk`} - Total: {success.summary.currency} {Number(success.summary.totalCost).toFixed(2)}
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link className="btn btn-primary" href="/dashboard/purchases">Ver compras</Link>
+            <Link className="btn btn-outline" href="/dashboard/products">Ver inventario</Link>
+            {isPhone ? <Link className="btn btn-outline" href={`/dashboard/products?ids=${success.productIds.join(",")}`}>Imprimir stickers</Link> : null}
+            <button type="button" className="btn btn-ghost" onClick={() => window.location.reload()}>Registrar otra compra</button>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
-    <DashboardLayout >
-      <Breadcrumbs
-        items={[
-          { label: 'Inicio', href: '/' },
-          { label: 'Compras', href: '/dashboard/purchases' },
-          { label: 'Nueva Compra' },
-        ]}
-      />
-      <div className="max-w-xl mx-auto">
-        <h2 className="text-2xl font-bold mb-4">Nueva Compra</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset className="border border-base-300 p-4 rounded-box">
-            <legend className="text-lg font-medium mb-2">Datos de la compra</legend>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Proveedor</span></label>
-              <select name="supplierId" value={form.supplierId} onChange={handleFormChange} required className="select select-bordered">
-                <option value="">Seleccionar</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+    <DashboardLayout>
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Compras", href: "/dashboard/purchases" }, { label: "Nueva compra" }]} />
+      <div className="mx-auto max-w-5xl space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold">Nueva compra</h1>
+          <p className="text-sm text-base-content/60">Registra mercaderia, pagos e ingreso automatico a stock.</p>
+        </div>
+
+        <div className="join">
+          <button type="button" className={`btn join-item ${kind === "PHONE" ? "btn-primary" : "btn-outline"}`} onClick={() => switchKind("PHONE")}>Equipos (Unitario)</button>
+          <button type="button" className={`btn join-item ${kind === "ACCESSORY" ? "btn-primary" : "btn-outline"}`} onClick={() => switchKind("ACCESSORY")}>Accesorios / Articulos (Bulk)</button>
+        </div>
+
+        {error ? <div className="alert alert-error text-sm">{error}</div> : null}
+        {supplierFeedback ? <div className="alert alert-warning text-sm" onClick={() => setSupplierFeedback(null)}>{supplierFeedback}</div> : null}
+
+        <section className="space-y-3 rounded border border-base-300 bg-base-100 p-4">
+          <h2 className="text-lg font-semibold">Datos principales</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="form-control">
+              <span className="label-text">Fecha de compra *</span>
+              <input type="date" className="input input-bordered" value={form.date} onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))} />
+            </label>
+            <BranchAutocomplete value={form.branchId || null} branches={branches} onChange={(branchId) => setForm((prev) => ({ ...prev, branchId, supplierId: "" }))} placeholder="Sucursal de compra" />
+            <label className="form-control">
+              <span className="label-text">Proveedor *</span>
+              <select className="select select-bordered" value={form.supplierId} onChange={(event) => setForm((prev) => ({ ...prev, supplierId: event.target.value }))} required>
+                <option value="">{form.branchId ? "Seleccionar proveedor" : "Elegi una sucursal primero"}</option>
+                {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <label className="form-control">
+            <span className="label-text">Notas</span>
+            <input className="input input-bordered" value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} />
+          </label>
+        </section>
+
+        <section className="space-y-3 rounded border border-base-300 bg-base-100 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Items</h2>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem(kind)])}>+ Agregar otro item</button>
+          </div>
+          <div className="space-y-4">
+            {items.map((item, index) => (
+              <div key={item.id} className="rounded border border-base-300 p-3">
+                <div className="flex justify-between gap-3">
+                  <h3 className="font-semibold">Item {index + 1}</h3>
+                  {items.length > 1 ? <button type="button" className="btn btn-ghost btn-xs" onClick={() => setItems((prev) => prev.filter((candidate) => candidate.id !== item.id))}>Eliminar</button> : null}
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <label className="form-control">
+                    <span className="label-text">{kind === "PHONE" ? "Modelo *" : "Articulo / modelo *"}</span>
+                    <input className="input input-bordered" value={item.modelName} onChange={(event) => updateItem(item.id, { modelName: event.target.value })} required />
+                  </label>
+                  {kind === "ACCESSORY" ? (
+                    <label className="form-control">
+                      <span className="label-text">Para modelo</span>
+                      <input className="input input-bordered" value={item.relatedModel} onChange={(event) => updateItem(item.id, { relatedModel: event.target.value })} />
+                    </label>
+                  ) : (
+                    <label className="form-control">
+                      <span className="label-text">Capacidad *</span>
+                      <input className="input input-bordered" type="number" value={item.capacityGB} onChange={(event) => updateItem(item.id, { capacityGB: event.target.value })} />
+                    </label>
+                  )}
+                  <label className="form-control">
+                    <span className="label-text">Color</span>
+                    <input className="input input-bordered" value={item.color} onChange={(event) => updateItem(item.id, { color: event.target.value })} />
+                  </label>
+                  {kind === "PHONE" ? (
+                    <>
+                      <label className="form-control">
+                        <span className="label-text">Estado fisico</span>
+                        <select className="select select-bordered" value={item.physicalState} onChange={(event) => updateItem(item.id, { physicalState: event.target.value as "NEW" | "USED" })}>
+                          <option value="NEW">Nuevo</option>
+                          <option value="USED">Usado</option>
+                        </select>
+                      </label>
+                      <label className="form-control">
+                        <span className="label-text">Grado / condition</span>
+                        <select className="select select-bordered" value={item.condition} onChange={(event) => updateItem(item.id, { condition: event.target.value as ConditionValue })}>
+                          <option value="SEALED">SEALED</option>
+                          <option value="A_PLUS">A_PLUS</option>
+                          <option value="OEM">OEM</option>
+                          <option value="ASIS">ASIS</option>
+                          <option value="ASIS_PLUS">ASIS_PLUS</option>
+                        </select>
+                      </label>
+                      <label className="form-control">
+                        <span className="label-text">Bateria %</span>
+                        <input className="input input-bordered" type="number" min={0} max={100} value={item.batteryPct} onChange={(event) => updateItem(item.id, { batteryPct: event.target.value })} />
+                      </label>
+                    </>
+                  ) : null}
+                  <label className="form-control">
+                    <span className="label-text">Cantidad *</span>
+                    <input className="input input-bordered" type="number" min={1} value={item.quantity} onChange={(event) => updateItemQuantity(item.id, Number(event.target.value))} />
+                  </label>
+                  <label className="form-control">
+                    <span className="label-text">Costo unitario *</span>
+                    <input className="input input-bordered" type="number" step="0.01" value={item.unitCost} onChange={(event) => updateItem(item.id, { unitCost: event.target.value })} />
+                  </label>
+                  <label className="form-control">
+                    <span className="label-text">Precio de venta</span>
+                    <input className="input input-bordered" type="number" step="0.01" value={item.salePrice} onChange={(event) => updateItem(item.id, { salePrice: event.target.value })} />
+                  </label>
+                  <label className="form-control md:col-span-3">
+                    <span className="label-text">Notas del item</span>
+                    <input className="input input-bordered" value={item.notes} onChange={(event) => updateItem(item.id, { notes: event.target.value })} />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {kind === "PHONE" ? (
+          <section className="space-y-3 rounded border border-base-300 bg-base-100 p-4">
+            <h2 className="text-lg font-semibold">Identificacion</h2>
+            {items.map((item) => (
+              <div key={item.id} className="space-y-2 rounded border border-base-300 p-3">
+                <div className="font-medium">{[item.modelName || "Equipo", item.color, item.capacityGB ? `${item.capacityGB}GB` : null].filter(Boolean).join(" · ")}</div>
+                {item.imeis.map((imei, index) => (
+                  <div key={`${item.id}-imei-${index}`} className="grid gap-2 md:grid-cols-[80px_1fr_1fr_auto]">
+                    <span className="self-center text-sm text-base-content/60">#{index + 1}</span>
+                    <input className="input input-bordered" placeholder="IMEI" value={imei} onChange={(event) => updateImei(item.id, index, event.target.value)} />
+                    <input className="input input-bordered" placeholder="Nota opcional" value={item.unitNotes[index] ?? ""} onChange={(event) => updateUnitNote(item.id, index, event.target.value)} />
+                    <button type="button" className="btn btn-outline" onClick={() => undefined}>Escanear IMEI</button>
+                  </div>
                 ))}
-              </select>
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Fecha</span></label>
-              <input type="date" name="date" value={form.date} onChange={handleFormChange} className="input input-bordered" />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Seña (USD)</span></label>
-              <input type="number" step="0.01" name="downPayment" value={form.downPayment} onChange={handleFormChange} className="input input-bordered" />
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Moneda</span></label>
-              <select name="currency" value={form.currency} onChange={handleFormChange} className="select select-bordered">
-                <option value="USD">USD</option>
-                <option value="ARS">ARS</option>
-                <option value="USDT">USDT</option>
-              </select>
-            </div>
-            <div className="form-control">
-              <label className="label"><span className="label-text">Notas</span></label>
-              <input type="text" name="notes" value={form.notes} onChange={handleFormChange} className="input input-bordered" />
-            </div>
-          </fieldset>
-          <fieldset className="border border-base-300 p-4 rounded-box">
-            <legend className="text-lg font-medium mb-2">Items</legend>
-            <div className="space-y-2">
-              <div className="form-control">
-                <label className="label"><span className="label-text">Producto</span></label>
-                <select name="productId" value={itemForm.productId} onChange={handleItemChange} className="select select-bordered">
-                  <option value="">Seleccionar</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>{p.modelName}</option>
-                  ))}
+              </div>
+            ))}
+          </section>
+        ) : null}
+
+        <section className="space-y-3 rounded border border-base-300 bg-base-100 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Pagos</h2>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setPayments((prev) => [...prev, newPayment()])}>+ Agregar otro medio de pago</button>
+          </div>
+          {!payments.length ? <p className="text-sm text-base-content/60">No se abona la compra al registrarla. Quedara en cuenta corriente.</p> : null}
+          <div className="space-y-2">
+            {payments.map((payment) => (
+              <div key={payment.id} className="grid gap-2 rounded border border-base-300 p-3 md:grid-cols-[1fr_120px_140px_140px_1fr_auto]">
+                <select className="select select-bordered" value={payment.method} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, method: event.target.value as PaymentMethodValue } : row))}>
+                  <option value="EFECTIVO_USD">Efectivo USD</option>
+                  <option value="EFECTIVO_PESOS">Efectivo ARS</option>
+                  <option value="TRANSFERENCIA_USD">Transferencia USD</option>
+                  <option value="TRANSFERENCIA_ARS">Transferencia ARS</option>
+                  <option value="USDT">USDT</option>
+                  <option value="TARJETA">Tarjeta</option>
                 </select>
+                <select className="select select-bordered" value={payment.currency} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, currency: event.target.value as CurrencyValue } : row))}>
+                  <option value="USD">USD</option>
+                  <option value="ARS">ARS</option>
+                  <option value="USDT">USDT</option>
+                </select>
+                <input className="input input-bordered" type="number" step="0.01" placeholder="Monto" value={payment.amount} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, amount: event.target.value } : row))} />
+                <input className="input input-bordered" type="number" step="0.01" placeholder="TC" value={payment.exchangeRate} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, exchangeRate: event.target.value } : row))} />
+                <input className="input input-bordered" placeholder="Nota" value={payment.note} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, note: event.target.value } : row))} />
+                <button type="button" className="btn btn-ghost" onClick={() => setPayments((prev) => prev.filter((row) => row.id !== payment.id))}>Quitar</button>
               </div>
-              <div className="form-control">
-                <label className="label"><span className="label-text">Unidades</span></label>
-                <input type="number" name="units" value={itemForm.units} onChange={handleItemChange} className="input input-bordered" />
-              </div>
-              <div className="form-control">
-                <label className="label"><span className="label-text">Costo unitario (USD)</span></label>
-                <input type="number" step="0.01" name="unitCost" value={itemForm.unitCost} onChange={handleItemChange} className="input input-bordered" />
-              </div>
-              <button type="button" onClick={addItem} className="btn btn-outline w-full">
-                Agregar Ítem
+            ))}
+          </div>
+          <div className="grid gap-3 text-sm md:grid-cols-3">
+            <div>Total compra: <span className="font-semibold">{form.currency} {total.toFixed(2)}</span></div>
+            <div>Total abonado USD eq.: <span className="font-semibold">USD {paidUsd.toFixed(2)}</span></div>
+            <div>Saldo pendiente: <span className="font-semibold">USD {Math.max(0, total - paidUsd).toFixed(2)}</span></div>
+          </div>
+        </section>
+
+        <div className="flex justify-end">
+          <button type="button" className="btn btn-primary" onClick={() => setConfirmOpen(true)} disabled={!form.branchId || !form.supplierId || saving}>
+            Confirmar compra
+          </button>
+        </div>
+      </div>
+
+      {confirmOpen ? (
+        <div className="modal modal-open">
+          <div className="modal-box max-h-[86vh] max-w-4xl overflow-y-auto rounded-lg">
+            <h2 className="text-xl font-semibold">Confirmacion de Compra</h2>
+            <p className="text-sm text-base-content/60">Revisa los datos antes de registrar</p>
+            <div className="mt-4 space-y-4">
+              <section className="rounded border border-base-300 p-3">
+                <h3 className="font-semibold">Informacion general</h3>
+                <p className="text-sm">Fecha: {form.date}</p>
+                <p className="text-sm">Proveedor: {suppliers.find((supplier) => supplier.id === form.supplierId)?.name ?? "-"}</p>
+                <p className="text-sm">Sucursal: {branches.find((branch) => branch.id === form.branchId)?.name ?? "-"}</p>
+              </section>
+              <section className="rounded border border-base-300 p-3">
+                <h3 className="font-semibold">Items</h3>
+                {items.map((item) => (
+                  <div key={item.id} className="mt-2 text-sm">
+                    <p className="font-medium">{item.modelName} · {item.quantity} un. · {form.currency} {(Number(item.unitCost || 0) * item.quantity).toFixed(2)}</p>
+                    {item.type === "PHONE" ? <p className="text-base-content/60">IMEI: {item.imeis.filter(Boolean).join(", ") || "sin cargar"}</p> : <p className="text-base-content/60">{item.relatedModel ? `Para ${item.relatedModel}` : ""}</p>}
+                  </div>
+                ))}
+              </section>
+              <section className="rounded border border-base-300 p-3">
+                <h3 className="font-semibold">Costos y pagos</h3>
+                <p className="text-sm">Total de compra: {form.currency} {total.toFixed(2)}</p>
+                {payments.map((payment) => <p key={payment.id} className="text-sm">{payment.method} · {payment.currency} {payment.amount}</p>)}
+                <div className={`alert mt-3 text-sm ${paidUsd >= total ? "alert-success" : "alert-warning"}`}>{paidUsd >= total ? "COMPRA SALDADA TOTALMENTE" : "SALDO PENDIENTE"}</div>
+              </section>
+            </div>
+            <div className="modal-action">
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmOpen(false)} disabled={saving}>Volver y corregir</button>
+              <button type="button" className="btn btn-primary" onClick={submit} disabled={saving}>
+                {saving ? <span className="loading loading-spinner loading-xs" /> : null}
+                Registrar compra
               </button>
             </div>
-            {items.length > 0 && (
-              <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
-                <table className="table table-zebra w-full">
-                  <thead>
-                    <tr>
-                      <th>Producto</th>
-                      <th>Unidades</th>
-                      <th>Costo unitario</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item, idx) => {
-                      const product = products.find((p) => p.id === item.productId)
-                      return (
-                        <tr key={idx}>
-                          <td>{product?.modelName ?? item.productId}</td>
-                          <td>{item.units}</td>
-                          <td>{item.unitCost.toFixed(2)}</td>
-                          <td>{(item.units * item.unitCost).toFixed(2)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </fieldset>
-          <button type="submit" className="btn btn-primary w-full mt-2">
-            Crear Compra
-          </button>
-        </form>
-      </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => !saving && setConfirmOpen(false)} />
+        </div>
+      ) : null}
     </DashboardLayout>
   )
 }

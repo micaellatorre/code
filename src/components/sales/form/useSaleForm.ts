@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react"
 import type { Buyer, SaleStatus } from "@prisma/client"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import type { Role } from "@/lib/auth/roles"
+import type { BranchOption } from "@/components/branches/BranchAutocomplete"
 import type { TradeInConfigDto, TradeInDeviceDraft } from "@/components/trade-in/types"
 import type {
   CustomerKind,
@@ -49,6 +50,8 @@ export function useSaleForm({
   const [activeStep, setActiveStep] = useState(0)
   const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(initialData?.buyer ?? null)
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(initialAppointmentId ?? null)
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(initialData?.branchId ?? "")
   const [meta, setMeta] = useState<SaleMeta>(initialData?.meta ?? { date: new Date(), origin: "Instagram" })
   const [items, setItems] = useState<SaleItemDraft[]>(initialData?.items ?? [])
   const [payments, setPayments] = useState<PaymentDraft[]>(initialData?.payments ?? [])
@@ -64,6 +67,18 @@ export function useSaleForm({
 
   const saleIsLocked = mode === "edit" && saleStatus === "CONFIRMADA" && activeRole !== "ADMIN"
   const canChangeStatus = activeRole === "ADMIN" || saleStatus === "SENADA"
+
+  useEffect(() => {
+    fetch("/api/users/me/branches", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload) => {
+        const nextBranches = Array.isArray(payload.branches) ? payload.branches : []
+        setBranches(nextBranches)
+        const current = payload.currentBranch as BranchOption | null
+        setSelectedBranchId((prev) => prev || initialData?.branchId || current?.id || "")
+      })
+      .catch(() => setBranches([]))
+  }, [initialData?.branchId])
 
   const totals = useMemo(() => {
     const subtotal = items
@@ -168,6 +183,7 @@ export function useSaleForm({
       tradeInDevices,
       date: meta.date.toISOString(),
       buyerId: selectedBuyer?.id,
+      branchId: isAdmin ? selectedBranchId || null : undefined,
       customerName: !selectedBuyer ? "Consumidor Final" : null,
       origin: operationFlow === "RESERVATION" ? "Reserva" : meta.origin === "Otro" ? meta.customOrigin : meta.origin,
       notes: meta.notes,
@@ -269,6 +285,9 @@ export function useSaleForm({
     setSelectedBuyer,
     selectedAppointmentId,
     setSelectedAppointmentId,
+    branches,
+    selectedBranchId,
+    setSelectedBranchId,
     meta,
     setMeta,
     items,

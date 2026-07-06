@@ -7,6 +7,7 @@ import { fromArgDateInputValue } from "@/lib/timezone"
 import type { Role } from "@/lib/auth/roles"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
+import type { BranchOption } from "@/components/branches/BranchAutocomplete"
 import type { InventorySegment, ProductsApiResponse, SerializedProduct } from "./types"
 import { compareIphoneModels, getIphoneSeries, getSeriesSortValue, isSealedPhone, normalizeModelKey } from "./utils"
 
@@ -82,6 +83,8 @@ export function useProductsInventory() {
   const [savingSenadoId, setSavingSenadoId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [savingBranchProductId, setSavingBranchProductId] = useState<string | null>(null)
 
   // pagination (cursor-based)
   const [cursor, setCursor] = useState<string | null>(null)
@@ -124,6 +127,14 @@ export function useProductsInventory() {
       return merged
     })
   }, [apiUrl, data, cursor, totalProducts])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    fetch("/api/users/me/branches", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload) => setBranches(Array.isArray(payload.branches) ? payload.branches : []))
+      .catch(() => setBranches([]))
+  }, [isAdmin])
 
   // enums + labels
   const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "DISPONIBLE", "FUERA_DE_STOCK", "VENDIDO"] as const
@@ -311,6 +322,7 @@ export function useProductsInventory() {
   }
 
   function canEditField(fieldName: string) {
+    if (fieldName === "branchId") return isAdmin
     if (fieldName === "costPrice") return canSeeCosts && canEditProducts
     if (fieldName === "salePrice") return canSeeSalePrice && canEditProducts
     if (["stock", "stockInitial", "stockAvailable"].includes(fieldName)) return canEditStock
@@ -793,6 +805,31 @@ export function useProductsInventory() {
     }
   }
 
+  async function changeProductBranch(productId: string, branchId: string) {
+    if (!isAdmin) return
+    const branch = branches.find((item) => item.id === branchId)
+    if (!branch) return
+    const rollback = productsLocal.find((product) => product.id === productId) ?? null
+    setSavingBranchProductId(productId)
+    setProductsLocal((prev) => prev.map((product) => (product.id === productId ? { ...product, branchId, branch } : product)))
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branchId }),
+      })
+      const updated = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(updated?.error ?? "No se pudo actualizar la sucursal.")
+      setProductsLocal((prev) => prev.map((product) => (product.id === productId ? { ...product, branchId: updated.branchId, branch: updated.branch } : product)))
+      mutate()
+    } catch (error) {
+      if (rollback) setProductsLocal((prev) => prev.map((product) => (product.id === productId ? rollback : product)))
+      console.error("Failed to update product branch", error)
+    } finally {
+      setSavingBranchProductId(null)
+    }
+  }
+
   function toggleGroup(key: string) {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
@@ -805,9 +842,9 @@ export function useProductsInventory() {
     viewMode, setViewMode, inventorySegment, setInventorySegment, search, setSearch, typeFilter, setTypeFilter, stateFilter, setStateFilter, senadoFilter, setSenadoFilter,
     brandFilter, setBrandFilter, conditionFilter, setConditionFilter, batteryMin, setBatteryMin, batteryMax, setBatteryMax, colorFilter, setColorFilter, capacityFilter, setCapacityFilter, originFilter, setOriginFilter, locationFilter, setLocationFilter, imeiSearch, setImeiSearch,
     isTableExpanded, setIsTableExpanded, drawerOpen, setDrawerOpen, expandedGroups, setExpandedGroups, showSensitiveColumns, setShowSensitiveColumns, selectedProductIds, setSelectedProductIds, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, generalColumnCount,
-    editingFields, savingField, savingStateId, savingSenadoId, deletingId, duplicatingId, cursor, setCursor, limit, orderBy, setOrderBy, apiUrl, data, error, isLoading, mutate, productsLocal, setProductsLocal, totalProducts,
+    editingFields, savingField, savingStateId, savingSenadoId, deletingId, duplicatingId, branches, savingBranchProductId, cursor, setCursor, limit, orderBy, setOrderBy, apiUrl, data, error, isLoading, mutate, productsLocal, setProductsLocal, totalProducts,
     stateOptions, stateColorMap, stateLabelMap, conditionOptions, conditionLabelMap, brands, conditions, colors, capacities, filteredProducts, locations, operationalProducts, phoneSections, grouped, groupedCounts, hasNext,
-    clearFilters, selectInventorySegment, toggleProductSelection, canEditField, editableCellProps, startEditField, cancelEditField, updateEditingValue, persistFieldUpdate, commitEditField, isEditing, getEditingValue, persistStockUpdate, startEditStock, changeStockBy, persistStateUpdate, changeState, changeSenado, deleteProduct, duplicateProduct, toggleGroup,
+    clearFilters, selectInventorySegment, toggleProductSelection, canEditField, editableCellProps, startEditField, cancelEditField, updateEditingValue, persistFieldUpdate, commitEditField, isEditing, getEditingValue, persistStockUpdate, startEditStock, changeStockBy, persistStateUpdate, changeState, changeSenado, deleteProduct, duplicateProduct, changeProductBranch, toggleGroup,
   }
 }
 

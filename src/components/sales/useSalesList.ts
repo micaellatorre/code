@@ -8,6 +8,7 @@ import { AR_TIME_ZONE } from "@/lib/timezone"
 import { formatInTimeZone } from "date-fns-tz"
 import { displaySaleUser, getSaleOrigin, getSaleSearchText, toNumber } from "./salesUtils"
 import type { SaleOriginFilter, SalesKpisValue, SaleStatusFilter, SerializedSale, UserSearchResult } from "./types"
+import type { BranchOption } from "@/components/branches/BranchAutocomplete"
 
 export function useSalesList(initial: SerializedSale[]) {
   const { data: session } = useSession()
@@ -37,11 +38,21 @@ export function useSalesList(initial: SerializedSale[]) {
   const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([])
   const [isSearchingUsers, setIsSearchingUsers] = useState(false)
   const [isSavingSeller, setIsSavingSeller] = useState(false)
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [savingBranchSaleId, setSavingBranchSaleId] = useState<string | null>(null)
   const sellerEditorRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setSales(initial)
   }, [initial])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    fetch("/api/users/me/branches", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload) => setBranches(Array.isArray(payload.branches) ? payload.branches : []))
+      .catch(() => setBranches([]))
+  }, [isAdmin])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedUserSearchQuery(userSearchQuery.trim()), 250)
@@ -192,6 +203,29 @@ export function useSalesList(initial: SerializedSale[]) {
     }
   }
 
+  async function handleSelectBranch(saleId: string, branchId: string) {
+    if (!isAdmin) return
+    const branch = branches.find((item) => item.id === branchId)
+    if (!branch) return
+
+    setSavingBranchSaleId(saleId)
+    try {
+      const response = await fetch(`/api/sales/${saleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branchId }),
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error ?? "No se pudo actualizar la sucursal.")
+
+      setSales((prev) => prev.map((sale) => (sale.id === saleId ? { ...sale, branchId, branch } : sale)))
+    } catch (error) {
+      console.error("Failed to update sale branch", error)
+    } finally {
+      setSavingBranchSaleId(null)
+    }
+  }
+
   async function cancelSale(sale: SerializedSale) {
     if (!canCancel) return
 
@@ -258,6 +292,11 @@ export function useSalesList(initial: SerializedSale[]) {
       onClose: closeSellerEditor,
       onUserSearchQueryChange: setUserSearchQuery,
       onSelectUser: handleSelectSeller,
+    },
+    branchEditor: {
+      branches,
+      savingBranchSaleId,
+      onSelectBranch: handleSelectBranch,
     },
     editingSellerId,
     userSearchQuery,

@@ -3,11 +3,16 @@
 
 import type { SaleMeta } from '@/components/sales/types';
 import { toArgDateTimeInputValue, fromArgDateTimeInputValue } from '@/lib/timezone';
+import BranchAutocomplete, { type BranchOption } from '@/components/branches/BranchAutocomplete';
 
 interface SaleMetaSectionProps {
     meta: SaleMeta;
     setMeta: (meta: SaleMeta) => void;
     disabled?: boolean;
+    isAdmin?: boolean;
+    branches?: BranchOption[];
+    selectedBranchId?: string;
+    setSelectedBranchId?: (branchId: string) => void;
 }
 
 const ORIGIN_OPTIONS = [
@@ -20,7 +25,7 @@ const ORIGIN_OPTIONS = [
     'Otro',
 ];
 
-export default function SaleMetaSection({ meta, setMeta, disabled = false }: SaleMetaSectionProps) {
+export default function SaleMetaSection({ meta, setMeta, disabled = false, isAdmin, branches = [], selectedBranchId, setSelectedBranchId }: SaleMetaSectionProps) {
     
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -58,6 +63,12 @@ export default function SaleMetaSection({ meta, setMeta, disabled = false }: Sal
                         {ORIGIN_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                 </div>
+                {isAdmin && setSelectedBranchId ? (
+                    <div className="form-control md:col-span-2">
+                        <BranchAutocomplete value={selectedBranchId || null} branches={branches} onChange={setSelectedBranchId} disabled={disabled} />
+                        <span className="label-text-alt mt-1 text-base-content/50">Sucursal donde se realiza la venta.</span>
+                    </div>
+                ) : null}
                 {meta.origin === 'Otro' && (
                     <div className="form-control md:col-span-2">
                         <label className="label"><span className="label-text">Especificar Origen</span></label>

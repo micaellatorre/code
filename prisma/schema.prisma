@@ -14,28 +14,33 @@ generator client {
 }
 
 model User {
-  id          String    @id @default(cuid())
-  email       String    @unique
-  name        String?
-  image       String?
-  isActive    Boolean   @default(true)
-  role        UserRole
-  tenantId    String?
-  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
-  lastLoginAt DateTime?
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  image           String?
+  isActive        Boolean   @default(true)
+  role            UserRole
+  tenantId        String?
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id])
+  currentBranchId String?
+  currentBranch   Branch?   @relation("UserCurrentBranch", fields: [currentBranchId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+  lastLoginAt     DateTime?
 
   appointments         Appointment[]
-  sales                Sale[]             @relation("SaleCreatedBy")
-  closedSales          Sale[]             @relation("SaleCloser")
+  sales                Sale[]               @relation("SaleCreatedBy")
+  closedSales          Sale[]               @relation("SaleCloser")
   reservations         Reservation[]
-  serviceOrders        ServiceOrder[]     @relation("ServiceOrderTechnician")
-  createdServiceOrders ServiceOrder[]     @relation("ServiceOrderCreatedBy")
-  auditLogs            AuditLog[]         @relation("AuditLogActor")
+  serviceOrders        ServiceOrder[]       @relation("ServiceOrderTechnician")
+  createdServiceOrders ServiceOrder[]       @relation("ServiceOrderCreatedBy")
+  auditLogs            AuditLog[]           @relation("AuditLogActor")
   cashMovements        CashMovement[]
   cashTransfers        CashTransfer[]
-  closerCommissions    CloserCommission[] @relation("CloserCommissionCloser")
+  closerCommissions    CloserCommission[]   @relation("CloserCommissionCloser")
+  branchCoverages      UserBranchCoverage[]
+
+  @@index([currentBranchId])
 }
 
 /// Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
@@ -67,6 +72,19 @@ model Tenant {
   tradeInBatteryRanges  TradeInBatteryRange[]
   tradeInPrices         TradeInPrice[]
   tradeInDeductionRules TradeInDeductionRule[]
+}
+
+model Province {
+  id   String @id
+  name String
+  code String @unique
+
+  buyers          Buyer[]
+  suppliers       Supplier[]
+  branches        Branch[]                 @relation("BranchProvince")
+  branchCoverages BranchProvinceCoverage[]
+
+  @@index([name])
 }
 
 /// Catálogo unificado: iPhones y accesorios.
@@ -129,9 +147,15 @@ model Buyer {
   dni          String?
   cuit         String?
   dob          DateTime?
+  /// LEGACY: texto libre historico. Usar provinceId/provinceRef para datos normalizados.
   province     String?
+  provinceId   String?
+  provinceRef  Province? @relation(fields: [provinceId], references: [id])
   city         String?
   postalCode   String?
+
+  registeredBranchId String?
+  registeredBranch   Branch? @relation("BuyerRegisteredBranch", fields: [registeredBranchId], references: [id])
 
   notes String?
 
@@ -160,6 +184,8 @@ model Buyer {
   @@index([tenantId, phone])
   @@index([tenantId, email])
   @@index([tenantId, province, city])
+  @@index([provinceId])
+  @@index([registeredBranchId])
 }
 
 /// Venta encabezado.
@@ -342,16 +368,27 @@ model Supplier {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  name        String
-  contactName String?
-  phone       String?
-  email       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  name          String
+  contactName   String?
+  phone         String?
+  email         String?
+  provinceId    String?
+  provinceRef   Province? @relation(fields: [provinceId], references: [id])
+  city          String?
+  postalCode    String?
+  addressStreet String?
+  addressNumber String?
+  branchId      String?
+  branch        Branch?   @relation("SupplierPrimaryBranch", fields: [branchId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  purchases Purchase[]
+  branchCoverages SupplierBranchCoverage[]
+  purchases       Purchase[]
 
   @@index([tenantId, name])
+  @@index([provinceId])
+  @@index([branchId])
 }
 
 /// Representa una compra realizada a un proveedor. Puede contener múltiples ítems.
@@ -459,23 +496,69 @@ model Branch {
   code String
   name String
 
-  province String?
-  city     String?
-  address  String?
-  phone    String?
-  email    String?
+  /// LEGACY: texto libre historico. Usar provinceId/provinceRef para datos normalizados.
+  province    String?
+  provinceId  String?
+  provinceRef Province? @relation("BranchProvince", fields: [provinceId], references: [id])
+  city        String?
+  address     String?
+  phone       String?
+  email       String?
 
   isActive Boolean @default(true)
 
-  products  Product[]
-  sales     Sale[]
-  purchases Purchase[]
+  products          Product[]
+  sales             Sale[]
+  purchases         Purchase[]
+  registeredBuyers  Buyer[]                  @relation("BuyerRegisteredBranch")
+  provinceCoverages BranchProvinceCoverage[]
+  currentUsers      User[]                   @relation("UserCurrentBranch")
+  userCoverages     UserBranchCoverage[]
+  suppliers         Supplier[]               @relation("SupplierPrimaryBranch")
+  supplierCoverages SupplierBranchCoverage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive])
+  @@index([provinceId])
+}
+
+model BranchProvinceCoverage {
+  id         String   @id @default(cuid())
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  provinceId String
+  province   Province @relation(fields: [provinceId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([branchId, provinceId])
+  @@index([provinceId])
+}
+
+model UserBranchCoverage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, branchId])
+  @@index([branchId])
+}
+
+model SupplierBranchCoverage {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([supplierId, branchId])
+  @@index([branchId])
 }
 
 model PurchasePayment {
@@ -946,6 +1029,7 @@ enum AuditModule {
   PRODUCT
   SALE
   PURCHASE
+  SUPPLIER
   RESERVATION
   SERVICE
   CASH

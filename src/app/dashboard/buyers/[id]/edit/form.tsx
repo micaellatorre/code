@@ -28,6 +28,8 @@ function normalizeInitialData(buyer: any): BuyerFormInitialData {
     businessName: buyer.businessName ?? null,
     dob: buyer.dob ?? null,
     province: buyer.province ?? null,
+    provinceId: buyer.provinceId ?? null,
+    registeredBranchId: buyer.registeredBranchId ?? null,
     city: buyer.city ?? null,
     postalCode: buyer.postalCode ?? null,
     notes: buyer.notes ?? null,

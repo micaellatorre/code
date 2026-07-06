@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { useConfirmDialog } from '@/components/ui/confirm-dialog'
 import ImeiDisplay from '@/components/common/ImeiDisplay'
+import BranchAutocomplete, { type BranchOption } from '@/components/branches/BranchAutocomplete'
 
 interface EditProductFormProps {
   id: string
@@ -13,11 +15,16 @@ interface EditProductFormProps {
 
 export default function EditProductForm({ id }: EditProductFormProps) {
   const router = useRouter()
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.activeRole === "ADMIN"
   const confirmDialog = useConfirmDialog()
   const [loading, setLoading] = useState(true)
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
     modelName: '',
     location: '',
+    branchId: '',
     origin: '',
     brand: '',
     imei: '',
@@ -42,6 +49,7 @@ export default function EditProductForm({ id }: EditProductFormProps) {
         setForm({
           modelName: data.modelName ?? '',
           location: data.location ?? '',
+          branchId: data.branchId ?? '',
           origin: data.origin ?? '',
           brand: data.brand ?? '',
           imei: data.imei ?? '',
@@ -60,6 +68,10 @@ export default function EditProductForm({ id }: EditProductFormProps) {
       setLoading(false)
     }
     fetchProduct()
+    fetch('/api/users/me/branches')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setBranches(data?.branches ?? []))
+      .catch(() => setBranches([]))
   }, [id])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -71,9 +83,11 @@ export default function EditProductForm({ id }: EditProductFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError(null)
     const payload: any = {
       modelName: form.modelName,
       location: form.location || null,
+      ...(isAdmin ? { branchId: form.branchId || null } : {}),
       origin: form.origin || null,
       brand: form.brand || null,
       imei: form.imei || null,
@@ -97,7 +111,8 @@ export default function EditProductForm({ id }: EditProductFormProps) {
       if (res.ok) {
         router.push('/dashboard/products')
       } else {
-        console.error('Error al actualizar producto')
+        const payload = await res.json().catch(() => null)
+        setError(payload?.error ?? 'Error al actualizar producto')
       }
     } finally {
       setIsSubmitting(false)
@@ -154,6 +169,7 @@ export default function EditProductForm({ id }: EditProductFormProps) {
         ]}
       />
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+        {error ? <div className="alert alert-error lg:col-span-3 text-sm">{error}</div> : null}
         <div className='lg:col-span-2 flex flex-col gap-4'>
           <fieldset className="card bg-base-100 border border-base-content/50 lg:col-span-1 p-4 space-y-2">
             <h2 className="text-lg font-bold mb-1">1. Datos del producto</h2>
@@ -170,6 +186,14 @@ export default function EditProductForm({ id }: EditProductFormProps) {
                 <input type="text" name="location" value={form.location} onChange={handleChange} required className="input input-bordered" />
               </div>
             </div>
+            {isAdmin ? (
+              <div className='flex flex-row w-full gap-4'>
+                <div className="form-control w-full">
+                  <BranchAutocomplete value={form.branchId || null} branches={branches} onChange={(branchId) => setForm((prev) => ({ ...prev, branchId }))} />
+                  <span className="label-text-alt mt-1 text-base-content/50">Ubicacion fisica actual del producto.</span>
+                </div>
+              </div>
+            ) : null}
             <div className='flex flex-row w-full gap-4'>
               <div className="form-control w-full">
                 <label className="label"><span className="label-text">Origen</span></label>

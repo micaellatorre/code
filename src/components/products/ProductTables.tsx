@@ -6,6 +6,7 @@ import { CheckIcon, ChevronDownIcon, DocumentDuplicateIcon, EyeIcon, EyeSlashIco
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE, toArgDateInputValue } from "@/lib/timezone"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
+import BranchAutocomplete from "@/components/branches/BranchAutocomplete"
 import type { SerializedProduct } from "./types"
 import type { ProductsInventory } from "./useProductsInventory"
 import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } from "./utils"
@@ -13,7 +14,7 @@ import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } f
 type ProductTablesProps = { inventory: ProductsInventory }
 
 export default function ProductTables({ inventory }: ProductTablesProps) {
-  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, startEditField, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup } = inventory
+  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, startEditField, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup, branches, savingBranchProductId, changeProductBranch } = inventory
   const [copiedImeiProductId, setCopiedImeiProductId] = React.useState<string | null>(null)
   const copiedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -199,34 +200,10 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
 
         {visibleLocationColumn ? (
           <td>
-            {canEditField("location") && isEditing(p.id, "location") ? (
-              <div className="flex items-center gap-2">
-                <input
-                  autoFocus
-                  type="text"
-                  value={getEditingValue(p.id, "location")}
-                  onChange={(e) => updateEditingValue(p.id, "location", e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitEditField(p.id, "location")
-                    if (e.key === "Escape") cancelEditField(p.id, "location")
-                  }}
-                  onBlur={() => commitEditField(p.id, "location")}
-                  className="input input-xs w-full min-w-[100px]"
-                  disabled={savingField?.productId === p.id && savingField?.fieldName === "location"}
-                />
-                <div className="flex flex-col join join-horizontal border border-base-content/10">
-                  <button className="btn btn-ghost btn-xs join-item" onClick={() => commitEditField(p.id, "location")}>
-                    <CheckIcon className="h-[1em]" />
-                  </button>
-                  <button className="btn btn-ghost btn-xs join-item" onClick={() => cancelEditField(p.id, "location")}>
-                    <XMarkIcon className="h-[1em]" />
-                  </button>
-                </div>
-              </div>
+            {canEditField("branchId") ? (
+              <BranchAutocomplete value={p.branchId} branches={branches} onChange={(branchId) => changeProductBranch(p.id, branchId)} compact loading={savingBranchProductId === p.id} />
             ) : (
-              <span {...editableCellProps(p.id, "location", p.location)}>
-                {p.location || "-"}
-              </span>
+              <span className="text-nowrap">{p.branch?.name ?? p.location ?? "Sin sucursal"}</span>
             )}
           </td>
         ) : null}
@@ -832,9 +809,11 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
         </td>
         {visibleLocationColumn ? (
           <td>
-            <OperationalEditableCell product={product} fieldName="location">
-              <span className='text-nowrap'>{product.location || "-"}</span>
-            </OperationalEditableCell>
+            {canEditField("branchId") ? (
+              <BranchAutocomplete value={product.branchId} branches={branches} onChange={(branchId) => changeProductBranch(product.id, branchId)} compact loading={savingBranchProductId === product.id} />
+            ) : (
+              <span className='text-nowrap'>{product.branch?.name ?? product.location ?? "Sin sucursal"}</span>
+            )}
           </td>
         ) : null}
         {visibleCostColumn ? (
@@ -879,7 +858,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               <th>Bateria %</th>
               <th>Condicion</th>
               <th>Estado</th>
-              {visibleLocationColumn ? <th>Ubicacion</th> : null}
+              {visibleLocationColumn ? <th>Sucursal</th> : null}
               {visibleCostColumn ? <th>Costo</th> : null}
               {visibleSalePriceColumn ? <th>Precio</th> : null}
               {hasProductActions ? <th>Acciones</th> : null}
@@ -895,7 +874,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
     const key = `${sectionKey}-${series}`
     const isOpen = !!expandedGroups[key]
     const available = products.reduce((sum, product) => sum + (product.stockAvailable ?? 0), 0)
-    const locationSummary = Array.from(new Set(products.map((product) => product.location).filter(Boolean))).join(", ") || "-"
+    const locationSummary = Array.from(new Set(products.map((product) => product.branch?.name ?? product.location).filter(Boolean))).join(", ") || "-"
     return (
       <div className="rounded-box border border-base-content/10 bg-base-100 overflow-hidden">
         <button type="button" className="w-full flex flex-wrap items-center gap-3 p-3 text-left hover:bg-base-200/60" onClick={() => toggleGroup(key)}>
@@ -903,7 +882,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
           <span className="font-semibold">{series}</span>
           <span className="badge badge-ghost badge-sm">{products.length} unidades</span>
           <span className="text-xs text-base-content/60">Disponible: {available}</span>
-          {visibleLocationColumn ? <span className="text-xs text-base-content/60">Ubicacion: {locationSummary}</span> : null}
+          {visibleLocationColumn ? <span className="text-xs text-base-content/60">Sucursal: {locationSummary}</span> : null}
           {visibleSalePriceColumn ? <span className="ml-auto text-xs">Precio: $ {rangeLabelFromItems(products, "salePrice")}</span> : null}
         </button>
         {isOpen ? <PhoneOperationalTable products={products} /> : null}
@@ -957,7 +936,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               <tr>
                 <th>Agregado</th>
                 {visibleOriginColumn ? <th>Origen</th> : null}
-                {visibleLocationColumn ? <th>Ubicación</th> : null}
+                {visibleLocationColumn ? <th>Sucursal</th> : null}
                 {visibleImeiColumn ? <th>IMEI</th> : null}
                 <th>Modelo</th>
                 <th>Bateria %</th>
@@ -1063,7 +1042,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                                 <thead>
                                   <tr>
                                     <th>Agregado</th>
-                                    {visibleLocationColumn ? <th>Ubicación</th> : null}
+                                    {visibleLocationColumn ? <th>Sucursal</th> : null}
                                     {visibleImeiColumn ? <th>IMEI</th> : null}
                                     <th>Modelo</th>
                                     <th>Bateria %</th>

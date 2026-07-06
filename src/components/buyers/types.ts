@@ -9,8 +9,13 @@ export type SerializedBuyer = {
   businessName: string | null
   dob: string | null
   province: string | null
+  provinceLegacy?: string | null
+  provinceId: string | null
+  provinceRef?: { id: string; code: string; name: string } | null
   city: string | null
   postalCode: string | null
+  registeredBranchId: string | null
+  registeredBranch?: { id: string; code: string; name: string } | null
   notes: string | null
   phone: string | null
   instagram: string | null

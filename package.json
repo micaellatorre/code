@@ -13,6 +13,9 @@
     "prisma:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "seed:manual": "node dist/seed.js",
+    "seed:provinces": "node scripts/seed-provinces.cjs",
+    "backfill:provinces": "node scripts/backfill-provinces.cjs --dry-run",
+    "backfill:main-branch": "node scripts/backfill-main-branch.cjs",
     "db:fix:numerics": "node prisma/fixNumerics.js"
   },
   "prisma": {

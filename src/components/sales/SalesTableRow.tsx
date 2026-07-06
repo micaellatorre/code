@@ -8,6 +8,7 @@ import SaleItemsCell from "./SaleItemsCell"
 import SaleMarginCell from "./SaleMarginCell"
 import SaleSellerEditor from "./SaleSellerEditor"
 import type { SerializedSale, UserSearchResult } from "./types"
+import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 
 type SalesTableRowProps = {
   sale: SerializedSale
@@ -31,6 +32,11 @@ type SalesTableRowProps = {
     onUserSearchQueryChange: (value: string) => void
     onSelectUser: (user: UserSearchResult) => void
   }
+  branchProps: {
+    branches: BranchOption[]
+    isSaving: boolean
+    onSelectBranch: (branchId: string) => void
+  }
 }
 
 export default function SalesTableRow(props: SalesTableRowProps) {
@@ -48,6 +54,19 @@ export default function SalesTableRow(props: SalesTableRowProps) {
       </td>
       <td className="align-top">
         <SaleSellerEditor sale={sale} isAdmin={props.isAdmin} {...props.sellerProps} />
+      </td>
+      <td className="align-top">
+        {props.isAdmin && sale.status !== "CANCELADA" ? (
+          <BranchAutocomplete
+            value={sale.branchId}
+            branches={props.branchProps.branches}
+            onChange={props.branchProps.onSelectBranch}
+            compact
+            loading={props.branchProps.isSaving}
+          />
+        ) : (
+          <span className="text-sm">{sale.branch?.name ?? "Sin sucursal"}</span>
+        )}
       </td>
       <td className="align-top">
         <SaleItemsCell items={sale.items} />

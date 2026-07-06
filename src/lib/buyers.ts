@@ -1,4 +1,5 @@
 import type { Buyer, BuyerType } from "@prisma/client"
+import { normalizePostalCode } from "@/lib/domain/argentina/provinces"
 
 export const BUYER_TYPES: BuyerType[] = ["MINORISTA", "MAYORISTA"]
 
@@ -20,6 +21,8 @@ export function normalizeInstagramForStorage(value: unknown) {
   const normalized = normalizeNullableString(value)?.replace(/^@+/, "") ?? null
   return normalized || null
 }
+
+export { normalizePostalCode }
 
 export function parseOptionalDate(value: unknown) {
   if (value == null || value === "") return null
@@ -48,7 +51,12 @@ export function validateBuyerRequiredFields(input: {
   if (!input.cuit) throw new Error("El CUIT es obligatorio para clientes mayoristas.")
 }
 
-export function serializeBuyer(buyer: Buyer) {
+export function serializeBuyer(
+  buyer: Buyer & {
+    provinceRef?: { id: string; code: string; name: string } | null
+    registeredBranch?: { id: string; code: string; name: string } | null
+  },
+) {
   return {
     id: buyer.id,
     tenantId: buyer.tenantId,
@@ -57,9 +65,14 @@ export function serializeBuyer(buyer: Buyer) {
     surname: buyer.surname,
     businessName: buyer.businessName,
     dob: buyer.dob ? buyer.dob.toISOString() : null,
-    province: buyer.province,
+    province: buyer.provinceRef?.name ?? buyer.province,
+    provinceLegacy: buyer.province,
+    provinceId: buyer.provinceId,
+    provinceRef: buyer.provinceRef ?? null,
     city: buyer.city,
     postalCode: buyer.postalCode,
+    registeredBranchId: buyer.registeredBranchId,
+    registeredBranch: buyer.registeredBranch ?? null,
     notes: buyer.notes,
     phone: buyer.phone,
     instagram: buyer.instagram,

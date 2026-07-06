@@ -13,7 +13,7 @@ import { databaseTabLabels } from "@/lib/database/config"
 
 export const dynamic = "force-dynamic"
 
-const exportFields = ["cash", "retail", "wholesale", "purchases", "reservations", "service", "audit"] as const
+const exportFields = ["cash", "retail", "wholesale", "purchases", "reservations", "service", "audit", "buyers"] as const
 
 const requestSchema = z.object({
   format: z.enum(["pdf", "xlsx"]),
@@ -31,6 +31,7 @@ function sheetName(field: DatabaseTabKey) {
     reservations: "Guardados Reservas",
     service: "Servicio Tecnico",
     audit: "Trazabilidad",
+    buyers: "Compradores",
   }
   return names[field] ?? databaseTabLabels[field]
 }
@@ -53,6 +54,7 @@ function flattenRows(model: DatabaseReadModel, field: (typeof exportFields)[numb
   if (field === "retail") {
     return model.retail.map((row) => ({
       Fecha: row.date,
+      Sucursal: row.branch,
       Cliente: row.customer,
       Item: row.itemSummary,
       IMEI: row.itemMeta,
@@ -70,6 +72,7 @@ function flattenRows(model: DatabaseReadModel, field: (typeof exportFields)[numb
   if (field === "wholesale") {
     return model.wholesale.map((row) => ({
       Fecha: row.date,
+      Sucursal: row.branch,
       Cliente: row.customer,
       Item: row.itemSummary,
       IMEI: row.itemMeta,
@@ -87,6 +90,8 @@ function flattenRows(model: DatabaseReadModel, field: (typeof exportFields)[numb
     return model.purchases.map((row) => ({
       Fecha: row.date,
       Proveedor: row.supplier,
+      "Provincia proveedor": row.supplierProvince,
+      "Ciudad proveedor": row.supplierCity,
       Modelo: row.model,
       "IMEI / Serie": row.imeiSerial,
       Codigo: row.code,
@@ -123,6 +128,21 @@ function flattenRows(model: DatabaseReadModel, field: (typeof exportFields)[numb
       Costo: row.costAmount,
       Moneda: row.currency,
       Estado: row.status,
+    }))
+  }
+
+  if (field === "buyers") {
+    return model.buyers.map((row) => ({
+      Nombre: row.name,
+      Tipo: row.type,
+      Provincia: row.province,
+      "Sucursal de registro": row.registeredBranch,
+      Instagram: row.instagram,
+      Telefono: row.phone,
+      "Ultima compra": row.lastPurchaseAt,
+      Operaciones: row.operations,
+      "Total comprado": row.totalPurchased,
+      Saldo: row.balanceDue,
     }))
   }
 

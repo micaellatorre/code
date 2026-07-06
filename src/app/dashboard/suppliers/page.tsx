@@ -1,59 +1,104 @@
-import Link from 'next/link'
-import DashboardLayout from '@/components/DashboardLayout'
-import Breadcrumbs from '@/components/Breadcrumbs'
-import SearchBar from '@/components/SearchBar'
-import prisma from '@/lib/prisma'
-import { requireRolePage } from '@/lib/auth/auth'
+import Link from "next/link"
+import { BuildingStorefrontIcon, CheckCircleIcon, MapPinIcon, Squares2X2Icon } from "@heroicons/react/24/outline"
+import DashboardLayout from "@/components/DashboardLayout"
+import Breadcrumbs from "@/components/Breadcrumbs"
+import SuppliersTable from "@/components/suppliers/SuppliersTable"
+import prisma from "@/lib/prisma"
+import { requireRolePage } from "@/lib/auth/auth"
+import { resolveSessionTenantId } from "@/lib/tenant"
+import { listSuppliers } from "@/lib/domain/suppliers"
 
-/**
- * Listado de proveedores.
- * Se integra con el layout del dashboard y añade un buscador.
- */
-export default async function SuppliersPage() {
-  await requireRolePage(['ADMIN', 'STOCK'])
+type SuppliersPageProps = {
+  searchParams?: Promise<{ q?: string; branchId?: string; page?: string }>
+}
 
-  const suppliers = await prisma.supplier.findMany({ orderBy: { name: 'asc' } })
+export default async function SuppliersPage({ searchParams }: SuppliersPageProps) {
+  const session = await requireRolePage(["ADMIN", "STOCK"])
+  const tenantId = await resolveSessionTenantId(session.user.tenantId)
+  if (!tenantId) throw new Error("Tenant no disponible")
+
+  const params = await searchParams
+  const page = Number(params?.page ?? "1")
+  const [{ suppliers, pagination }, branches] = await Promise.all([
+    listSuppliers({
+      tenantId,
+      q: params?.q,
+      branchId: params?.branchId,
+      page: Number.isFinite(page) ? page : 1,
+      pageSize: 50,
+    }),
+    prisma.branch.findMany({
+      where: { tenantId, isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, code: true, name: true },
+    }),
+  ])
+  const hasFilters = Boolean(params?.q || params?.branchId)
+  const linkedSuppliers = suppliers.filter((supplier) => supplier.branch).length
+  const coveredSuppliers = suppliers.filter((supplier) => supplier.branchCoverages.length > 0).length
+  const legacySuppliers = suppliers.length - linkedSuppliers
+
   return (
-    <DashboardLayout >
-      {/* Breadcrumbs de navegación */}
-      <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Proveedores' }]} />
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Proveedores</h2>
-          <Link href="/dashboard/suppliers/new" className="btn btn-primary">
-            Nuevo Proveedor
-          </Link>
-        </div>
-        {/* La barra de búsqueda no recibe callback en el servidor */}
-        <SearchBar />
-        <div className="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
-          <table className="table table-zebra w-full">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Contacto</th>
-                <th>Teléfono</th>
-                <th>Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suppliers.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
-                  <td>{s.contactName ?? '-'}</td>
-                  <td>{s.phone ?? '-'}</td>
-                  <td>{s.email ?? '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {/* Paginación estática */}
-          <div className="join mt-4">
-            <button className="join-item btn">«</button>
-            <button className="join-item btn btn-active">1</button>
-            <button className="join-item btn">2</button>
-            <button className="join-item btn">»</button>
+    <DashboardLayout>
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Proveedores", href: "/dashboard/suppliers" }]} />
+      <div className="space-y-4">
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+          <div>
+            <h1 className="text-2xl font-bold">Proveedores</h1>
+            <p className="text-sm text-base-content/60">Gestiona proveedores, sucursales y cobertura de abastecimiento.</p>
           </div>
+          <Link href="/dashboard/suppliers/new" className="btn btn-primary">+ Nuevo proveedor</Link>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-lg border border-base-300 bg-base-100 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase text-base-content/50">Total</span>
+              <BuildingStorefrontIcon className="size-5 text-primary" />
+            </div>
+            <p className="mt-1 text-2xl font-semibold">{pagination.total}</p>
+          </div>
+          <div className="rounded-lg border border-base-300 bg-base-100 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase text-base-content/50">Con sucursal</span>
+              <CheckCircleIcon className="size-5 text-success" />
+            </div>
+            <p className="mt-1 text-2xl font-semibold">{linkedSuppliers}</p>
+          </div>
+          <div className="rounded-lg border border-base-300 bg-base-100 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase text-base-content/50">Con cobertura</span>
+              <MapPinIcon className="size-5 text-info" />
+            </div>
+            <p className="mt-1 text-2xl font-semibold">{coveredSuppliers}</p>
+          </div>
+          <div className="rounded-lg border border-base-300 bg-base-100 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase text-base-content/50">Legacy</span>
+              <Squares2X2Icon className="size-5 text-base-content/50" />
+            </div>
+            <p className="mt-1 text-2xl font-semibold">{legacySuppliers}</p>
+          </div>
+        </div>
+
+        <form className="grid gap-3 rounded-lg border border-base-300 bg-base-100 p-3 md:grid-cols-[1fr_260px_auto_auto]">
+          <input
+            name="q"
+            defaultValue={params?.q ?? ""}
+            className="input input-bordered"
+            placeholder="Buscar por proveedor, contacto, telefono, email..."
+          />
+          <select name="branchId" defaultValue={params?.branchId ?? ""} className="select select-bordered">
+            <option value="">Todas las sucursales</option>
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
+          <button className="btn btn-outline" type="submit">Filtrar</button>
+          {hasFilters ? <Link href="/dashboard/suppliers" className="btn btn-ghost">Limpiar</Link> : null}
+        </form>
+
+        <SuppliersTable suppliers={suppliers} />
+        <div className="text-sm text-base-content/60">
+          Mostrando {suppliers.length} de {pagination.total} proveedores.
         </div>
       </div>
     </DashboardLayout>

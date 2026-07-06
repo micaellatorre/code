@@ -41,6 +41,7 @@ export async function GET(req: Request) {
           { cuit: { contains: q, mode: "insensitive" } },
           { dni: { contains: q, mode: "insensitive" } },
           { province: { contains: q, mode: "insensitive" } },
+          { provinceRef: { name: { contains: q, mode: "insensitive" } } },
           { city: { contains: q, mode: "insensitive" } },
           { postalCode: { contains: q, mode: "insensitive" } },
           { addressStreet: { contains: q, mode: "insensitive" } },
@@ -50,6 +51,7 @@ export async function GET(req: Request) {
       },
       orderBy: { createdAt: "desc" },
       take: 50,
+      include: { provinceRef: true, registeredBranch: { select: { id: true, code: true, name: true } } },
     })
 
     return NextResponse.json({ results: results.map(serializeBuyer) })

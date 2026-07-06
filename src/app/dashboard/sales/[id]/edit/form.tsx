@@ -66,6 +66,8 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
         setInitialData({
           id: sale.id,
+          branchId: sale.branchId ?? null,
+          branch: sale.branch ?? null,
           buyer: sale.buyer ?? null,
           meta: {
             date: sale.date ? new Date(sale.date) : new Date(),

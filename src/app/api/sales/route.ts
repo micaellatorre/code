@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { requireRoleApi } from "@/lib/auth/auth";
 import { NextResponse } from "next/server";
 import { Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client";
+import { resolveSessionTenantId } from "@/lib/tenant";
+import { resolveOperationBranch } from "@/lib/domain/user-branches";
 
 type SaleOperationType = "CONFIRM_SALE" | "RESERVE";
 
@@ -12,18 +14,40 @@ export async function GET() {
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status });
   }
+  const tenantId = await resolveSessionTenantId(auth.session.user.tenantId);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 });
+  }
+  const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO";
 
   const sales = await prisma.sale.findMany({
+    where: { tenantId },
     include: {
       items: { include: { product: true } },
       payments: true,
       buyer: true,
       user: { select: { id: true, name: true, email: true } },
+      branch: { select: { id: true, code: true, name: true } },
     },
     orderBy: { date: "desc" },
   });
 
-  return NextResponse.json(sales);
+  return NextResponse.json(sales.map((sale) => ({
+    ...sale,
+    costTotal: canSeeFinancials ? sale.costTotal : null,
+    profit: canSeeFinancials ? sale.profit : null,
+    items: sale.items.map((item) => ({
+      ...item,
+      unitCost: canSeeFinancials ? item.unitCost : null,
+      lineCost: canSeeFinancials ? item.lineCost : null,
+      lineProfit: canSeeFinancials ? item.lineProfit : null,
+      product: {
+        ...item.product,
+        costPrice: canSeeFinancials ? item.product.costPrice : null,
+        shippingCost: canSeeFinancials ? item.product.shippingCost : null,
+      },
+    })),
+  })));
 }
 
 interface SaleItemInput {
@@ -57,6 +81,9 @@ interface SaleInputBody {
   }[];
   date?: string;
   buyerId?: string;
+  branchId?: string | null;
+  closerId?: string | null;
+  saleType?: "MINORISTA" | "MAYORISTA" | null;
   customerName?: string;
   origin?: string;
   notes?: string;
@@ -105,6 +132,9 @@ export async function POST(request: Request) {
     appointmentId,
     date,
     buyerId,
+    branchId,
+    closerId,
+    saleType,
     customerName,
     origin,
     notes,
@@ -136,11 +166,22 @@ export async function POST(request: Request) {
   try {
     const txResult = await prisma.$transaction(
       async (tx) => {
-        const tenantId = process.env.DEFAULT_TENANT_ID as string | undefined;
+        const tenantId = await resolveSessionTenantId(auth.session.user.tenantId);
         if (!tenantId) throw apiError("DEFAULT_TENANT_ID no configurado", 500);
 
         const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });
         if (!tenant) throw apiError("Tenant no encontrado", 500);
+        const operationBranch = await resolveOperationBranch({
+          actorUserId: auth.session.user.id,
+          actorRole: auth.session.user.activeRole,
+          tenantId: tenant.id,
+          requestedBranchId: branchId,
+          entityLabel: "venta",
+        }, tx);
+        if (closerId) {
+          const closer = await tx.user.findFirst({ where: { id: closerId, tenantId: tenant.id, isActive: true }, select: { id: true } });
+          if (!closer) throw apiError("Closer no disponible", 400);
+        }
 
         const productIds = items.map((it) => String(it.productId));
         const products = await tx.product.findMany({
@@ -247,6 +288,9 @@ export async function POST(request: Request) {
           data: {
             tenantId: tenant.id,
             userId: auth.session.user.id,
+            branchId: operationBranch.id,
+            closerId: closerId || null,
+            saleType: saleType || null,
             date: date ? new Date(date) : new Date(),
             buyerId: buyerId || null,
             customerName: buyerId ? undefined : customerName || "Consumidor Final",
@@ -296,6 +340,7 @@ export async function POST(request: Request) {
                 stock: 1,
                 stockAvailable: 0,
                 origin: "Plan Canje",
+                branchId: operationBranch.id,
                 notes: [
                   device.batteryRangeLabel ? `Bateria: ${device.batteryRangeLabel}` : null,
                   device.notes || null,
@@ -408,6 +453,7 @@ export async function POST(request: Request) {
       include: {
         buyer: true,
         user: { select: { id: true, name: true, email: true } },
+        branch: { select: { id: true, code: true, name: true } },
         payments: true,
         items: { include: { product: true } },
       },
@@ -420,6 +466,10 @@ export async function POST(request: Request) {
 
     if (error.statusCode) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
+
+    if (error.message?.includes("Sucursal") || error.message?.includes("Selecciona") || error.message?.includes("permisos")) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
 
     return NextResponse.json({ error: "Error creating sale" }, { status: 500 });

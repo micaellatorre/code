@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
+import { UserRole } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
+import { createAuditLog } from "@/lib/domain/audit"
 import {
   isBuyerType,
   normalizeInstagramForStorage,
   normalizeNullableString,
+  normalizePostalCode,
   parseOptionalDate,
   serializeBuyer,
   validateBuyerRequiredFields,
 } from "@/lib/buyers"
+import { normalizeProvinceId } from "@/lib/domain/argentina/provinces"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -21,8 +25,10 @@ const PATCH_FIELDS = [
   "businessName",
   "dob",
   "province",
+  "provinceId",
   "city",
   "postalCode",
+  "registeredBranchId",
   "notes",
   "phone",
   "instagram",
@@ -83,10 +89,38 @@ function buildPatchData(body: Record<string, unknown>) {
       continue
     }
 
+    if (field === "postalCode") {
+      data.postalCode = normalizePostalCode(body.postalCode)
+      continue
+    }
+
+    if (field === "provinceId") {
+      const rawProvinceId = normalizeNullableString(body.provinceId)
+      const provinceId = rawProvinceId ? normalizeProvinceId(rawProvinceId) : null
+      if (rawProvinceId && !provinceId) throw new Error("Provincia invalida")
+      data.provinceId = provinceId
+      continue
+    }
+
     data[field] = normalizeNullableString(body[field])
   }
 
   return data
+}
+
+async function assertBuyerReferences(tenantId: string | undefined, data: Record<string, unknown>) {
+  if (data.provinceId) {
+    const province = await prisma.province.findUnique({ where: { id: data.provinceId as string }, select: { id: true } })
+    if (!province) throw new Error("Provincia invalida")
+  }
+
+  if (data.registeredBranchId) {
+    const branch = await prisma.branch.findFirst({
+      where: { id: data.registeredBranchId as string, ...(tenantId ? { tenantId } : {}) },
+      select: { id: true },
+    })
+    if (!branch) throw new Error("Sucursal de registro invalida")
+  }
 }
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
@@ -102,6 +136,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     const tenantId = getSessionTenantId(auth)
     const buyer = await prisma.buyer.findFirst({
       where: { id, ...(tenantId ? { tenantId } : {}) },
+      include: { provinceRef: true, registeredBranch: { select: { id: true, code: true, name: true } } },
     })
 
     if (!buyer) {
@@ -155,10 +190,24 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       cuit: Object.prototype.hasOwnProperty.call(data, "cuit") ? (data.cuit as string | null) : existingBuyer.cuit,
       dni: Object.prototype.hasOwnProperty.call(data, "dni") ? (data.dni as string | null) : existingBuyer.dni,
     })
+    await assertBuyerReferences(tenantId, data)
 
     const updatedBuyer = await prisma.buyer.update({
       where: { id },
       data,
+      include: { provinceRef: true, registeredBranch: { select: { id: true, code: true, name: true } } },
+    })
+    await createAuditLog({
+      tenantId: updatedBuyer.tenantId,
+      actorUserId: auth.session.user.id,
+      actorRole: auth.session.user.activeRole as UserRole,
+      action: "UPDATE",
+      module: "BUYER",
+      entityType: "Buyer",
+      entityId: updatedBuyer.id,
+      detail: `Cliente actualizado: ${updatedBuyer.name}`,
+      oldValue: existingBuyer,
+      newValue: updatedBuyer,
     })
 
     return NextResponse.json({ buyer: serializeBuyer(updatedBuyer) })
@@ -183,7 +232,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
     const tenantId = getSessionTenantId(auth)
     const existingBuyer = await prisma.buyer.findFirst({
       where: { id, ...(tenantId ? { tenantId } : {}) },
-      select: { id: true },
+      include: { _count: { select: { sales: true, appointments: true, reservations: true, serviceOrders: true } } },
     })
 
     if (!existingBuyer) {
@@ -191,6 +240,15 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
       if (mismatch) return mismatch
 
       return NextResponse.json({ error: "Buyer not found" }, { status: 404 })
+    }
+
+    const hasHistory =
+      existingBuyer._count.sales +
+      existingBuyer._count.appointments +
+      existingBuyer._count.reservations +
+      existingBuyer._count.serviceOrders > 0
+    if (hasHistory) {
+      return NextResponse.json({ error: "No se puede eliminar un comprador con historial asociado." }, { status: 409 })
     }
 
     await prisma.buyer.delete({ where: { id } })

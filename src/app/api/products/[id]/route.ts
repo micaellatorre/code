@@ -1,6 +1,10 @@
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { NextRequest, NextResponse } from "next/server"
+import { UserRole } from "@prisma/client"
+import { createAuditLog } from "@/lib/domain/audit"
+import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
+import { resolveSessionTenantId } from "@/lib/tenant"
 
 type Ctx = {
   params: Promise<{ id: string }>
@@ -14,7 +18,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   }
 
   const { id } = await params
-  const product = await prisma.product.findUnique({ where: { id } })
+  const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+  const product = await prisma.product.findFirst({
+    where: { id, ...(tenantId ? { tenantId } : {}) },
+    include: { branch: { select: { id: true, code: true, name: true } } },
+  })
   if (!product) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
   return NextResponse.json(product)
 }
@@ -29,10 +37,39 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   const { id } = await params
   const body = await request.json()
   try {
+    const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+    if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
+    const current = await prisma.product.findFirst({ where: { id, tenantId }, include: { branch: { select: { id: true, name: true } } } })
+    if (!current) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
+
     if (body.senado === false) body.senadoAt = null
     if (body.senado === true && !body.senadoAt) body.senadoAt = new Date()
+    if (Object.prototype.hasOwnProperty.call(body, "branchId")) {
+      if (!canManuallyAssignEntityBranch(auth.session.user.activeRole)) {
+        return NextResponse.json({ error: "No tenes permisos para cambiar la sucursal de un producto." }, { status: 403 })
+      }
+      const nextBranchId = body.branchId == null || String(body.branchId).trim() === "" ? null : String(body.branchId)
+      if (nextBranchId) {
+        const branch = await prisma.branch.findFirst({ where: { id: nextBranchId, tenantId, isActive: true }, select: { id: true } })
+        if (!branch) return NextResponse.json({ error: "Sucursal no disponible" }, { status: 400 })
+      }
+    }
 
-    const product = await prisma.product.update({ where: { id }, data: body })
+    const product = await prisma.product.update({ where: { id }, data: body, include: { branch: { select: { id: true, name: true } } } })
+    if (Object.prototype.hasOwnProperty.call(body, "branchId") && current.branchId !== product.branchId) {
+      await createAuditLog({
+        tenantId,
+        actorUserId: auth.session.user.id,
+        actorRole: auth.session.user.activeRole as UserRole,
+        action: "BRANCH_TRANSFER",
+        module: "PRODUCT",
+        entityType: "Product",
+        entityId: product.id,
+        detail: `Traslado de producto de ${current.branch?.name ?? "Sin sucursal"} a ${product.branch?.name ?? "Sin sucursal"}`,
+        oldValue: { branchId: current.branchId, branchName: current.branch?.name ?? null },
+        newValue: { branchId: product.branchId, branchName: product.branch?.name ?? null },
+      })
+    }
     return NextResponse.json(product)
   } catch (err: any) {
     console.error(err)
@@ -52,6 +89,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
   try {
     const updateData: any = {}
+    const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+    if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
+    const current = await prisma.product.findFirst({ where: { id, tenantId }, include: { branch: { select: { id: true, name: true } } } })
+    if (!current) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
 
     if (Object.prototype.hasOwnProperty.call(body, "stock")) {
       const stock = Number(body.stock)
@@ -164,11 +205,39 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, "branchId")) {
+      if (!canManuallyAssignEntityBranch(auth.session.user.activeRole)) {
+        return NextResponse.json({ error: "No tenes permisos para cambiar la sucursal de un producto." }, { status: 403 })
+      }
+      const branchId = body.branchId == null || String(body.branchId).trim() === "" ? null : String(body.branchId)
+      if (!branchId) {
+        updateData.branchId = null
+      } else {
+        const branch = await prisma.branch.findFirst({ where: { id: branchId, tenantId, isActive: true }, select: { id: true } })
+        if (!branch) return NextResponse.json({ error: "Sucursal no disponible" }, { status: 400 })
+        updateData.branchId = branch.id
+      }
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No hay campos para actualizar" }, { status: 400 })
     }
 
-    const product = await prisma.product.update({ where: { id }, data: updateData })
+    const product = await prisma.product.update({ where: { id }, data: updateData, include: { branch: { select: { id: true, code: true, name: true } } } })
+    if (Object.prototype.hasOwnProperty.call(updateData, "branchId") && current.branchId !== product.branchId) {
+      await createAuditLog({
+        tenantId,
+        actorUserId: auth.session.user.id,
+        actorRole: auth.session.user.activeRole as UserRole,
+        action: "BRANCH_TRANSFER",
+        module: "PRODUCT",
+        entityType: "Product",
+        entityId: product.id,
+        detail: `Traslado de producto de ${current.branch?.name ?? "Sin sucursal"} a ${product.branch?.name ?? "Sin sucursal"}`,
+        oldValue: { branchId: current.branchId, branchName: current.branch?.name ?? null },
+        newValue: { branchId: product.branchId, branchName: product.branch?.name ?? null },
+      })
+    }
     return NextResponse.json(product)
   } catch (err: any) {
     console.error(err)
@@ -185,8 +254,39 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
 
   const { id } = await params
   try {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            saleItems: true,
+            PurchaseItem: true,
+            appointmentInterests: true,
+            reservationItems: true,
+            serviceOrders: true,
+          },
+        },
+      },
+    })
+    if (!product) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
+
+    const hasHistory =
+      product._count.saleItems +
+      product._count.PurchaseItem +
+      product._count.appointmentInterests +
+      product._count.reservationItems +
+      product._count.serviceOrders > 0
+
+    if (hasHistory) {
+      const updated = await prisma.product.update({
+        where: { id },
+        data: { status: "DISCONTINUED", state: product.state === "VENDIDO" ? product.state : "FUERA_DE_STOCK", stockAvailable: 0 },
+      })
+      return NextResponse.json({ success: true, mode: "discontinued", product: updated })
+    }
+
     await prisma.product.delete({ where: { id } })
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, mode: "deleted" })
   } catch (err: any) {
     console.error(err)
     return NextResponse.json({ error: "Error eliminando producto" }, { status: 500 })

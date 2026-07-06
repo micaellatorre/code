@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
+import { UserRole } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
+import { createAuditLog } from "@/lib/domain/audit"
 import {
   isBuyerType,
   normalizeBuyerType,
   normalizeInstagramForStorage,
   normalizeNullableString,
+  normalizePostalCode,
   parseOptionalDate,
   serializeBuyer,
   validateBuyerRequiredFields,
 } from "@/lib/buyers"
+import { normalizeProvinceId } from "@/lib/domain/argentina/provinces"
 
 async function getDefaultTenantId() {
   const tenantId = process.env.DEFAULT_TENANT_ID
@@ -24,6 +28,10 @@ function buildBuyerData(body: Record<string, unknown>) {
     throw new Error("Tipo de cliente invalido")
   }
 
+  const rawProvinceId = normalizeNullableString(body.provinceId)
+  const provinceId = rawProvinceId ? normalizeProvinceId(rawProvinceId) : null
+  if (rawProvinceId && !provinceId) throw new Error("Provincia invalida")
+
   const data = {
     type: normalizeBuyerType(body.type),
     name: normalizeNullableString(body.name),
@@ -31,8 +39,10 @@ function buildBuyerData(body: Record<string, unknown>) {
     businessName: normalizeNullableString(body.businessName),
     dob: parseOptionalDate(body.dob),
     province: normalizeNullableString(body.province),
+    provinceId,
     city: normalizeNullableString(body.city),
-    postalCode: normalizeNullableString(body.postalCode),
+    postalCode: normalizePostalCode(body.postalCode),
+    registeredBranchId: normalizeNullableString(body.registeredBranchId),
     notes: normalizeNullableString(body.notes),
     phone: normalizeNullableString(body.phone),
     instagram: normalizeInstagramForStorage(body.instagram),
@@ -52,6 +62,18 @@ function buildBuyerData(body: Record<string, unknown>) {
   }
 }
 
+async function assertBuyerReferences(tenantId: string, data: { provinceId?: string | null; registeredBranchId?: string | null }) {
+  if (data.provinceId) {
+    const province = await prisma.province.findUnique({ where: { id: data.provinceId }, select: { id: true } })
+    if (!province) throw new Error("Provincia invalida")
+  }
+
+  if (data.registeredBranchId) {
+    const branch = await prisma.branch.findFirst({ where: { id: data.registeredBranchId, tenantId }, select: { id: true } })
+    if (!branch) throw new Error("Sucursal de registro invalida")
+  }
+}
+
 export async function GET() {
   const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
 
@@ -66,6 +88,7 @@ export async function GET() {
       // where: tenantId ? { tenantId } : undefined,
       orderBy: { createdAt: "desc" },
       take: 200,
+      include: { provinceRef: true, registeredBranch: { select: { id: true, code: true, name: true } } },
     })
     return NextResponse.json(buyers.map(serializeBuyer))
   } catch (error) {
@@ -89,11 +112,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tenant no disponible para crear cliente" }, { status: 403 })
     }
 
+    const data = buildBuyerData(body)
+    await assertBuyerReferences(tenantId, data)
+
     const newBuyer = await prisma.buyer.create({
       data: {
-        ...buildBuyerData(body),
+        ...data,
         tenantId,
       },
+      include: { provinceRef: true, registeredBranch: { select: { id: true, code: true, name: true } } },
+    })
+    await createAuditLog({
+      tenantId,
+      actorUserId: auth.session.user.id,
+      actorRole: auth.session.user.activeRole as UserRole,
+      action: "CREATE",
+      module: "BUYER",
+      entityType: "Buyer",
+      entityId: newBuyer.id,
+      detail: `Cliente creado: ${newBuyer.name}`,
+      newValue: newBuyer,
     })
 
     return NextResponse.json({ buyer: serializeBuyer(newBuyer) }, { status: 201 })

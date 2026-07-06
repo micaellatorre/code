@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
+import { resolveOperationBranch } from "@/lib/domain/user-branches"
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
@@ -63,6 +64,8 @@ const PRODUCT_SELECT = {
   batteryPct: true,
   purchaseDate: true,
   location: true,
+  branchId: true,
+  branch: { select: { id: true, code: true, name: true } },
   origin: true,
   costPrice: true,
   salePrice: true,
@@ -194,13 +197,15 @@ export async function GET(request: Request) {
       color: p.color ?? null,
       batteryPct: p.batteryPct ?? null,
       location: p.location ?? null,
+      branchId: p.branchId ?? null,
+      branch: p.branch ?? null,
       origin: p.origin ?? null,
 
       purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
 
-      costPrice: p.costPrice != null ? String(p.costPrice) : null,
+      costPrice: auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO" ? (p.costPrice != null ? String(p.costPrice) : null) : null,
       salePrice: p.salePrice != null ? String(p.salePrice) : null,
-      shippingCost: p.shippingCost != null ? String(p.shippingCost) : null,
+      shippingCost: auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO" ? (p.shippingCost != null ? String(p.shippingCost) : null) : null,
 
       stockInitial: p.stockInitial ?? 0,
       stock: p.stock ?? 0,
@@ -228,16 +233,23 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const tenantId = body.tenantId ?? (await resolveProductTenantId(auth.session.user.tenantId))
+    const tenantId = await resolveProductTenantId(auth.session.user.tenantId)
     if (!tenantId) {
       return NextResponse.json({ error: "DEFAULT_TENANT_ID not set" }, { status: 500 })
     }
 
     if (body.senado === false) body.senadoAt = null
     if (body.senado === true && !body.senadoAt) body.senadoAt = new Date()
+    const branch = await resolveOperationBranch({
+      actorUserId: auth.session.user.id,
+      actorRole: auth.session.user.activeRole,
+      tenantId,
+      requestedBranchId: typeof body.branchId === "string" ? body.branchId : null,
+      entityLabel: "producto",
+    })
 
     const product = await prisma.product.create({
-      data: { ...body, tenantId },
+      data: { ...body, tenantId, branchId: branch.id },
     })
 
     // Keep POST response consistent with your client shape if you want
@@ -254,6 +266,7 @@ export async function POST(request: Request) {
     return NextResponse.json(serialized, { status: 201 })
   } catch (err) {
     console.error(err)
-    return NextResponse.json({ error: "Error creando producto" }, { status: 500 })
+    const message = err instanceof Error ? err.message : "Error creando producto"
+    return NextResponse.json({ error: message }, { status: message.includes("permisos") || message.includes("Selecciona") || message.includes("Sucursal") ? 403 : 500 })
   }
 }

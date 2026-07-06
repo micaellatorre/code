@@ -114,6 +114,7 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
         onTransport={list.setTransportSale}
         onCancel={list.cancelSale}
         sellerEditor={list.sellerEditor}
+        branchEditor={list.branchEditor}
       />
       <ExportSalesModal open={list.isExportOpen} onClose={() => list.setIsExportOpen(false)} sales={list.filteredSales} canSeeMargin={list.canSeeMargin} />
       <ReceiptModal sale={list.receiptSale} onClose={() => list.setReceiptSale(null)} />

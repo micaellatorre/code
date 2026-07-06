@@ -86,7 +86,17 @@ export default function SaleForm({
       key: "meta",
       title: "Venta",
       summary: form.meta.origin,
-      node: <SaleMetaStep meta={form.meta} setMeta={form.setMeta} disabled={form.saleIsLocked} />,
+      node: (
+        <SaleMetaStep
+          meta={form.meta}
+          setMeta={form.setMeta}
+          disabled={form.saleIsLocked}
+          isAdmin={form.isAdmin}
+          branches={form.branches}
+          selectedBranchId={form.selectedBranchId}
+          setSelectedBranchId={form.setSelectedBranchId}
+        />
+      ),
     })
   }
 
