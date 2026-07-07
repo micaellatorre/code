@@ -16,7 +16,8 @@
     "seed:provinces": "node scripts/seed-provinces.cjs",
     "backfill:provinces": "node scripts/backfill-provinces.cjs --dry-run",
     "backfill:main-branch": "node scripts/backfill-main-branch.cjs",
-    "db:fix:numerics": "node prisma/fixNumerics.js"
+    "db:fix:numerics": "node prisma/fixNumerics.js",
+    "migrate:product-origins:suppliers": "node scripts/run-ts-script.cjs scripts/migrate-product-origins-to-suppliers.ts"
   },
   "prisma": {
     "seed": "node dist/seed.js"

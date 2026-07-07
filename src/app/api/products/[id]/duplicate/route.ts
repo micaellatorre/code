@@ -65,6 +65,10 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         stock: defaultStock,
         stockAvailable: defaultStock,
       },
+      include: {
+        branch: { select: { id: true, code: true, name: true } },
+        supplier: { select: { id: true, name: true } },
+      },
     })
 
     return NextResponse.json({ product: newProduct })

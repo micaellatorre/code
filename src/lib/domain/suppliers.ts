@@ -23,6 +23,7 @@ export type SupplierInput = z.infer<typeof supplierSchema>
 export function supplierErrorStatus(message: string) {
   const normalized = message.toLowerCase()
   if (normalized.includes("no encontrado")) return 404
+  if (normalized.includes("existe")) return 409
   if (normalized.includes("compras asociadas")) return 409
   if (
     normalized.includes("inval") ||
@@ -124,6 +125,31 @@ async function validateSupplierBranches(params: {
 
 function branchDto(branch: { id: string; code: string; name: string } | null) {
   return branch ? { id: branch.id, code: branch.code, name: branch.name } : null
+}
+
+export async function findSuppliersByNameInsensitive(params: {
+  tenantId: string
+  name: string
+  tx?: Prisma.TransactionClient
+}) {
+  const tx = params.tx ?? prisma
+  return tx.supplier.findMany({
+    where: {
+      tenantId: params.tenantId,
+      name: { equals: params.name.trim(), mode: "insensitive" },
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, name: true, branchId: true },
+  })
+}
+
+export async function findSupplierByNameInsensitive(params: {
+  tenantId: string
+  name: string
+  tx?: Prisma.TransactionClient
+}) {
+  const suppliers = await findSuppliersByNameInsensitive(params)
+  return suppliers[0] ?? null
 }
 
 export function serializeSupplier(supplier: SupplierWithRelations, lastPurchaseAt?: Date | null) {
@@ -279,6 +305,9 @@ export async function createSupplier(params: {
   return prisma.$transaction(async (tx) => {
     const data = normalizeSupplierFields(input)
     await assertProvince(data.provinceId, tx)
+    const duplicate = await findSupplierByNameInsensitive({ tenantId: params.tenantId, name: data.name!, tx })
+    if (duplicate) throw new Error("Ya existe un proveedor con ese nombre")
+
     const { coverageIds } = await validateSupplierBranches({
       tenantId: params.tenantId,
       branchId: data.branchId,

@@ -1,9 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type FormEvent, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 
-type Option = { id: string; name?: string | null; email?: string | null; modelName?: string; imei?: string | null; surname?: string | null }
+type Option = {
+  id: string
+  name?: string | null
+  email?: string | null
+  modelName?: string
+  imei?: string | null
+  surname?: string | null
+}
 
 export default function ServiceOrderForm() {
   const router = useRouter()
@@ -48,7 +55,7 @@ export default function ServiceOrderForm() {
     })
   }
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
     setIsSaving(true)
     setError(null)
@@ -74,36 +81,256 @@ export default function ServiceOrderForm() {
     router.refresh()
   }
 
+  const selectedBuyer = buyers.find((buyer) => buyer.id === form.buyerId)
+  const selectedProduct = products.find((product) => product.id === form.productId)
+  const selectedTechnician = users.find((user) => user.id === form.technicianId)
+  const serviceTypeLabel = form.type === "CUSTOMER" ? "Cliente" : "Stock"
+  const buyerName = selectedBuyer ? [selectedBuyer.name, selectedBuyer.surname].filter(Boolean).join(" ") : ""
+
   return (
-    <form onSubmit={submit} className="mx-auto max-w-4xl space-y-4">
-      <fieldset className="rounded-lg border border-base-300 p-4">
-        <legend className="px-1 text-sm font-semibold uppercase text-base-content/60">Tipo de servicio</legend>
-        <div className="join">
-          {(["CUSTOMER", "STOCK"] as const).map((type) => <button key={type} type="button" className={`btn join-item ${form.type === type ? "btn-primary" : "btn-outline"}`} onClick={() => setField("type", type)}>{type}</button>)}
+    <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:p-4 lg:grid-cols-[1fr_320px]">
+      {error ? <div className="alert alert-error py-3 text-sm lg:col-span-2">{error}</div> : null}
+
+      <div className="space-y-3">
+        <section className="rounded-lg border border-base-300 bg-base-100 p-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Tipo de servicio</h2>
+              <p className="text-sm text-base-content/60">Origen operativo de la orden.</p>
+            </div>
+            <div className="join">
+              {(["CUSTOMER", "STOCK"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`btn btn-sm join-item ${form.type === type ? "btn-primary" : "btn-outline"}`}
+                  onClick={() => setField("type", type)}
+                  disabled={isSaving}
+                >
+                  {type === "CUSTOMER" ? "Cliente" : "Stock"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-base-300 bg-base-100 p-4">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold">Cliente / equipo</h2>
+            <p className="text-sm text-base-content/60">Producto asociado y datos del equipo recibido.</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <SelectField label="Comprador" value={form.buyerId} onChange={(value) => setField("buyerId", value)} disabled={isSaving}>
+              <option value="">Seleccionar</option>
+              {buyers.map((buyer) => (
+                <option key={buyer.id} value={buyer.id}>
+                  {[buyer.name, buyer.surname].filter(Boolean).join(" ")}
+                </option>
+              ))}
+            </SelectField>
+
+            <SelectField label="Producto stock" value={form.productId} onChange={(value) => setField("productId", value)} disabled={isSaving}>
+              <option value="">Sin producto</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.modelName}
+                </option>
+              ))}
+            </SelectField>
+
+            <TextField label="Modelo *" value={form.modelName} onChange={(value) => setField("modelName", value)} disabled={isSaving} required />
+            <TextField label="IMEI / serie" value={form.imeiSerial} onChange={(value) => setField("imeiSerial", value)} disabled={isSaving} />
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-base-300 bg-base-100 p-4">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold">Diagnostico y responsable</h2>
+            <p className="text-sm text-base-content/60">Detalle tecnico, asignacion y valores de la reparacion.</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <TextareaField
+              label="Falla *"
+              value={form.failureDescription}
+              onChange={(value) => setField("failureDescription", value)}
+              disabled={isSaving}
+              required
+              className="md:col-span-2"
+            />
+
+            <SelectField label="Tecnico" value={form.technicianId} onChange={(value) => setField("technicianId", value)} disabled={isSaving}>
+              <option value="">Sin asignar</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name || user.email}
+                </option>
+              ))}
+            </SelectField>
+
+            <SelectField label="Moneda" value={form.currency} onChange={(value) => setField("currency", value)} disabled={isSaving}>
+              <option>USD</option>
+              <option>ARS</option>
+              <option>USDT</option>
+            </SelectField>
+
+            <TextField
+              type="number"
+              step="0.01"
+              label="Precio"
+              value={form.priceAmount}
+              onChange={(value) => setField("priceAmount", value)}
+              disabled={isSaving}
+            />
+            <TextField
+              type="number"
+              step="0.01"
+              label="Costo"
+              value={form.costAmount}
+              onChange={(value) => setField("costAmount", value)}
+              disabled={isSaving}
+            />
+
+            <TextareaField
+              label="Notas"
+              value={form.notes}
+              onChange={(value) => setField("notes", value)}
+              disabled={isSaving}
+              className="md:col-span-2"
+            />
+          </div>
+        </section>
+      </div>
+
+      <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4">
+        <h2 className="font-semibold">Resumen</h2>
+        <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Tipo</dt>
+            <dd className="font-medium">{serviceTypeLabel}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Cliente</dt>
+            <dd className="text-right font-medium">{buyerName || "Pendiente"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Producto</dt>
+            <dd className="text-right font-medium">{selectedProduct?.modelName || form.modelName || "Pendiente"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Tecnico</dt>
+            <dd className="text-right font-medium">{selectedTechnician?.name || selectedTechnician?.email || "Sin asignar"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Precio</dt>
+            <dd className="font-medium">
+              {form.priceAmount ? `${form.currency} ${form.priceAmount}` : "Pendiente"}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 flex flex-col gap-2">
+          <button type="submit" className="btn btn-primary w-full" disabled={isSaving}>
+            {isSaving ? <span className="loading loading-spinner loading-xs" /> : null}
+            {isSaving ? "Registrando..." : "Crear orden"}
+          </button>
+          <button type="button" className="btn btn-ghost w-full" onClick={() => router.back()} disabled={isSaving}>
+            Volver
+          </button>
         </div>
-      </fieldset>
-      <fieldset className="rounded-lg border border-base-300 p-4">
-        <legend className="px-1 text-sm font-semibold uppercase text-base-content/60">Cliente / equipo</legend>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="form-control"><span className="label-text">Comprador</span><select className="select select-bordered" value={form.buyerId} onChange={(event) => setField("buyerId", event.target.value)}><option value="">Seleccionar</option>{buyers.map((buyer) => <option key={buyer.id} value={buyer.id}>{[buyer.name, buyer.surname].filter(Boolean).join(" ")}</option>)}</select></label>
-          <label className="form-control"><span className="label-text">Producto stock</span><select className="select select-bordered" value={form.productId} onChange={(event) => setField("productId", event.target.value)}><option value="">Sin producto</option>{products.map((product) => <option key={product.id} value={product.id}>{product.modelName}</option>)}</select></label>
-          <label className="form-control"><span className="label-text">Modelo *</span><input required className="input input-bordered" value={form.modelName} onChange={(event) => setField("modelName", event.target.value)} /></label>
-          <label className="form-control"><span className="label-text">IMEI / serie</span><input className="input input-bordered" value={form.imeiSerial} onChange={(event) => setField("imeiSerial", event.target.value)} /></label>
-        </div>
-      </fieldset>
-      <fieldset className="rounded-lg border border-base-300 p-4">
-        <legend className="px-1 text-sm font-semibold uppercase text-base-content/60">Diagnostico y responsable</legend>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="form-control md:col-span-2"><span className="label-text">Falla *</span><textarea required className="textarea textarea-bordered" value={form.failureDescription} onChange={(event) => setField("failureDescription", event.target.value)} /></label>
-          <label className="form-control"><span className="label-text">Tecnico</span><select className="select select-bordered" value={form.technicianId} onChange={(event) => setField("technicianId", event.target.value)}><option value="">Sin asignar</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name || user.email}</option>)}</select></label>
-          <label className="form-control"><span className="label-text">Moneda</span><select className="select select-bordered" value={form.currency} onChange={(event) => setField("currency", event.target.value)}><option>USD</option><option>ARS</option><option>USDT</option></select></label>
-          <label className="form-control"><span className="label-text">Precio</span><input type="number" step="0.01" className="input input-bordered" value={form.priceAmount} onChange={(event) => setField("priceAmount", event.target.value)} /></label>
-          <label className="form-control"><span className="label-text">Costo</span><input type="number" step="0.01" className="input input-bordered" value={form.costAmount} onChange={(event) => setField("costAmount", event.target.value)} /></label>
-          <label className="form-control md:col-span-2"><span className="label-text">Notas</span><textarea className="textarea textarea-bordered" value={form.notes} onChange={(event) => setField("notes", event.target.value)} /></label>
-        </div>
-      </fieldset>
-      {error ? <div className="alert alert-error text-sm">{error}</div> : null}
-      <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={() => router.back()} disabled={isSaving}>Volver</button><button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? "Registrando..." : "Crear orden"}</button></div>
+      </aside>
     </form>
+  )
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  disabled,
+  children,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled: boolean
+  children: ReactNode
+}) {
+  return (
+    <label className="form-control">
+      <span className="label">
+        <span className="label-text">{label}</span>
+      </span>
+      <select className="select select-bordered" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+        {children}
+      </select>
+    </label>
+  )
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+  disabled,
+  type = "text",
+  step,
+  required = false,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled: boolean
+  type?: string
+  step?: string
+  required?: boolean
+}) {
+  return (
+    <label className="form-control">
+      <span className="label">
+        <span className="label-text">{label}</span>
+      </span>
+      <input
+        type={type}
+        step={step}
+        className="input input-bordered"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        required={required}
+      />
+    </label>
+  )
+}
+
+function TextareaField({
+  label,
+  value,
+  onChange,
+  disabled,
+  required = false,
+  className = "",
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled: boolean
+  required?: boolean
+  className?: string
+}) {
+  return (
+    <label className={`form-control ${className}`}>
+      <span className="label">
+        <span className="label-text">{label}</span>
+      </span>
+      <textarea
+        className="textarea textarea-bordered min-h-28"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        required={required}
+      />
+    </label>
   )
 }

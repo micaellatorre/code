@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import type { BuyerType } from "@prisma/client"
@@ -202,44 +201,46 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
   const isWholesale = form.type === "MAYORISTA"
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 sm:p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{mode === "create" ? "Nuevo cliente" : "Editar cliente"}</h1>
-          <p className="mt-1 text-sm text-base-content/60">Datos principales segun el tipo de cliente.</p>
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:p-4 lg:grid-cols-[1fr_320px]">
+      {error ? <div className="alert alert-error py-3 text-sm lg:col-span-2">{error}</div> : null}
+
+      <section className="rounded-lg border border-base-300 bg-base-100 p-4">
+        <div className="mb-5">
+          <h2 className="text-lg font-semibold">1. Datos del cliente</h2>
+          <p className="text-sm text-base-content/60">Informacion comercial, fiscal y de contacto del cliente.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="join">
-            <button
-              type="button"
-              className={`btn btn-sm join-item ${form.type === "MINORISTA" ? "btn-primary" : "btn-outline"}`}
-              onClick={() => update("type", "MINORISTA")}
-              disabled={isSubmitting}
-            >
-              Minorista
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm join-item ${form.type === "MAYORISTA" ? "btn-primary" : "btn-outline"}`}
-              onClick={() => update("type", "MAYORISTA")}
-              disabled={isSubmitting}
-            >
-              Mayorista
-            </button>
+
+        <div className="space-y-6">
+          <div>
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/70">Clasificacion</h3>
+              <p className="text-sm text-base-content/60">Define si el cliente compra como consumidor final o mayorista.</p>
+            </div>
+            <div className="join">
+              <button
+                type="button"
+                aria-pressed={form.type === "MINORISTA"}
+                className={`btn btn-sm join-item ${form.type === "MINORISTA" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => update("type", "MINORISTA")}
+                disabled={isSubmitting}
+              >
+                Minorista
+              </button>
+              <button
+                type="button"
+                aria-pressed={form.type === "MAYORISTA"}
+                className={`btn btn-sm join-item ${form.type === "MAYORISTA" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => update("type", "MAYORISTA")}
+                disabled={isSubmitting}
+              >
+                Mayorista
+              </button>
+            </div>
           </div>
-          <Link href="/dashboard/buyers" className="btn btn-ghost btn-sm">
-            Volver
-          </Link>
-        </div>
-      </div>
 
-      {error ? <div className="alert alert-error py-3 text-sm">{error}</div> : null}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-3">
-          <section className="rounded-lg border border-base-300 bg-base-100 p-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold">Datos</h2>
+          <div className="border-t border-base-300 pt-5">
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/70">Identificacion</h3>
               <p className="text-sm text-base-content/60">
                 {isWholesale ? "Datos del contacto y razon social." : "Datos personales del cliente minorista."}
               </p>
@@ -259,12 +260,12 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
               )}
               <TextField type="date" label="Fecha de nacimiento" value={form.dob} onChange={(value) => update("dob", value)} disabled={isSubmitting} />
             </div>
-          </section>
+          </div>
 
-          <section className="rounded-lg border border-base-300 bg-base-100 p-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold">Ubicacion comercial</h2>
-              <p className="text-sm text-base-content/60">Provincia normalizada y sucursal de registro.</p>
+          <div className="border-t border-base-300 pt-5">
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/70">Ubicacion comercial</h3>
+              <p className="text-sm text-base-content/60">Provincia normalizada, sucursal de registro y domicilio.</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -281,11 +282,11 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
               <TextField label="Domicilio calle" value={form.addressStreet} onChange={(value) => update("addressStreet", value)} disabled={isSubmitting} />
               <TextField label="Domicilio numero" value={form.addressNumber} onChange={(value) => update("addressNumber", value)} disabled={isSubmitting} />
             </div>
-          </section>
+          </div>
 
-          <section className="rounded-lg border border-base-300 bg-base-100 p-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold">Contacto</h2>
+          <div className="border-t border-base-300 pt-5">
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/70">Contacto</h3>
               <p className="text-sm text-base-content/60">Canales de contacto principales.</p>
             </div>
 
@@ -294,11 +295,11 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
               <TextField type="email" label="Email" value={form.email} onChange={(value) => update("email", value)} disabled={isSubmitting} />
               <TextField label="Instagram" value={form.instagram} onChange={(value) => update("instagram", value)} disabled={isSubmitting} />
             </div>
-          </section>
+          </div>
 
-          <section className="rounded-lg border border-base-300 bg-base-100 p-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold">Notas</h2>
+          <div className="border-t border-base-300 pt-5">
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/70">Notas</h3>
               <p className="text-sm text-base-content/60">Informacion operativa interna del cliente.</p>
             </div>
             <textarea
@@ -307,37 +308,47 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
               onChange={(event) => update("notes", event.target.value)}
               disabled={isSubmitting}
             />
-          </section>
+          </div>
         </div>
+      </section>
 
-        <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4">
-          <h2 className="font-semibold">Resumen</h2>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Tipo</dt>
-              <dd className="font-medium">{BUYER_TYPE_LABELS[form.type]}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Cliente</dt>
-              <dd className="font-medium text-right">
-                {isWholesale && form.businessName ? form.businessName : [form.name, form.surname].filter(Boolean).join(" ") || "Pendiente"}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Documento</dt>
-              <dd className="font-medium text-right">{isWholesale ? form.cuit || "Pendiente" : form.dni || "Pendiente"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Sucursal</dt>
-              <dd className="font-medium text-right">{branches.find((branch) => branch.id === form.registeredBranchId)?.name ?? "Pendiente"}</dd>
-            </div>
-          </dl>
-          <button type="submit" className="btn btn-primary mt-4 w-full" disabled={isSubmitting}>
+      <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4">
+        <h2 className="font-semibold">Resumen</h2>
+        <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Tipo</dt>
+            <dd className="font-medium">{BUYER_TYPE_LABELS[form.type]}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Cliente</dt>
+            <dd className="font-medium text-right">
+              {isWholesale && form.businessName ? form.businessName : [form.name, form.surname].filter(Boolean).join(" ") || "Pendiente"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Documento</dt>
+            <dd className="font-medium text-right">{isWholesale ? form.cuit || "Pendiente" : form.dni || "Pendiente"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Contacto</dt>
+            <dd className="font-medium text-right">{form.phone || form.email || form.instagram || "Pendiente"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-base-content/60">Sucursal</dt>
+            <dd className="font-medium text-right">{branches.find((branch) => branch.id === form.registeredBranchId)?.name ?? "Pendiente"}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 flex flex-col gap-2">
+          <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
             {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
             {isSubmitting ? "Guardando..." : mode === "create" ? "Crear cliente" : "Guardar cambios"}
           </button>
-        </aside>
-      </div>
+          <button type="button" className="btn btn-ghost w-full" onClick={() => router.back()} disabled={isSubmitting}>
+            Volver
+          </button>
+        </div>
+      </aside>
     </form>
   )
 }

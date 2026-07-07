@@ -77,7 +77,10 @@ export default function EditBuyerForm({ id }: EditBuyerFormProps) {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="p-6">Cargando cliente...</div>
+        <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Clientes", href: "/dashboard/buyers" }, { label: "Editar Cliente" }]} />
+        <div className="flex items-center justify-center py-10">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
       </DashboardLayout>
     )
   }
@@ -86,7 +89,9 @@ export default function EditBuyerForm({ id }: EditBuyerFormProps) {
     return (
       <DashboardLayout>
         <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Clientes", href: "/dashboard/buyers" }, { label: "Editar Cliente" }]} />
-        <div className="alert alert-error">{error || "No se pudo cargar el cliente."}</div>
+        <div className="p-4">
+          <div className="alert alert-error">{error || "No se pudo cargar el cliente."}</div>
+        </div>
       </DashboardLayout>
     )
   }

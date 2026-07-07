@@ -66,6 +66,8 @@ const PRODUCT_SELECT = {
   location: true,
   branchId: true,
   branch: { select: { id: true, code: true, name: true } },
+  supplierId: true,
+  supplier: { select: { id: true, name: true } },
   origin: true,
   costPrice: true,
   salePrice: true,
@@ -103,6 +105,18 @@ async function resolveProductTenantId(sessionTenantId: string | null | undefined
   })
 
   return productWithTenant?.tenantId ?? configuredTenantId
+}
+
+async function resolveProductSupplierId(tenantId: string, value: unknown) {
+  const supplierId = typeof value === "string" ? value.trim() : ""
+  if (!supplierId) return null
+
+  const supplier = await prisma.supplier.findFirst({
+    where: { id: supplierId, tenantId },
+    select: { id: true },
+  })
+  if (!supplier) throw new Error("Proveedor no disponible")
+  return supplier.id
 }
 
 /**
@@ -199,6 +213,8 @@ export async function GET(request: Request) {
       location: p.location ?? null,
       branchId: p.branchId ?? null,
       branch: p.branch ?? null,
+      supplierId: p.supplierId ?? null,
+      supplier: p.supplier ?? null,
       origin: p.origin ?? null,
 
       purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
@@ -247,9 +263,14 @@ export async function POST(request: Request) {
       requestedBranchId: typeof body.branchId === "string" ? body.branchId : null,
       entityLabel: "producto",
     })
+    const supplierId = await resolveProductSupplierId(tenantId, body.supplierId)
 
     const product = await prisma.product.create({
-      data: { ...body, tenantId, branchId: branch.id },
+      data: { ...body, tenantId, branchId: branch.id, supplierId },
+      include: {
+        branch: { select: { id: true, code: true, name: true } },
+        supplier: { select: { id: true, name: true } },
+      },
     })
 
     // Keep POST response consistent with your client shape if you want

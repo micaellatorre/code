@@ -122,6 +122,20 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
     )
   }
 
+  function SupplierCell({ product }: { product: SerializedProduct }) {
+    if (!product.supplier) return <span className="text-base-content/40">-</span>
+
+    return (
+      <Link
+        href={`/dashboard/suppliers/${product.supplier.id}/edit`}
+        className="link link-primary whitespace-nowrap"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {product.supplier.name}
+      </Link>
+    )
+  }
+
   function ProductRow({ p }: { p: SerializedProduct }) {
     return (
       <tr key={p.id}>
@@ -197,6 +211,10 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             )}
           </td>
         ) : null}
+
+        <td>
+          <SupplierCell product={p} />
+        </td>
 
         {visibleLocationColumn ? (
           <td>
@@ -752,6 +770,9 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             </span>
           </OperationalEditableCell>
         </td>
+        <td>
+          <SupplierCell product={product} />
+        </td>
         {visibleImeiColumn ? (
           <td className="font-mono text-xs">
             {canEditField("imei") && isEditing(product.id, "imei") ? (
@@ -852,6 +873,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               {/* <th>Select</th> */}
               <th>Codigo</th>
               <th>Modelo</th>
+              <th>Proveedor</th>
               {visibleImeiColumn ? <th>IMEI</th> : null}
               <th>GB</th>
               <th>Color</th>
@@ -936,6 +958,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               <tr>
                 <th>Agregado</th>
                 {visibleOriginColumn ? <th>Origen</th> : null}
+                <th>Proveedor</th>
                 {visibleLocationColumn ? <th>Sucursal</th> : null}
                 {visibleImeiColumn ? <th>IMEI</th> : null}
                 <th>Modelo</th>
@@ -1042,6 +1065,8 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                                 <thead>
                                   <tr>
                                     <th>Agregado</th>
+                                    {visibleOriginColumn ? <th>Origen</th> : null}
+                                    <th>Proveedor</th>
                                     {visibleLocationColumn ? <th>Sucursal</th> : null}
                                     {visibleImeiColumn ? <th>IMEI</th> : null}
                                     <th>Modelo</th>

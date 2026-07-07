@@ -10,6 +10,18 @@ type Ctx = {
   params: Promise<{ id: string }>
 }
 
+async function resolveProductSupplierId(tenantId: string, value: unknown) {
+  const supplierId = typeof value === "string" ? value.trim() : ""
+  if (!supplierId) return null
+
+  const supplier = await prisma.supplier.findFirst({
+    where: { id: supplierId, tenantId },
+    select: { id: true },
+  })
+  if (!supplier) throw new Error("Proveedor no disponible")
+  return supplier.id
+}
+
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "STOCK", "SOCIO"])
 
@@ -21,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
   const product = await prisma.product.findFirst({
     where: { id, ...(tenantId ? { tenantId } : {}) },
-    include: { branch: { select: { id: true, code: true, name: true } } },
+    include: { branch: { select: { id: true, code: true, name: true } }, supplier: { select: { id: true, name: true } } },
   })
   if (!product) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
   return NextResponse.json(product)
@@ -54,8 +66,11 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
         if (!branch) return NextResponse.json({ error: "Sucursal no disponible" }, { status: 400 })
       }
     }
+    if (Object.prototype.hasOwnProperty.call(body, "supplierId")) {
+      body.supplierId = await resolveProductSupplierId(tenantId, body.supplierId)
+    }
 
-    const product = await prisma.product.update({ where: { id }, data: body, include: { branch: { select: { id: true, name: true } } } })
+    const product = await prisma.product.update({ where: { id }, data: body, include: { branch: { select: { id: true, name: true } }, supplier: { select: { id: true, name: true } } } })
     if (Object.prototype.hasOwnProperty.call(body, "branchId") && current.branchId !== product.branchId) {
       await createAuditLog({
         tenantId,
@@ -73,7 +88,8 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     return NextResponse.json(product)
   } catch (err: any) {
     console.error(err)
-    return NextResponse.json({ error: "Error actualizando producto" }, { status: 500 })
+    const message = err instanceof Error ? err.message : "Error actualizando producto"
+    return NextResponse.json({ error: message }, { status: message.includes("Proveedor") ? 400 : 500 })
   }
 }
 
@@ -218,12 +234,15 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         updateData.branchId = branch.id
       }
     }
+    if (Object.prototype.hasOwnProperty.call(body, "supplierId")) {
+      updateData.supplierId = await resolveProductSupplierId(tenantId, body.supplierId)
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No hay campos para actualizar" }, { status: 400 })
     }
 
-    const product = await prisma.product.update({ where: { id }, data: updateData, include: { branch: { select: { id: true, code: true, name: true } } } })
+    const product = await prisma.product.update({ where: { id }, data: updateData, include: { branch: { select: { id: true, code: true, name: true } }, supplier: { select: { id: true, name: true } } } })
     if (Object.prototype.hasOwnProperty.call(updateData, "branchId") && current.branchId !== product.branchId) {
       await createAuditLog({
         tenantId,
@@ -241,7 +260,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     return NextResponse.json(product)
   } catch (err: any) {
     console.error(err)
-    return NextResponse.json({ error: "Error actualizando producto" }, { status: 500 })
+    const message = err instanceof Error ? err.message : "Error actualizando producto"
+    return NextResponse.json({ error: message }, { status: message.includes("Proveedor") ? 400 : 500 })
   }
 }
 
