@@ -4,6 +4,7 @@ import UserBranchAdmin from "@/components/users/UserBranchAdmin"
 import { requireRolePage } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
 import prisma from "@/lib/prisma"
+import { branchCreationOrder } from "@/lib/domain/branch-order"
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +24,7 @@ export default async function UsersPage() {
     }),
     prisma.branch.findMany({
       where: { tenantId, isActive: true },
-      orderBy: [{ name: "asc" }, { code: "asc" }],
+      orderBy: branchCreationOrder,
       select: { id: true, code: true, name: true },
     }),
   ])

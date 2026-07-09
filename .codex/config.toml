@@ -1,0 +1,26 @@
+# TECH-STOCK project-scoped Codex configuration.
+# Keep this file free of secrets. Use environment variables or `codex mcp login`
+# for credentials and OAuth-backed MCP servers.
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.figma-remote]
+url = "https://mcp.figma.com/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+
+[mcp_servers.figma-local]
+url = "http://127.0.0.1:3845/mcp"
+startup_timeout_sec = 5
+tool_timeout_sec = 60

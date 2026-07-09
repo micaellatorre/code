@@ -28,14 +28,14 @@ export async function POST(request: Request) {
   const parsed = purchaseSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Datos invalidos", fieldErrors: parsed.error.flatten().fieldErrors }, { status: 400 })
   try {
-    const purchase = await createPurchaseWithPayments({
+    const result = await createPurchaseWithPayments({
       tenantId,
       actorUserId: auth.session.user.id,
       actorRole: auth.session.user.activeRole as UserRole,
       actorRealRole: auth.session.user.role as UserRole,
       input: parsed.data,
     })
-    return NextResponse.json({ purchase }, { status: 201 })
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error creando compra"
     return NextResponse.json({ error: message }, { status: 400 })

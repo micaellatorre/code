@@ -1,28 +1,34 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import type { ReactNode } from "react"
-import { useMemo, useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import type { CSSProperties, ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import Navbar from "./Navbar"
 import UserSessionMenu from "./UserSessionMenu"
 import BranchContextSwitcher from "@/components/branches/BranchContextSwitcher"
-import type { Role } from "@/lib/auth/roles"
 import {
-  CalendarIcon,
-  DevicePhoneMobileIcon,
-  CurrencyDollarIcon,
-  ArrowsRightLeftIcon,
-  Squares2X2Icon,
-  UsersIcon,
-  CircleStackIcon,
+  dashboardNavigationGroups,
+  isDashboardNavigationItemActive,
+} from "@/lib/navigation/dashboard-navigation"
+import {
   MapPinIcon,
-  WrenchScrewdriverIcon,
-  UserGroupIcon,
-  ShoppingCartIcon,
-  BuildingStorefrontIcon,
-} from "@heroicons/react/24/solid"
+  Bars3BottomLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDownIcon,
+} from "@heroicons/react/24/outline"
+
+const MAGNET_ACTIVATION_WIDTH = 96
+const VIEWPORT_SAFE_MARGIN = 16
+const FLOATING_SIDEBAR_MARGIN = 8
+const FOLLOW_STRENGTH = 0.18
+const MAGNET_RETURN_DELAY = 650
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
 
 export default function DashboardLayout({
   children,
@@ -30,124 +36,420 @@ export default function DashboardLayout({
   children?: ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session } = useSession()
-
-  const tabs = useMemo(
-    () => [
-      {
-        key: "dashboard",
-        label: "Dashboard",
-        href: "/dashboard",
-        icon: <Squares2X2Icon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "SOCIO"] as Role[],
-      },
-      {
-        key: "purchases",
-        label: "Compras",
-        href: "/dashboard/purchases",
-        icon: <ShoppingCartIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN"] as Role[],
-      },
-      {
-        key: "suppliers",
-        label: "Proveedores",
-        href: "/dashboard/suppliers",
-        icon: <BuildingStorefrontIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "STOCK"] as Role[],
-      },
-      {
-        key: "buyers",
-        label: "Clientes",
-        href: "/dashboard/buyers",
-        icon: <UsersIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
-      },
-      {
-        key: "appointments",
-        label: "Citas",
-        href: "/dashboard/appointments",
-        icon: <CalendarIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
-      },
-      {
-        key: "products",
-        label: "Productos",
-        href: "/dashboard/products",
-        icon: <DevicePhoneMobileIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "VENDEDOR", "STOCK", "SOCIO"] as Role[],
-      },
-      {
-        key: "sales",
-        label: "Ventas",
-        href: "/dashboard/sales",
-        icon: <CurrencyDollarIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"] as Role[],
-      },
-      {
-        key: "database",
-        label: "Base Datos",
-        href: "/dashboard/database",
-        icon: <CircleStackIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "SOCIO", "VENDEDOR", "STOCK"] as Role[],
-      },
-      {
-        key: "branches",
-        label: "Sucursales",
-        href: "/dashboard/branches",
-        icon: <MapPinIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "SOCIO"] as Role[],
-      },
-      {
-        key: "users",
-        label: "Mi Equipo",
-        href: "/dashboard/users",
-        icon: <UserGroupIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN"] as Role[],
-      },
-      {
-        key: "service-orders",
-        label: "Servicio Técnico",
-        href: "/dashboard/service-orders",
-        icon: <WrenchScrewdriverIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN"] as Role[],
-      },
-      {
-        key: "trade-in",
-        label: "Plan Canje",
-        href: "/dashboard/trade-in",
-        icon: <ArrowsRightLeftIcon className="size-5 shrink-0" />,
-        allowedRoles: ["ADMIN", "VENDEDOR"] as Role[],
-      },
-    ],
-    []
-  )
-
-  const [collapsed, setCollapsed] = useState(true)
-  const [mobileOpen, setMobileOpen] = useState(false)
-
-  const toggleSidebarVisibility = () => {
-    setMobileOpen((prev) => !prev)
-  }
-
-  const closeSidebar = () => {
-    setMobileOpen(false)
-  }
-
-  const toggleDesktopCollapse = () => {
-    setCollapsed((prev) => !prev)
-  }
-
-  const isTabActive = (href: string) => {
-    if (href === "/") return pathname === "/"
-    return pathname === href || pathname.startsWith(`${href}/`)
-  }
 
   const activeRole = session?.user?.activeRole
 
-  const sidebarWidth = collapsed ? "w-[68px]" : "w-[188px]"
+  const [collapsed, setCollapsed] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarPinned, setSidebarPinned] = useState(false)
+  const [isDesktopNavigation, setIsDesktopNavigation] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+
+  const handleRef = useRef<HTMLButtonElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
+  const currentYRef = useRef(0)
+  const targetYRef = useRef(0)
+  const animationFrameRef = useRef<number | null>(null)
+  const returnTimeoutRef = useRef<number | null>(null)
+  const sidebarOpenRef = useRef(false)
+  const sidebarPinnedRef = useRef(false)
+
+  const isTabActive = useCallback(
+    (href: string) => isDashboardNavigationItemActive(pathname, href),
+    [pathname]
+  )
+
+  const visibleGroups = useMemo(() => {
+    return dashboardNavigationGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => {
+          if (!activeRole) return true
+          return item.allowedRoles.includes(activeRole)
+        }),
+      }))
+      .filter((group) => group.items.length > 0)
+  }, [activeRole])
+
+  const activeGroupKey = useMemo(() => {
+    return visibleGroups.find((group) =>
+      group.items.some((item) => isTabActive(item.href))
+    )?.key
+  }, [isTabActive, visibleGroups])
+
+  useEffect(() => {
+    const savedCollapsed = window.localStorage.getItem(
+      "dashboard-sidebar-collapsed"
+    )
+
+    if (savedCollapsed !== null) {
+      setCollapsed(savedCollapsed === "true")
+    }
+
+    const savedOpenGroups = window.localStorage.getItem(
+      "dashboard-sidebar-open-groups"
+    )
+
+    if (savedOpenGroups) {
+      try {
+        setOpenGroups(JSON.parse(savedOpenGroups))
+      } catch {
+        setOpenGroups({})
+      }
+    }
+
+    const savedPinned = window.localStorage.getItem(
+      "dashboard-sidebar-pinned"
+    )
+    const desktopNavigation = window.matchMedia("(min-width: 1024px)").matches
+
+    if (savedPinned !== null && desktopNavigation) {
+      setSidebarPinned(savedPinned === "true")
+    }
+  }, [])
+
+  useEffect(() => {
+    const desktopQuery = window.matchMedia("(min-width: 1024px)")
+
+    const syncNavigationMode = () => {
+      const desktopNavigation = desktopQuery.matches
+      setIsDesktopNavigation(desktopNavigation)
+
+      if (!desktopNavigation) {
+        setSidebarPinned(false)
+        return
+      }
+
+      const savedPinned = window.localStorage.getItem(
+        "dashboard-sidebar-pinned"
+      )
+
+      if (savedPinned === "true") {
+        setSidebarPinned(true)
+        setSidebarOpen(false)
+      }
+    }
+
+    syncNavigationMode()
+    desktopQuery.addEventListener("change", syncNavigationMode)
+
+    return () => {
+      desktopQuery.removeEventListener("change", syncNavigationMode)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!activeGroupKey) return
+
+    setOpenGroups((prev) => {
+      if (prev[activeGroupKey]) return prev
+
+      const next = {
+        ...prev,
+        [activeGroupKey]: true,
+      }
+
+      window.localStorage.setItem(
+        "dashboard-sidebar-open-groups",
+        JSON.stringify(next)
+      )
+
+      return next
+    })
+  }, [activeGroupKey])
+
+  useEffect(() => {
+    sidebarOpenRef.current = sidebarOpen
+  }, [sidebarOpen])
+
+  useEffect(() => {
+    sidebarPinnedRef.current = sidebarPinned
+  }, [sidebarPinned])
+
+  const applyFloatingSidebarTop = useCallback(() => {
+    const sidebar = sidebarRef.current
+    if (!sidebar || sidebarPinnedRef.current) return
+
+    const desktopNavigation = window.matchMedia("(min-width: 1024px)").matches
+
+    if (!desktopNavigation) {
+      sidebar.style.top = `${FLOATING_SIDEBAR_MARGIN}px`
+      return
+    }
+
+    const rect = sidebar.getBoundingClientRect()
+    const sidebarHeight = Math.min(
+      rect.height || window.innerHeight - FLOATING_SIDEBAR_MARGIN * 2,
+      window.innerHeight - FLOATING_SIDEBAR_MARGIN * 2
+    )
+    const maxTop = Math.max(
+      FLOATING_SIDEBAR_MARGIN,
+      window.innerHeight - sidebarHeight - FLOATING_SIDEBAR_MARGIN
+    )
+    const nextTop = clamp(
+      currentYRef.current - sidebarHeight / 2,
+      FLOATING_SIDEBAR_MARGIN,
+      maxTop
+    )
+
+    sidebar.style.top = `${nextTop}px`
+  }, [])
+
+  const openFloatingSidebar = useCallback(() => {
+    setSidebarOpen(true)
+
+    window.requestAnimationFrame(() => {
+      applyFloatingSidebarTop()
+    })
+  }, [applyFloatingSidebarTop])
+
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false)
+  }, [])
+
+  const handleNavigation = useCallback(() => {
+    if (!sidebarPinnedRef.current) {
+      setSidebarOpen(false)
+    }
+  }, [])
+
+  const toggleSidebarPinned = () => {
+    const next = !sidebarPinned
+
+    setSidebarPinned(next)
+    setSidebarOpen(!next)
+    window.localStorage.setItem("dashboard-sidebar-pinned", String(next))
+
+    if (!next) {
+      window.requestAnimationFrame(() => {
+        applyFloatingSidebarTop()
+      })
+    }
+  }
+
+  const toggleDesktopCollapse = () => {
+    setCollapsed((prev) => {
+      const next = !prev
+      window.localStorage.setItem("dashboard-sidebar-collapsed", String(next))
+      return next
+    })
+  }
+
+  const toggleGroup = (groupKey: string) => {
+    setOpenGroups((prev) => {
+      const next = {
+        ...prev,
+        [groupKey]: !prev[groupKey],
+      }
+
+      window.localStorage.setItem(
+        "dashboard-sidebar-open-groups",
+        JSON.stringify(next)
+      )
+
+      return next
+    })
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Escape" &&
+        sidebarOpenRef.current &&
+        !sidebarPinnedRef.current
+      ) {
+        setSidebarOpen(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!sidebarOpen || sidebarPinned) return
+
+    const frame = window.requestAnimationFrame(() => {
+      applyFloatingSidebarTop()
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+    }
+  }, [
+    applyFloatingSidebarTop,
+    collapsed,
+    openGroups,
+    sidebarOpen,
+    sidebarPinned,
+    visibleGroups,
+  ])
+
+  useEffect(() => {
+    if (sidebarPinned) return
+
+    const desktopQuery = window.matchMedia("(min-width: 1024px)")
+    const finePointerQuery = window.matchMedia("(pointer: fine)")
+    const reducedMotionQuery = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    )
+
+    const supportsMagneticNavigation = () =>
+      desktopQuery.matches && finePointerQuery.matches
+
+    const getHandleHeight = () =>
+      handleRef.current?.getBoundingClientRect().height || 48
+
+    const getSafeCenterY = (centerY: number) => {
+      const halfHandleHeight = getHandleHeight() / 2
+
+      return clamp(
+        centerY,
+        VIEWPORT_SAFE_MARGIN + halfHandleHeight,
+        window.innerHeight - VIEWPORT_SAFE_MARGIN - halfHandleHeight
+      )
+    }
+
+    const getNeutralCenterY = () => getSafeCenterY(window.innerHeight * 0.45)
+
+    const writeHandlePosition = (centerY: number) => {
+      const handle = handleRef.current
+      if (!handle) return
+
+      const handleHeight = getHandleHeight()
+      const top = clamp(
+        centerY - handleHeight / 2,
+        VIEWPORT_SAFE_MARGIN,
+        window.innerHeight - handleHeight - VIEWPORT_SAFE_MARGIN
+      )
+
+      handle.style.top = `${top}px`
+    }
+
+    const stopAnimation = () => {
+      if (animationFrameRef.current === null) return
+
+      window.cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+
+    const tick = () => {
+      const distance = targetYRef.current - currentYRef.current
+      const nextY = currentYRef.current + distance * FOLLOW_STRENGTH
+
+      currentYRef.current =
+        Math.abs(distance) < 0.5 ? targetYRef.current : nextY
+
+      writeHandlePosition(currentYRef.current)
+
+      if (sidebarOpenRef.current && !sidebarPinnedRef.current) {
+        applyFloatingSidebarTop()
+      }
+
+      if (Math.abs(targetYRef.current - currentYRef.current) >= 0.5) {
+        animationFrameRef.current = window.requestAnimationFrame(tick)
+      } else {
+        animationFrameRef.current = null
+      }
+    }
+
+    const startAnimation = () => {
+      if (animationFrameRef.current !== null) return
+
+      animationFrameRef.current = window.requestAnimationFrame(tick)
+    }
+
+    const moveHandle = (centerY: number) => {
+      targetYRef.current = getSafeCenterY(centerY)
+
+      if (reducedMotionQuery.matches) {
+        stopAnimation()
+        currentYRef.current = targetYRef.current
+        writeHandlePosition(currentYRef.current)
+        applyFloatingSidebarTop()
+        return
+      }
+
+      startAnimation()
+    }
+
+    const scheduleNeutralReturn = () => {
+      if (returnTimeoutRef.current !== null) return
+
+      returnTimeoutRef.current = window.setTimeout(() => {
+        returnTimeoutRef.current = null
+        moveHandle(getNeutralCenterY())
+      }, MAGNET_RETURN_DELAY)
+    }
+
+    const clearNeutralReturn = () => {
+      if (returnTimeoutRef.current === null) return
+
+      window.clearTimeout(returnTimeoutRef.current)
+      returnTimeoutRef.current = null
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!supportsMagneticNavigation()) return
+
+      if (event.clientX <= MAGNET_ACTIVATION_WIDTH) {
+        clearNeutralReturn()
+        moveHandle(event.clientY)
+        return
+      }
+
+      scheduleNeutralReturn()
+    }
+
+    const syncInitialPosition = () => {
+      const neutralCenterY = getNeutralCenterY()
+
+      currentYRef.current = neutralCenterY
+      targetYRef.current = neutralCenterY
+      writeHandlePosition(neutralCenterY)
+      applyFloatingSidebarTop()
+    }
+
+    syncInitialPosition()
+
+    window.addEventListener("pointermove", handlePointerMove, {
+      passive: true,
+    })
+    window.addEventListener("resize", syncInitialPosition)
+    desktopQuery.addEventListener("change", syncInitialPosition)
+    finePointerQuery.addEventListener("change", syncInitialPosition)
+    reducedMotionQuery.addEventListener("change", syncInitialPosition)
+
+    return () => {
+      clearNeutralReturn()
+      stopAnimation()
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("resize", syncInitialPosition)
+      desktopQuery.removeEventListener("change", syncInitialPosition)
+      finePointerQuery.removeEventListener("change", syncInitialPosition)
+      reducedMotionQuery.removeEventListener("change", syncInitialPosition)
+    }
+  }, [applyFloatingSidebarTop, sidebarPinned])
+
+  const effectiveCollapsed = isDesktopNavigation && collapsed
+  const sidebarVisible = sidebarPinned || sidebarOpen
+  const showBackdrop = sidebarOpen && !sidebarPinned
+  const sidebarWidth = effectiveCollapsed
+    ? "lg:w-[68px] w-[240px]"
+    : "w-[240px]"
+  const contentOffset = sidebarPinned
+    ? effectiveCollapsed
+      ? "lg:pl-[84px]"
+      : "lg:pl-[256px]"
+    : ""
 
   const renderLogo = (expanded: boolean) => (
-    <div className="flex items-center ">
+    <div className="flex items-center">
       <svg
         width="40"
         height="20"
@@ -166,7 +468,7 @@ export default function DashboardLayout({
       <span
         className={[
           "overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300",
-          expanded ? "max-w-[100px] opacity-100 ml-2" : "max-w-0 opacity-0",
+          expanded ? "ml-2 max-w-[150px] opacity-100" : "max-w-0 opacity-0",
         ].join(" ")}
       >
         Importaciones
@@ -177,101 +479,245 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-base-100">
       <button
+        ref={handleRef}
+        type="button"
+        aria-label="Abrir menú lateral"
+        title="Abrir menú lateral"
+        onClick={openFloatingSidebar}
+        className={[
+          "fixed -left-[1.35rem] top-[45vh] z-[180] hidden h-12 w-12 items-center justify-center rounded-r-xl border border-base-300 bg-base-200/90 text-base-content shadow backdrop-blur transition-[left,transform,opacity,box-shadow,background-color] duration-200 ease-out hover:left-2 hover:scale-[1.03] hover:bg-base-200/95 hover:shadow-lg focus-visible:left-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transform-none motion-reduce:transition-none motion-reduce:hover:scale-100 lg:inline-flex",
+          sidebarPinned
+            ? "pointer-events-none opacity-0"
+            : "pointer-events-auto opacity-100",
+        ].join(" ")}
+      >
+        <Bars3BottomLeftIcon className="size-6" />
+      </button>
+
+      <button
+        type="button"
+        aria-label="Abrir menú lateral"
+        title="Abrir menú lateral"
+        onClick={openFloatingSidebar}
+        className={[
+          "btn btn-sm btn-square fixed left-2 top-3 z-[180] border border-base-300 bg-base-200/95 shadow-lg backdrop-blur transition-opacity duration-200 lg:hidden",
+          sidebarVisible
+            ? "pointer-events-none opacity-0"
+            : "pointer-events-auto opacity-100",
+        ].join(" ")}
+      >
+        <Bars3BottomLeftIcon className="size-6" />
+      </button>
+
+      <button
         type="button"
         aria-label="Cerrar menú lateral"
         onClick={closeSidebar}
         className={[
-          "fixed inset-0 z-[150] bg-black/30 transition-opacity duration-300",
-          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+          "fixed inset-0 z-[150] bg-black/20 backdrop-blur-[1px] transition-opacity duration-300",
+          showBackdrop
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0",
         ].join(" ")}
       />
 
       <aside
+        ref={sidebarRef}
+        style={
+          sidebarPinned
+            ? ({
+              top: FLOATING_SIDEBAR_MARGIN,
+              bottom: FLOATING_SIDEBAR_MARGIN,
+            } as CSSProperties)
+            : ({ top: FLOATING_SIDEBAR_MARGIN } as CSSProperties)
+        }
         className={[
-          "fixed inset-y-0 left-0 z-[190] m-2 flex flex-col rounded-xl bg-base-200/95 backdrop-blur shadow-2xl transition-all duration-300",
+          "fixed left-2 z-[190] flex max-h-[calc(100vh-16px)] flex-col overflow-visible rounded-xl bg-base-200/95 backdrop-blur transition-[width,transform,top,box-shadow,border-color] duration-300 ease-out motion-reduce:transition-none",
+          sidebarPinned
+            ? "border border-base-300 shadow-none"
+            : "border border-transparent shadow-2xl",
+          sidebarPinned ? "bottom-2" : "bottom-2 lg:bottom-auto",
           sidebarWidth,
-          mobileOpen ? "translate-x-0" : "-translate-x-[120%]",
+          sidebarVisible ? "translate-x-0" : "-translate-x-[120%]",
         ].join(" ")}
       >
-        <div className={`${collapsed ? "px-2" : "px-2"} py-2 flex items-center justify-center`}>
-          <button
-            type="button"
-            onClick={toggleDesktopCollapse}
+        <div
+          className={[
+            "px-2 py-2",
+            effectiveCollapsed
+              ? "flex flex-col items-center gap-2"
+              : "flex items-center gap-2",
+          ].join(" ")}
+        >
+          <div
             className={[
-              "btn btn-ghost h-11 min-h-11 rounded-lg transition-all duration-300 px-2",
-              collapsed ? "w-auto" : "w-full justify-start",
+              "flex h-11 min-w-0 items-center",
+              effectiveCollapsed ? "justify-center" : "flex-1 px-2",
             ].join(" ")}
-            aria-label={collapsed ? "Expandir menú lateral" : "Colapsar menú lateral"}
-            title={collapsed ? "Expandir menú" : "Colapsar menú"}
           >
-            {renderLogo(!collapsed)}
-          </button>
+            {renderLogo(!effectiveCollapsed)}
+          </div>
+
+          <div
+            className={[
+              "flex gap-1",
+              effectiveCollapsed ? "flex-col" : "items-center",
+            ].join(" ")}
+          >
+            <button
+              type="button"
+              onClick={toggleSidebarPinned}
+              className="btn btn-ghost btn-sm btn-square hidden lg:inline-flex"
+              aria-label={sidebarPinned ? "Desfijar menú" : "Fijar menú"}
+              title={sidebarPinned ? "Desfijar menú" : "Fijar menú"}
+            >
+              <MapPinIcon
+                className={[
+                  "size-5 transition-transform duration-200",
+                  sidebarPinned ? "text-primary" : "",
+                ].join(" ")}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleDesktopCollapse}
+              className="btn btn-ghost btn-sm btn-square hidden lg:inline-flex"
+              aria-label={
+                effectiveCollapsed
+                  ? "Expandir menú lateral"
+                  : "Colapsar menú lateral"
+              }
+              title={effectiveCollapsed ? "Expandir menú" : "Colapsar menú"}
+            >
+              {effectiveCollapsed ? (
+                <ChevronRightIcon className="size-5" />
+              ) : (
+                <ChevronLeftIcon className="size-5" />
+              )}
+            </button>
+          </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 pb-2">
-          <ul className="menu gap-1 p-0 mt-1">
-            {tabs.map((tab) => {
-              const active = isTabActive(tab.href)
-              const disabled = activeRole ? !tab.allowedRoles.includes(activeRole) : false
-              const baseClasses = [
-                "group flex items-center rounded-lg transition-all duration-200",
-                collapsed ? "justify-center h-10 px-0" : "gap-4 h-10 px-2",
-              ].join(" ")
-              const stateClasses = disabled
-                ? "cursor-not-allowed text-base-content/35 bg-transparent"
-                : active
-                  ? "bg-primary text-primary-content"
-                  : "text-base-content hover:bg-base-300/70"
+        <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          <div className="space-y-3">
+            {visibleGroups.map((group, groupIndex) => {
+              const groupHasActiveItem = group.items.some((item) =>
+                isTabActive(item.href)
+              )
+
+              const groupIsOpen =
+                effectiveCollapsed ||
+                groupHasActiveItem ||
+                openGroups[group.key] !== false
 
               return (
-                <li key={tab.key}>
-                  {disabled ? (
-                    <span
-                      aria-disabled="true"
-                      title={collapsed ? `${tab.label} (sin acceso)` : undefined}
-                      className={[baseClasses, stateClasses].join(" ")}
+                <section
+                  key={group.key}
+                  className={groupIndex > 0 && effectiveCollapsed ? "border-t border-base-300 pt-3" : ""}
+                >
+                  {!effectiveCollapsed && group.label ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.key)}
+                      className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-base-content/45 transition hover:bg-base-300/50 hover:text-base-content/70"
+                      aria-expanded={groupIsOpen}
                     >
-                      <span className="shrink-0">{tab.icon}</span>
-                      <span
+                      <span>{group.label}</span>
+
+                      <ChevronDownIcon
                         className={[
-                          "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-300",
-                          collapsed ? "max-w-0 opacity-0 hidden" : "max-w-[100px] opacity-100",
+                          "size-3.5 transition-transform duration-200",
+                          groupIsOpen ? "rotate-0" : "-rotate-90",
                         ].join(" ")}
-                      >
-                        {tab.label}
-                      </span>
-                    </span>
-                  ) : (
-                    <Link
-                      href={tab.href}
-                      onClick={closeSidebar}
-                      title={collapsed ? tab.label : undefined}
-                      className={[baseClasses, stateClasses].join(" ")}
+                      />
+                    </button>
+                  ) : null}
+
+                  {groupIsOpen ? (
+                    <ul
+                      className={[
+                        "menu gap-1 p-0",
+                        !effectiveCollapsed && group.label ? "mt-1" : "",
+                      ].join(" ")}
                     >
-                      <span className="shrink-0">{tab.icon}</span>
-                      <span
-                        className={[
-                          "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-300",
-                          collapsed ? "max-w-0 opacity-0 hidden " : "max-w-[100px] opacity-100",
-                        ].join(" ")}
-                      >
-                        {tab.label}
-                      </span>
-                    </Link>
-                  )}
-                </li>
+                      {group.items.map((item) => {
+                        const active = isTabActive(item.href)
+                        const Icon = item.icon
+
+                        const baseClasses = [
+                          "group relative flex items-center rounded-lg transition-all duration-200",
+                          effectiveCollapsed ? "h-10 justify-center px-0" : "h-10 gap-3 px-3",
+                        ].join(" ")
+
+                        const stateClasses = active
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-base-content/70 hover:bg-base-300/70 hover:text-base-content"
+
+                        return (
+                          <li key={item.key}>
+                            <Link
+                              href={item.href}
+                              onClick={handleNavigation}
+                              onMouseEnter={() => router.prefetch(item.href)}
+                              title={effectiveCollapsed ? item.label : undefined}
+                              aria-current={active ? "page" : undefined}
+                              className={[baseClasses, stateClasses].join(" ")}
+                            >
+                              {active ? (
+                                <span
+                                  aria-hidden="true"
+                                  className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary"
+                                />
+                              ) : null}
+
+                              <Icon
+                                className={[
+                                  "size-5 shrink-0 transition-transform duration-200",
+                                  active
+                                    ? "text-primary"
+                                    : "text-base-content/55 group-hover:text-base-content",
+                                  !effectiveCollapsed ? "group-hover:scale-105" : "",
+                                ].join(" ")}
+                              />
+
+                              <span
+                                className={[
+                                  "overflow-hidden whitespace-nowrap text-sm transition-all duration-300",
+                                  effectiveCollapsed
+                                    ? "hidden max-w-0 opacity-0"
+                                    : "max-w-[170px] opacity-100",
+                                ].join(" ")}
+                              >
+                                {item.label}
+                              </span>
+                            </Link>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : null}
+                </section>
               )
             })}
-          </ul>
+          </div>
         </nav>
-        <div className="space-y-2 border-t border-base-300 px-2 py-2">
-          {!collapsed ? <BranchContextSwitcher /> : null}
-          <UserSessionMenu menu="side" />
+
+        <div className="relative z-10 space-y-2 border-t border-base-300 px-2 py-2">
+          {!effectiveCollapsed ? <BranchContextSwitcher /> : null}
+          {/* <UserSessionMenu menu="side" /> */}
+          {/* Box height */}
+          <div className="h-10" />
         </div>
       </aside>
 
-      <div className="min-h-screen">
-        <Navbar onToggleSidebar={toggleSidebarVisibility} />
+      <div
+        className={[
+          "min-h-screen transition-[padding] duration-300 ease-out motion-reduce:transition-none",
+          contentOffset,
+        ].join(" ")}
+      >
+        <Navbar />
 
         <main className="px-3 pb-3 sm:px-4 sm:pb-4">
           <div className="min-h-[calc(100vh-96px)] bg-base-100">

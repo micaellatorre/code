@@ -68,6 +68,16 @@ const PRODUCT_SELECT = {
   branch: { select: { id: true, code: true, name: true } },
   supplierId: true,
   supplier: { select: { id: true, name: true } },
+  PurchaseItem: {
+    select: {
+      purchase: {
+        select: {
+          supplier: { select: { id: true, name: true } },
+        },
+      },
+    },
+    take: 1,
+  },
   origin: true,
   costPrice: true,
   salePrice: true,
@@ -191,7 +201,11 @@ export async function GET(request: Request) {
     const page: ProductRow[] = hasNextPage ? rows.slice(0, limit) : rows
     const nextCursor = hasNextPage ? page[page.length - 1]?.id ?? null : null
 
-    const products = page.map((p: ProductRow) => ({
+    const products = page.map((p: ProductRow) => {
+      const purchaseSupplier = p.PurchaseItem[0]?.purchase.supplier ?? null
+      const supplier = p.supplier ?? purchaseSupplier
+
+      return {
       id: p.id,
       tenantId: p.tenantId,
 
@@ -213,8 +227,8 @@ export async function GET(request: Request) {
       location: p.location ?? null,
       branchId: p.branchId ?? null,
       branch: p.branch ?? null,
-      supplierId: p.supplierId ?? null,
-      supplier: p.supplier ?? null,
+      supplierId: p.supplierId ?? supplier?.id ?? null,
+      supplier,
       origin: p.origin ?? null,
 
       purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
@@ -231,7 +245,8 @@ export async function GET(request: Request) {
 
       createdAt: p.createdAt ? p.createdAt.toISOString() : null,
       updatedAt: p.updatedAt ? p.updatedAt.toISOString() : null,
-    }))
+      }
+    })
 
     return NextResponse.json({ products, nextCursor, totalProducts }, { status: 200 })
   } catch (error) {

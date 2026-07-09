@@ -36,7 +36,7 @@ export default function BranchContextSwitcher() {
   }, [])
 
   async function changeBranch(branchId: string) {
-    if (branchId === currentBranch?.id) return
+    if (branchId === currentBranch?.id) return  
     setSaving(true)
     setError(null)
     try {
@@ -62,8 +62,8 @@ export default function BranchContextSwitcher() {
 
   return (
     <div className="flex max-w-64 flex-col items-start gap-1 text-xs">
-      <div className="flex items-center gap-2">
-        <span className="text-base-content/50">Sucursal</span>
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-base-content/50 w-full">Sucursal</span>
         {branches.length === 1 ? (
           <span className="badge badge-ghost badge-sm">{branches[0].name}</span>
         ) : (

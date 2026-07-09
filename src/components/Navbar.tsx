@@ -3,19 +3,12 @@
 import { useEffect } from "react"
 import { useDolar } from "@/app/hooks/useDolar"
 import { DolarPanelItem } from "@/app/lib/dolar"
-import {
-  Bars3BottomLeftIcon,
-  ArrowTopRightOnSquareIcon,
-} from "@heroicons/react/24/solid"
-import { signIn, signOut, useSession } from "next-auth/react"
+import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/solid"
+import { signIn, useSession } from "next-auth/react"
 import ThemeSwitcher from "./ThemeSwitcher"
 import UserSessionMenu from "./UserSessionMenu"
 
-export default function Navbar({
-  onToggleSidebar,
-}: {
-  onToggleSidebar: () => void
-}) {
+export default function Navbar() {
   const { data: session, status } = useSession()
 
   const { data: dolarData, error, isLoading } = useDolar()
@@ -40,14 +33,6 @@ export default function Navbar({
     <header className="sticky top-0 z-[100] bg-base-100/35 backdrop-blur">
       <div className="navbar min-h-16 px-3 sm:px-4">
         <div className="flex flex-1 items-center gap-2">
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="btn btn-ghost btn-sm btn-square"
-            aria-label="Abrir o cerrar menú lateral"
-          >
-            <Bars3BottomLeftIcon className="size-6" />
-          </button>
           <svg
             width="30"
             height="15"

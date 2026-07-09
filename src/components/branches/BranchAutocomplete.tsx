@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronDownIcon } from "@heroicons/react/24/solid"
 
 export type BranchOption = {
@@ -32,6 +32,8 @@ export default function BranchAutocomplete({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [activeIndex, setActiveIndex] = useState(0)
+  const [opensAbove, setOpensAbove] = useState(false)
+  const [listMaxHeight, setListMaxHeight] = useState(240)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const selected = branches.find((branch) => branch.id === value) ?? null
   const filtered = useMemo(() => {
@@ -39,6 +41,43 @@ export default function BranchAutocomplete({
     if (!needle) return branches
     return branches.filter((branch) => `${branch.name} ${branch.code}`.toLowerCase().includes(needle))
   }, [branches, query])
+
+  const updatePopoverPosition = useCallback(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+
+    const rect = wrapper.getBoundingClientRect()
+    const viewportMargin = 12
+    const preferredMaxHeight = 240
+    const spaceBelow = window.innerHeight - rect.bottom - viewportMargin
+    const spaceAbove = rect.top - viewportMargin
+    const shouldOpenAbove =
+      spaceBelow < preferredMaxHeight && spaceAbove > spaceBelow
+    const availableSpace = shouldOpenAbove ? spaceAbove : spaceBelow
+
+    setOpensAbove(shouldOpenAbove)
+    setListMaxHeight(
+      Math.max(120, Math.min(preferredMaxHeight, availableSpace))
+    )
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    updatePopoverPosition()
+    window.addEventListener("resize", updatePopoverPosition)
+    window.addEventListener("scroll", updatePopoverPosition, true)
+
+    return () => {
+      window.removeEventListener("resize", updatePopoverPosition)
+      window.removeEventListener("scroll", updatePopoverPosition, true)
+    }
+  }, [open, updatePopoverPosition])
+
+  function openAutocomplete() {
+    setOpen(true)
+    window.requestAnimationFrame(updatePopoverPosition)
+  }
 
   function choose(branch: BranchOption) {
     onChange(branch.id)
@@ -51,7 +90,7 @@ export default function BranchAutocomplete({
     if (disabled) return
     if (event.key === "ArrowDown") {
       event.preventDefault()
-      setOpen(true)
+      openAutocomplete()
       setActiveIndex((prev) => Math.min(prev + 1, filtered.length - 1))
     }
     if (event.key === "ArrowUp") {
@@ -74,7 +113,7 @@ export default function BranchAutocomplete({
         type="button"
         className="inline-flex max-w-44 items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-base-200 disabled:hover:bg-transparent"
         disabled={disabled}
-        onClick={() => setOpen(true)}
+        onClick={openAutocomplete}
         onKeyDown={handleKeyDown}
         title={selected?.name ?? placeholder}
       >
@@ -95,10 +134,10 @@ export default function BranchAutocomplete({
             disabled={disabled}
             value={open ? query : selected?.name ?? ""}
             placeholder={selected?.name ?? placeholder}
-            onFocus={() => setOpen(true)}
+            onFocus={openAutocomplete}
             onChange={(event) => {
               setQuery(event.target.value)
-              setOpen(true)
+              openAutocomplete()
               setActiveIndex(0)
             }}
             onKeyDown={handleKeyDown}
@@ -108,7 +147,13 @@ export default function BranchAutocomplete({
         </div>
       </label>
       {open && !disabled ? (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-base-300 bg-base-100 p-1 shadow-xl">
+        <div
+          style={{ maxHeight: listMaxHeight }}
+          className={[
+            "absolute z-50 w-full overflow-auto rounded-lg border border-base-300 bg-base-100 p-1 shadow-xl",
+            opensAbove ? "bottom-full mb-1" : "top-full mt-1",
+          ].join(" ")}
+        >
           {filtered.length ? filtered.map((branch, index) => (
             <button
               key={branch.id}

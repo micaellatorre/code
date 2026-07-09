@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma"
 import { requireRolePage } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
 import { listSuppliers } from "@/lib/domain/suppliers"
+import { branchCreationOrder } from "@/lib/domain/branch-order"
 
 type SuppliersPageProps = {
   searchParams?: Promise<{ q?: string; branchId?: string; page?: string }>
@@ -29,7 +30,7 @@ export default async function SuppliersPage({ searchParams }: SuppliersPageProps
     }),
     prisma.branch.findMany({
       where: { tenantId, isActive: true },
-      orderBy: { name: "asc" },
+      orderBy: branchCreationOrder,
       select: { id: true, code: true, name: true },
     }),
   ])

@@ -110,7 +110,6 @@ function paymentStatusLabel(status: SuccessPayload["summary"]["paymentStatus"]) 
 }
 
 export default function NewPurchaseForm() {
-  const [kind, setKind] = useState<PurchaseKind>("PHONE")
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
   const [supplierFeedback, setSupplierFeedback] = useState<string | null>(null)
@@ -164,14 +163,38 @@ export default function NewPurchaseForm() {
   const paidUsd = useMemo(() => payments.reduce((acc, payment) => acc + amountUsd(payment), 0), [payments])
   const totalUnits = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items])
 
-  function switchKind(nextKind: PurchaseKind) {
-    setKind(nextKind)
-    setItems([newItem(nextKind)])
-    setError(null)
-  }
-
   function updateItem(itemId: string, patch: Partial<PurchaseItemForm>) {
     setItems((prev) => prev.map((item) => item.id === itemId ? { ...item, ...patch } : item))
+  }
+
+  function changeItemType(itemId: string, type: PurchaseKind) {
+    setItems((prev) => prev.map((item) => {
+      if (item.id !== itemId || item.type === type) return item
+
+      if (type === "PHONE") {
+        return {
+          ...item,
+          type,
+          relatedModel: "",
+          physicalState: "USED",
+          condition: "ASIS",
+          imeis: Array.from({ length: item.quantity }, () => ""),
+          unitNotes: Array.from({ length: item.quantity }, () => ""),
+        }
+      }
+
+      return {
+        ...item,
+        type,
+        relatedModel: "",
+        capacityGB: "",
+        physicalState: "USED",
+        condition: "ASIS",
+        batteryPct: "",
+        imeis: [],
+        unitNotes: [],
+      }
+    }))
   }
 
   function updateItemQuantity(itemId: string, quantity: number) {
@@ -255,21 +278,31 @@ export default function NewPurchaseForm() {
   }
 
   if (success) {
-    const isPhone = kind === "PHONE"
+    const phoneUnits = items
+      .filter((item) => item.type === "PHONE")
+      .reduce((acc, item) => acc + item.quantity, 0)
+    const accessoryUnits = items
+      .filter((item) => item.type === "ACCESSORY")
+      .reduce((acc, item) => acc + item.quantity, 0)
+    const successUnitsLabel = [
+      phoneUnits ? `${phoneUnits} equipos` : null,
+      accessoryUnits ? `${accessoryUnits} accesorios` : null,
+    ].filter(Boolean).join(" y ")
+
     return (
       <DashboardLayout>
         <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Compras", href: "/dashboard/purchases" }, { label: "Nueva compra" }]} />
         <div className="mx-auto max-w-2xl rounded border border-success/30 bg-success/5 p-6 text-center">
           <h1 className="text-2xl font-bold">Compra registrada con exito</h1>
           <p className="mt-2 text-base-content/70">
-            {isPhone
-              ? `${success.summary.totalUnits} equipos ingresados al inventario`
-              : `${success.summary.totalUnits} unidades ingresadas al stock bulk`} - Total: {success.summary.currency} {Number(success.summary.totalCost).toFixed(2)}
+            {successUnitsLabel || `${success.summary.totalUnits} unidades`} ingresados al inventario - Total: {success.summary.currency} {Number(success.summary.totalCost).toFixed(2)}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link className="btn btn-primary" href="/dashboard/purchases">Ver compras</Link>
             <Link className="btn btn-outline" href="/dashboard/products">Ver inventario</Link>
-            {isPhone ? <Link className="btn btn-outline" href={`/dashboard/products?ids=${success.productIds.join(",")}`}>Imprimir stickers</Link> : null}
+            {success.productIds.length === 1 ? (
+              <Link className="btn btn-outline" href={`/dashboard/products/${success.productIds[0]}/edit`}>Ver producto creado</Link>
+            ) : null}
             <button type="button" className="btn btn-ghost" onClick={() => window.location.reload()}>Registrar otra compra</button>
           </div>
         </div>
@@ -284,11 +317,6 @@ export default function NewPurchaseForm() {
         <div>
           <h1 className="text-2xl font-bold">Nueva compra</h1>
           <p className="text-sm text-base-content/60">Registra mercaderia, pagos e ingreso automatico a stock.</p>
-        </div>
-
-        <div className="join">
-          <button type="button" className={`btn join-item ${kind === "PHONE" ? "btn-primary" : "btn-outline"}`} onClick={() => switchKind("PHONE")}>Equipos (Unitario)</button>
-          <button type="button" className={`btn join-item ${kind === "ACCESSORY" ? "btn-primary" : "btn-outline"}`} onClick={() => switchKind("ACCESSORY")}>Accesorios / Articulos (Bulk)</button>
         </div>
 
         {error ? <div className="alert alert-error text-sm">{error}</div> : null}
@@ -319,21 +347,42 @@ export default function NewPurchaseForm() {
         <section className="space-y-3 rounded border border-base-300 bg-base-100 p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Items</h2>
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem(kind)])}>+ Agregar otro item</button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem("PHONE")])}>+ Telefono</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem("ACCESSORY")])}>+ Accesorio</button>
+            </div>
           </div>
           <div className="space-y-4">
             {items.map((item, index) => (
               <div key={item.id} className="rounded border border-base-300 p-3">
                 <div className="flex justify-between gap-3">
                   <h3 className="font-semibold">Item {index + 1}</h3>
-                  {items.length > 1 ? <button type="button" className="btn btn-ghost btn-xs" onClick={() => setItems((prev) => prev.filter((candidate) => candidate.id !== item.id))}>Eliminar</button> : null}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div className="join">
+                      <button
+                        type="button"
+                        className={`btn btn-xs join-item ${item.type === "PHONE" ? "btn-primary" : "btn-outline"}`}
+                        onClick={() => changeItemType(item.id, "PHONE")}
+                      >
+                        TELEFONO
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-xs join-item ${item.type === "ACCESSORY" ? "btn-primary" : "btn-outline"}`}
+                        onClick={() => changeItemType(item.id, "ACCESSORY")}
+                      >
+                        ACCESORIO
+                      </button>
+                    </div>
+                    {items.length > 1 ? <button type="button" className="btn btn-ghost btn-xs" onClick={() => setItems((prev) => prev.filter((candidate) => candidate.id !== item.id))}>Eliminar</button> : null}
+                  </div>
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                   <label className="form-control">
-                    <span className="label-text">{kind === "PHONE" ? "Modelo *" : "Articulo / modelo *"}</span>
+                    <span className="label-text">{item.type === "PHONE" ? "Modelo *" : "Articulo / modelo *"}</span>
                     <input className="input input-bordered" value={item.modelName} onChange={(event) => updateItem(item.id, { modelName: event.target.value })} required />
                   </label>
-                  {kind === "ACCESSORY" ? (
+                  {item.type === "ACCESSORY" ? (
                     <label className="form-control">
                       <span className="label-text">Para modelo</span>
                       <input className="input input-bordered" value={item.relatedModel} onChange={(event) => updateItem(item.id, { relatedModel: event.target.value })} />
@@ -348,7 +397,7 @@ export default function NewPurchaseForm() {
                     <span className="label-text">Color</span>
                     <input className="input input-bordered" value={item.color} onChange={(event) => updateItem(item.id, { color: event.target.value })} />
                   </label>
-                  {kind === "PHONE" ? (
+                  {item.type === "PHONE" ? (
                     <>
                       <label className="form-control">
                         <span className="label-text">Estado fisico</span>
@@ -395,10 +444,10 @@ export default function NewPurchaseForm() {
           </div>
         </section>
 
-        {kind === "PHONE" ? (
+        {items.some((item) => item.type === "PHONE") ? (
           <section className="space-y-3 rounded border border-base-300 bg-base-100 p-4">
             <h2 className="text-lg font-semibold">Identificacion</h2>
-            {items.map((item) => (
+            {items.filter((item) => item.type === "PHONE").map((item) => (
               <div key={item.id} className="space-y-2 rounded border border-base-300 p-3">
                 <div className="font-medium">{[item.modelName || "Equipo", item.color, item.capacityGB ? `${item.capacityGB}GB` : null].filter(Boolean).join(" · ")}</div>
                 {item.imeis.map((imei, index) => (

@@ -1,6 +1,7 @@
 import { Prisma, type UserRole } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { createAuditLog } from "@/lib/domain/audit"
+import { branchCreationOrder } from "@/lib/domain/branch-order"
 
 export type BranchSummary = {
   id: string
@@ -68,7 +69,7 @@ export async function getUserSelectableBranches(params: ActorBranchParams, tx: P
   if (params.role === "ADMIN") {
     return tx.branch.findMany({
       where: { tenantId: params.tenantId, isActive: true },
-      orderBy: [{ name: "asc" }, { code: "asc" }],
+      orderBy: branchCreationOrder,
       select: branchSelect,
     })
   }
@@ -79,7 +80,7 @@ export async function getUserSelectableBranches(params: ActorBranchParams, tx: P
       isActive: true,
       userCoverages: { some: { userId: params.userId } },
     },
-    orderBy: [{ name: "asc" }, { code: "asc" }],
+    orderBy: branchCreationOrder,
     select: branchSelect,
   })
 }
@@ -219,7 +220,7 @@ export async function setUserBranchCoverage(params: {
       await syncAdminBranchCoverage({ tenantId: params.tenantId, userId: targetUser.id }, tx)
       const fallback = await tx.branch.findFirst({
         where: { tenantId: params.tenantId, isActive: true },
-        orderBy: [{ name: "asc" }, { code: "asc" }],
+        orderBy: branchCreationOrder,
         select: { id: true },
       })
       if (!targetUser.currentBranchId && fallback) {

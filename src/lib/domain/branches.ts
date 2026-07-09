@@ -2,6 +2,7 @@ import { z } from "zod"
 import prisma from "@/lib/prisma"
 import { createAuditLog } from "@/lib/domain/audit"
 import { normalizeProvinceId } from "@/lib/domain/argentina/provinces"
+import { branchCreationOrder } from "@/lib/domain/branch-order"
 import { syncAdminCoverageForNewBranch } from "@/lib/domain/user-branches"
 import type { UserRole } from "@prisma/client"
 
@@ -44,7 +45,7 @@ async function assertProvinceIds(tx: { province: { findMany: typeof prisma.provi
 export async function listBranches(tenantId: string) {
   return prisma.branch.findMany({
     where: { tenantId },
-    orderBy: [{ isActive: "desc" }, { name: "asc" }],
+    orderBy: branchCreationOrder,
     include: branchInclude,
   })
 }
