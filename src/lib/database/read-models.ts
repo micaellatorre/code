@@ -369,13 +369,13 @@ export async function getDatabaseReadModel(params: {
       orderBy: { createdAt: "desc" },
       include: { actorUser: { select: { name: true, email: true } } },
     }),
-    prisma.cashMovement.findMany({
+    canSeeFinancials ? prisma.cashMovement.findMany({
       where: { tenantId: params.tenantId, occurredAt: whereDate },
       orderBy: { occurredAt: "desc" },
       include: {
         account: { select: { name: true, code: true } },
       },
-    }),
+    }) : Promise.resolve([]),
     prisma.buyer.findMany({
       where: { tenantId: params.tenantId },
       orderBy: { updatedAt: "desc" },
@@ -538,7 +538,7 @@ export async function getDatabaseReadModel(params: {
     user: displayUser(log.actorUser),
   }))
 
-  const cash: DatabaseCashRow[] = [
+  const cash: DatabaseCashRow[] = canSeeFinancials ? [
     ...cashMovements.map((movement) => ({
       id: movement.id,
       source: "CASH_MOVEMENT" as const,
@@ -579,7 +579,7 @@ export async function getDatabaseReadModel(params: {
         amountUsd: purchase.currency === "USD" || purchase.currency === "USDT" ? toNumber(purchase.downPayment) : null,
         type: "EGRESO",
       })),
-  ].sort((a, b) => b.date.localeCompare(a.date))
+  ].sort((a, b) => b.date.localeCompare(a.date)) : []
 
   const buyerRows = buyers.map((buyer): DatabaseBuyerRow => {
     const lastPurchase = buyer.sales.reduce<Date | null>((latest, sale) => {

@@ -7,8 +7,8 @@ export default async function CashTransferPage() {
   await requireRolePage(["ADMIN"])
   return (
     <DashboardLayout>
-      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Caja", href: "/dashboard/database?tab=cash" }, { label: "Convertir moneda" }]} />
-      <div className="space-y-4"><h1 className="text-2xl font-bold">Convertir moneda</h1><CashTransferForm /></div>
+      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Caja", href: "/dashboard/cash" }, { label: "Conversion" }]} />
+      <div className="space-y-4"><h1 className="text-2xl font-bold">Conversion / transferencia</h1><CashTransferForm /></div>
     </DashboardLayout>
   )
 }

@@ -37,6 +37,7 @@ model User {
   auditLogs            AuditLog[]           @relation("AuditLogActor")
   cashMovements        CashMovement[]
   cashTransfers        CashTransfer[]
+  closedCashDays       CashDailyClose[]     @relation("CashDailyCloseClosedBy")
   closerCommissions    CloserCommission[]   @relation("CloserCommissionCloser")
   branchCoverages      UserBranchCoverage[]
 
@@ -66,6 +67,7 @@ model Tenant {
   cashAccounts          CashAccount[]
   cashMovements         CashMovement[]
   cashTransfers         CashTransfer[]
+  cashDailyCloses       CashDailyClose[]
   closerCommissionPlans CloserCommissionPlan[]
   closerCommissions     CloserCommission[]
 
@@ -301,17 +303,22 @@ model Payment {
   saleId String
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
-  method       PaymentMethod
-  currency     Currency      @default(USD) // es mas complejo porque puede estar en diferentes currencies, pero lo ideal seria llevar los payments con currency != USD a su valor equivalente en USD
-  amount       Decimal       @db.Decimal(12, 2)
-  exchangeRate Decimal?      @db.Decimal(12, 4)
-  amountUsd    Decimal?      @db.Decimal(12, 2)
-  paidAt       DateTime      @default(now())
-  note         String?
+  method                     PaymentMethod
+  currency                   Currency            @default(USD) // es mas complejo porque puede estar en diferentes currencies, pero lo ideal seria llevar los payments con currency != USD a su valor equivalente en USD
+  amount                     Decimal             @db.Decimal(12, 2)
+  exchangeRate               Decimal?            @db.Decimal(12, 4)
+  amountUsd                  Decimal?            @db.Decimal(12, 2)
+  cashAccountId              String?
+  cashAccount                CashAccount?        @relation("SalePaymentCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
+  originReservationPaymentId String?             @unique
+  originReservationPayment   ReservationPayment? @relation("ReservationPaymentConvertedToSalePayment", fields: [originReservationPaymentId], references: [id], onDelete: SetNull)
+  paidAt                     DateTime            @default(now())
+  note                       String?
 
   createdAt DateTime @default(now())
 
   @@index([saleId, paidAt])
+  @@index([cashAccountId])
 }
 
 /// “Pedidos mayoristas” (leads/órdenes) previo a convertir en venta.
@@ -520,6 +527,11 @@ model Branch {
   userCoverages     UserBranchCoverage[]
   suppliers         Supplier[]               @relation("SupplierPrimaryBranch")
   supplierCoverages SupplierBranchCoverage[]
+  cashAccounts      CashAccount[]
+  cashMovements     CashMovement[]
+  cashTransfers     CashTransfer[]
+  cashDailyCloses   CashDailyClose[]
+  reservations      Reservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -574,8 +586,10 @@ model PurchasePayment {
   currency Currency
   amount   Decimal       @db.Decimal(12, 2)
 
-  exchangeRate Decimal? @db.Decimal(12, 4)
-  amountUsd    Decimal? @db.Decimal(12, 2)
+  exchangeRate  Decimal?     @db.Decimal(12, 4)
+  amountUsd     Decimal?     @db.Decimal(12, 2)
+  cashAccountId String?
+  cashAccount   CashAccount? @relation("PurchasePaymentCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
 
   paidAt DateTime @default(now())
   note   String?
@@ -583,6 +597,7 @@ model PurchasePayment {
   createdAt DateTime @default(now())
 
   @@index([purchaseId, paidAt])
+  @@index([cashAccountId])
 }
 
 model Reservation {
@@ -595,6 +610,9 @@ model Reservation {
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
 
   convertedSaleId String?
   convertedSale   Sale?   @relation(fields: [convertedSaleId], references: [id])
@@ -619,6 +637,7 @@ model Reservation {
   @@index([tenantId, reservedAt])
   @@index([tenantId, status])
   @@index([buyerId])
+  @@index([branchId])
   @@index([convertedSaleId])
 }
 
@@ -651,8 +670,11 @@ model ReservationPayment {
   currency Currency
   amount   Decimal       @db.Decimal(12, 2)
 
-  exchangeRate Decimal? @db.Decimal(12, 4)
-  amountUsd    Decimal? @db.Decimal(12, 2)
+  exchangeRate         Decimal?     @db.Decimal(12, 4)
+  amountUsd            Decimal?     @db.Decimal(12, 2)
+  cashAccountId        String?
+  cashAccount          CashAccount? @relation("ReservationPaymentCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
+  convertedSalePayment Payment?     @relation("ReservationPaymentConvertedToSalePayment")
 
   paidAt DateTime @default(now())
   note   String?
@@ -660,6 +682,7 @@ model ReservationPayment {
   createdAt DateTime @default(now())
 
   @@index([reservationId, paidAt])
+  @@index([cashAccountId])
 }
 
 model ServiceOrder {
@@ -747,21 +770,32 @@ model CashAccount {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  code     String
-  name     String
-  type     CashAccountType
-  currency Currency
-  isActive Boolean         @default(true)
+  code      String
+  name      String
+  type      CashAccountType
+  currency  Currency
+  scope     CashAccountScope @default(TENANT)
+  branchId  String?
+  branch    Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  sortOrder Int              @default(0)
+  isActive  Boolean          @default(true)
 
-  movements     CashMovement[]
-  transfersFrom CashTransfer[] @relation("CashTransferFrom")
-  transfersTo   CashTransfer[] @relation("CashTransferTo")
+  movements           CashMovement[]
+  transfersFrom       CashTransfer[]                  @relation("CashTransferFrom")
+  transfersTo         CashTransfer[]                  @relation("CashTransferTo")
+  closeSnapshots      CashDailyCloseAccountSnapshot[]
+  salePayments        Payment[]                       @relation("SalePaymentCashAccount")
+  purchasePayments    PurchasePayment[]               @relation("PurchasePaymentCashAccount")
+  reservationPayments ReservationPayment[]            @relation("ReservationPaymentCashAccount")
+  closerCommissions   CloserCommission[]              @relation("CloserCommissionCashAccount")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive])
+  @@index([branchId])
+  @@index([tenantId, branchId, isActive])
 }
 
 model CashMovement {
@@ -771,6 +805,9 @@ model CashMovement {
 
   accountId String
   account   CashAccount @relation(fields: [accountId], references: [id])
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
@@ -790,12 +827,17 @@ model CashMovement {
   transferId String?
   transfer   CashTransfer? @relation(fields: [transferId], references: [id])
 
+  reversalOfId String?       @unique
+  reversalOf   CashMovement? @relation("CashMovementReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy   CashMovement? @relation("CashMovementReversal")
+
   occurredAt DateTime @default(now())
   createdAt  DateTime @default(now())
 
   @@index([tenantId, occurredAt])
   @@index([tenantId, category, occurredAt])
   @@index([accountId, occurredAt])
+  @@index([branchId, occurredAt])
   @@index([sourceType, sourceId])
   @@index([transferId])
 }
@@ -814,10 +856,18 @@ model CashTransfer {
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
-  fromAmount   Decimal  @db.Decimal(12, 2)
-  toAmount     Decimal  @db.Decimal(12, 2)
-  exchangeRate Decimal? @db.Decimal(12, 4)
-  detail       String?
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  kind                  CashTransferKind @default(TRANSFER)
+  fromAmount            Decimal          @db.Decimal(12, 2)
+  toAmount              Decimal          @db.Decimal(12, 2)
+  exchangeRate          Decimal?         @db.Decimal(12, 4)
+  benchmarkExchangeRate Decimal?         @db.Decimal(12, 4)
+  theoreticalAmountUsd  Decimal?         @db.Decimal(12, 2)
+  realAmountUsd         Decimal?         @db.Decimal(12, 2)
+  fxResultUsd           Decimal?         @db.Decimal(12, 2)
+  detail                String?
 
   occurredAt DateTime @default(now())
   createdAt  DateTime @default(now())
@@ -827,6 +877,55 @@ model CashTransfer {
   @@index([tenantId, occurredAt])
   @@index([fromAccountId, occurredAt])
   @@index([toAccountId, occurredAt])
+  @@index([branchId, occurredAt])
+}
+
+model CashDailyClose {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  closedById String?
+  closedBy   User?   @relation("CashDailyCloseClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+
+  businessDate DateTime @db.Date
+
+  incomeUsd  Decimal @default(0) @db.Decimal(12, 2)
+  expenseUsd Decimal @default(0) @db.Decimal(12, 2)
+  netUsd     Decimal @default(0) @db.Decimal(12, 2)
+
+  closedAt DateTime @default(now())
+  notes    String?
+
+  accountSnapshots CashDailyCloseAccountSnapshot[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, branchId, businessDate])
+  @@index([tenantId, businessDate])
+  @@index([branchId, businessDate])
+}
+
+model CashDailyCloseAccountSnapshot {
+  id String @id @default(cuid())
+
+  closeId String
+  close   CashDailyClose @relation(fields: [closeId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   CashAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  currency   Currency
+  balance    Decimal  @db.Decimal(12, 2)
+  balanceUsd Decimal? @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@unique([closeId, accountId])
+  @@index([accountId])
 }
 
 model CloserCommissionPlan {
@@ -866,10 +965,12 @@ model CloserCommission {
   amount     Decimal  @db.Decimal(12, 2)
   currency   Currency @default(USD)
 
-  status   CommissionStatus @default(PENDING)
-  earnedAt DateTime         @default(now())
-  paidAt   DateTime?
-  notes    String?
+  status        CommissionStatus @default(PENDING)
+  earnedAt      DateTime         @default(now())
+  paidAt        DateTime?
+  cashAccountId String?
+  cashAccount   CashAccount?     @relation("CloserCommissionCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
+  notes         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -878,6 +979,7 @@ model CloserCommission {
   @@index([saleId])
   @@index([closerId, earnedAt])
   @@index([status])
+  @@index([cashAccountId])
 }
 
 // ====================== Enums =========================
@@ -1026,6 +1128,10 @@ enum AuditAction {
   CASH_IN
   CASH_OUT
   CONVERSION
+  CASH_CLOSE
+  CASH_MOVEMENT_CORRECTED
+  CASH_ACCOUNT_REASSIGNED
+  CASH_BACKFILL
 }
 
 enum AuditModule {
@@ -1051,6 +1157,11 @@ enum CashAccountType {
   DIGITAL_WALLET
   CRYPTO
   OTHER
+}
+
+enum CashAccountScope {
+  TENANT
+  BRANCH
 }
 
 enum CashMovementDirection {
@@ -1080,6 +1191,11 @@ enum CashMovementSource {
   CLOSER_COMMISSION
   TRANSFER
   MANUAL
+}
+
+enum CashTransferKind {
+  TRANSFER
+  CONVERSION
 }
 
 enum CloserCommissionBase {

@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
-type Account = { id: string; name: string; code: string; currency: string }
+type Account = { id: string; name: string; code: string; currency: string; scope?: string; branch?: { name: string } | null }
 
 export default function CashMovementForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -15,6 +16,27 @@ export default function CashMovementForm() {
   useEffect(() => {
     fetch("/api/cash-accounts").then((res) => res.ok ? res.json() : null).then((data) => setAccounts(data?.accounts ?? []))
   }, [])
+
+  useEffect(() => {
+    const accountId = searchParams.get("accountId")
+    const direction = searchParams.get("direction")
+    const category = searchParams.get("category")
+    const detail = searchParams.get("detail")
+    const amount = searchParams.get("amount")
+    const currency = searchParams.get("currency")
+    const exchangeRate = searchParams.get("exchangeRate")
+    if (!accountId && !direction && !category && !detail && !amount && !currency && !exchangeRate) return
+    setForm((prev) => ({
+      ...prev,
+      accountId: accountId || prev.accountId,
+      direction: direction === "EXPENSE" ? "EXPENSE" : "INCOME",
+      category: category && ["ADJUSTMENT", "EXPENSE", "SERVICE_PAYMENT", "COMMISSION_PAYMENT"].includes(category) ? category : "ADJUSTMENT",
+      detail: detail || prev.detail,
+      amount: amount || prev.amount,
+      currency: currency && ["USD", "ARS", "USDT"].includes(currency) ? currency : prev.currency,
+      exchangeRate: exchangeRate || "",
+    }))
+  }, [searchParams])
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -27,17 +49,22 @@ export default function CashMovementForm() {
       setError(payload?.error ?? "No se pudo registrar el movimiento")
       return
     }
-    router.push("/dashboard/database?tab=cash")
+    router.push("/dashboard/cash")
     router.refresh()
+  }
+
+  function selectAccount(accountId: string) {
+    const account = accounts.find((item) => item.id === accountId)
+    setForm((prev) => ({ ...prev, accountId, currency: account?.currency ?? prev.currency }))
   }
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-2xl space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="form-control"><span className="label-text">Cuenta *</span><select required className="select select-bordered" value={form.accountId} onChange={(event) => setForm((prev) => ({ ...prev, accountId: event.target.value }))}><option value="">Seleccionar</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>)}</select></label>
+        <label className="form-control"><span className="label-text">Cuenta *</span><select required className="select select-bordered" value={form.accountId} onChange={(event) => selectAccount(event.target.value)}><option value="">Seleccionar</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>)}</select></label>
         <label className="form-control"><span className="label-text">Tipo *</span><select className="select select-bordered" value={form.direction} onChange={(event) => setForm((prev) => ({ ...prev, direction: event.target.value }))}><option value="INCOME">Ingreso</option><option value="EXPENSE">Egreso</option></select></label>
-        <label className="form-control"><span className="label-text">Categoria</span><select className="select select-bordered" value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}><option>ADJUSTMENT</option><option>EXPENSE</option><option>SERVICE_PAYMENT</option><option>COMMISSION_PAYMENT</option></select></label>
-        <label className="form-control"><span className="label-text">Moneda</span><select className="select select-bordered" value={form.currency} onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value }))}><option>USD</option><option>ARS</option><option>USDT</option></select></label>
+        <label className="form-control"><span className="label-text">Categoria</span><select className="select select-bordered" value={form.category} onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}><option value="ADJUSTMENT">Ajuste</option><option value="EXPENSE">Gasto</option><option value="SERVICE_PAYMENT">Servicio tecnico</option><option value="COMMISSION_PAYMENT">Comision</option></select></label>
+        <label className="form-control"><span className="label-text">Moneda</span><input readOnly className="input input-bordered bg-base-200" value={form.currency} /></label>
         <label className="form-control"><span className="label-text">Monto *</span><input required type="number" step="0.01" className="input input-bordered" value={form.amount} onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))} /></label>
         <label className="form-control"><span className="label-text">Tipo de cambio</span><input type="number" step="0.01" className="input input-bordered" value={form.exchangeRate} onChange={(event) => setForm((prev) => ({ ...prev, exchangeRate: event.target.value }))} /></label>
         <label className="form-control md:col-span-2"><span className="label-text">Detalle *</span><textarea required className="textarea textarea-bordered" value={form.detail} onChange={(event) => setForm((prev) => ({ ...prev, detail: event.target.value }))} /></label>

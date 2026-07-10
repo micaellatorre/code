@@ -3,6 +3,8 @@ import { z } from "zod"
 import prisma from "@/lib/prisma"
 import { createAuditLog } from "@/lib/domain/audit"
 import { decimal, normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money"
+import { isMonetaryPaymentMethod, postReservationPaymentToCash } from "@/lib/domain/cash"
+import { resolveOperationBranch } from "@/lib/domain/user-branches"
 
 const giftSchema = z.object({ label: z.string().trim().min(1) })
 
@@ -11,6 +13,7 @@ export const reservationPaymentSchema = z.object({
   currency: z.enum(["ARS", "USD", "USDT"]),
   amount: z.union([z.string(), z.number()]),
   exchangeRate: z.union([z.string(), z.number()]).optional().nullable(),
+  cashAccountId: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   paidAt: z.string().optional().nullable(),
 })
@@ -50,6 +53,7 @@ function paymentCreate(payment: z.infer<typeof reservationPaymentSchema>) {
     amount,
     exchangeRate,
     amountUsd: normalizeAmountUsd(amount, payment.currency, exchangeRate),
+    cashAccountId: isMonetaryPaymentMethod(payment.method) ? payment.cashAccountId || null : null,
     note: payment.note?.trim() || null,
     paidAt: parseDate(payment.paidAt) ?? new Date(),
   }
@@ -97,11 +101,18 @@ export async function createReservation(params: {
     }
 
     const reservedAt = parseDate(input.reservedAt) ?? new Date()
+    const branch = await resolveOperationBranch({
+      actorUserId: params.actorUserId,
+      actorRole: params.actorRole,
+      tenantId: params.tenantId,
+      entityLabel: "venta",
+    }, tx)
     const reservation = await tx.reservation.create({
       data: {
         tenantId: params.tenantId,
         buyerId: input.buyerId || null,
         userId: params.actorUserId,
+        branchId: branch.id,
         reservedAt,
         pickupAt: parseDate(input.pickupAt),
         agreedTotal: optionalDecimal(input.agreedTotal),
@@ -120,6 +131,18 @@ export async function createReservation(params: {
       },
       include: { items: true },
     })
+
+    const createdPayments = await tx.reservationPayment.findMany({ where: { reservationId: reservation.id } })
+    for (const payment of createdPayments) {
+      await postReservationPaymentToCash({
+        tx,
+        tenantId: params.tenantId,
+        actorUserId: params.actorUserId,
+        actorRole: params.actorRole,
+        reservation: { id: reservation.id, branchId: branch.id },
+        payment,
+      })
+    }
 
     for (const productId of productIds) {
       await tx.product.update({
@@ -154,11 +177,19 @@ export async function addReservationPayment(params: {
 }) {
   const input = reservationPaymentSchema.parse(params.input)
   return prisma.$transaction(async (tx) => {
-    const reservation = await tx.reservation.findFirst({ where: { id: params.reservationId, tenantId: params.tenantId }, select: { id: true, status: true } })
+    const reservation = await tx.reservation.findFirst({ where: { id: params.reservationId, tenantId: params.tenantId }, select: { id: true, status: true, branchId: true } })
     if (!reservation) throw new Error("Reserva no encontrada")
     if (reservation.status !== "ACTIVE") throw new Error("Solo se pueden registrar pagos en reservas activas")
 
     const payment = await tx.reservationPayment.create({ data: { reservationId: reservation.id, ...paymentCreate(input) } })
+    await postReservationPaymentToCash({
+      tx,
+      tenantId: params.tenantId,
+      actorUserId: params.actorUserId,
+      actorRole: params.actorRole,
+      reservation,
+      payment,
+    })
     const updated = await recalcReservationTotals(tx, reservation.id)
     await createAuditLog({
       tenantId: params.tenantId,
@@ -268,6 +299,7 @@ export async function convertReservationToSale(params: {
       data: {
         tenantId: params.tenantId,
         userId: params.actorUserId,
+        branchId: reservation.branchId,
         buyerId: reservation.buyerId,
         customerName: reservation.buyer ? [reservation.buyer.name, reservation.buyer.surname].filter(Boolean).join(" ") : "Reserva",
         date: new Date(),
@@ -289,6 +321,8 @@ export async function convertReservationToSale(params: {
             amount: payment.amount,
             exchangeRate: payment.exchangeRate,
             amountUsd: payment.amountUsd,
+            cashAccountId: payment.cashAccountId,
+            originReservationPaymentId: payment.id,
             paidAt: payment.paidAt,
             note: payment.note,
           })),

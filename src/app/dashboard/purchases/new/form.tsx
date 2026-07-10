@@ -41,7 +41,16 @@ type PaymentForm = {
   currency: CurrencyValue
   amount: string
   exchangeRate: string
+  cashAccountId: string
   note: string
+}
+
+type CashAccountOption = {
+  id: string
+  name: string
+  currency: CurrencyValue
+  scope: "TENANT" | "BRANCH"
+  branch?: { name: string } | null
 }
 
 type SuccessPayload = {
@@ -81,7 +90,7 @@ function newItem(type: PurchaseKind): PurchaseItemForm {
 }
 
 function newPayment(): PaymentForm {
-  return { id: makeId(), method: "EFECTIVO_USD", currency: "USD", amount: "", exchangeRate: "", note: "" }
+  return { id: makeId(), method: "EFECTIVO_USD", currency: "USD", amount: "", exchangeRate: "", cashAccountId: "", note: "" }
 }
 
 function normalizeItemQuantity(item: PurchaseItemForm, quantity: number): PurchaseItemForm {
@@ -111,6 +120,7 @@ function paymentStatusLabel(status: SuccessPayload["summary"]["paymentStatus"]) 
 
 export default function NewPurchaseForm() {
   const [branches, setBranches] = useState<BranchOption[]>([])
+  const [cashAccounts, setCashAccounts] = useState<CashAccountOption[]>([])
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
   const [supplierFeedback, setSupplierFeedback] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -137,6 +147,13 @@ export default function NewPurchaseForm() {
         setForm((prev) => ({ ...prev, branchId: prev.branchId || currentId }))
       })
       .catch(() => setBranches([]))
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/cash-accounts", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { accounts: [] })
+      .then((payload) => setCashAccounts(Array.isArray(payload.accounts) ? payload.accounts : []))
+      .catch(() => setCashAccounts([]))
   }, [])
 
   useEffect(() => {
@@ -253,6 +270,8 @@ export default function NewPurchaseForm() {
         currency: payment.currency,
         amount: payment.amount,
         exchangeRate: payment.exchangeRate || null,
+        cashAccountId: payment.cashAccountId || null,
+        paidAt: form.date,
         note: payment.note || null,
       })),
     }
@@ -471,7 +490,7 @@ export default function NewPurchaseForm() {
           {!payments.length ? <p className="text-sm text-base-content/60">No se abona la compra al registrarla. Quedara en cuenta corriente.</p> : null}
           <div className="space-y-2">
             {payments.map((payment) => (
-              <div key={payment.id} className="grid gap-2 rounded border border-base-300 p-3 md:grid-cols-[1fr_120px_140px_140px_1fr_auto]">
+              <div key={payment.id} className="grid gap-2 rounded border border-base-300 p-3 md:grid-cols-[1fr_120px_140px_140px_1fr_1fr_auto]">
                 <select className="select select-bordered" value={payment.method} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, method: event.target.value as PaymentMethodValue } : row))}>
                   <option value="EFECTIVO_USD">Efectivo USD</option>
                   <option value="EFECTIVO_PESOS">Efectivo ARS</option>
@@ -480,13 +499,19 @@ export default function NewPurchaseForm() {
                   <option value="USDT">USDT</option>
                   <option value="TARJETA">Tarjeta</option>
                 </select>
-                <select className="select select-bordered" value={payment.currency} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, currency: event.target.value as CurrencyValue } : row))}>
+                <select className="select select-bordered" value={payment.currency} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, currency: event.target.value as CurrencyValue, cashAccountId: "" } : row))}>
                   <option value="USD">USD</option>
                   <option value="ARS">ARS</option>
                   <option value="USDT">USDT</option>
                 </select>
                 <input className="input input-bordered" type="number" step="0.01" placeholder="Monto" value={payment.amount} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, amount: event.target.value } : row))} />
                 <input className="input input-bordered" type="number" step="0.01" placeholder="TC" value={payment.exchangeRate} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, exchangeRate: event.target.value } : row))} />
+                <select className="select select-bordered" value={payment.cashAccountId} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, cashAccountId: event.target.value } : row))}>
+                  <option value="">Caja</option>
+                  {cashAccounts.filter((account) => account.currency === payment.currency).map((account) => (
+                    <option key={account.id} value={account.id}>{account.name} · {account.currency}{account.scope === "BRANCH" && account.branch?.name ? ` · ${account.branch.name}` : ""}</option>
+                  ))}
+                </select>
                 <input className="input input-bordered" placeholder="Nota" value={payment.note} onChange={(event) => setPayments((prev) => prev.map((row) => row.id === payment.id ? { ...row, note: event.target.value } : row))} />
                 <button type="button" className="btn btn-ghost" onClick={() => setPayments((prev) => prev.filter((row) => row.id !== payment.id))}>Quitar</button>
               </div>

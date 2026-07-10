@@ -55,9 +55,12 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
         const payments: PaymentDraft[] = Array.isArray(sale.payments)
           ? sale.payments.map((payment: any) => ({
+              id: payment.id,
               method: payment.method as PaymentMethod,
               currency: payment.currency as Currency,
               amount: payment.amount != null ? String(payment.amount) : "0",
+              exchangeRate: payment.exchangeRate != null ? String(payment.exchangeRate) : undefined,
+              cashAccountId: payment.cashAccountId ?? undefined,
               note: payment.note ?? undefined,
               paidAt: payment.paidAt ? new Date(payment.paidAt) : undefined,
               _id: String(payment.id ?? crypto.randomUUID()),

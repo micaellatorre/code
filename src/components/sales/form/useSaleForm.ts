@@ -197,12 +197,14 @@ export function useSaleForm({
         kind: item.kind,
       })),
       payments: payments.map((payment) => ({
+        id: payment.id,
         method: payment.method,
         currency: payment.currency,
         amount: payment.amount,
         note: payment.note,
         paidAt: payment.paidAt?.toISOString(),
         exchangeRate: payment.exchangeRate,
+        cashAccountId: payment.cashAccountId,
       })),
     }
   }

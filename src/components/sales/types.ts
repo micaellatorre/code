@@ -54,6 +54,10 @@ export type SalePaymentSummary = {
   method: PaymentMethod | string
   currency: Currency | string
   amount: string | null
+  exchangeRate?: string | null
+  amountUsd?: string | null
+  cashAccountId?: string | null
+  originReservationPaymentId?: string | null
   paidAt?: string | null
   note?: string | null
 }
@@ -115,12 +119,14 @@ export type SaleItemDraft = {
 }
 
 export type PaymentDraft = {
+  id?: string
   method: PaymentMethod
   currency: Currency
   amount: string
   note?: string
   paidAt?: Date
   exchangeRate?: string
+  cashAccountId?: string
   _id: string
 }
 

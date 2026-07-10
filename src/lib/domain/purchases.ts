@@ -12,6 +12,7 @@ import { createAuditLog } from "@/lib/domain/audit"
 import { decimal, normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money"
 import { fromArgDateInputValue } from "@/lib/timezone"
 import { assertSupplierCoversBranch } from "@/lib/domain/suppliers"
+import { isMonetaryPaymentMethod, postPurchasePaymentToCash } from "@/lib/domain/cash"
 
 const currencySchema = z.nativeEnum(Currency)
 
@@ -20,6 +21,8 @@ export const purchasePaymentSchema = z.object({
   currency: currencySchema,
   amount: z.union([z.string(), z.number()]),
   exchangeRate: z.union([z.string(), z.number()]).optional().nullable(),
+  cashAccountId: z.string().optional().nullable(),
+  paidAt: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
 })
 
@@ -340,10 +343,20 @@ export async function createPurchaseWithPayments(params: {
           amount,
           exchangeRate,
           amountUsd,
+          cashAccountId: isMonetaryPaymentMethod(payment.method) ? payment.cashAccountId || null : null,
+          paidAt: parsePurchaseDate(payment.paidAt),
           note: payment.note?.trim() || null,
         },
       })
       paymentRows.push(row)
+      await postPurchasePaymentToCash({
+        tx,
+        tenantId: params.tenantId,
+        actorUserId: params.actorUserId,
+        actorRole: params.actorRole,
+        purchase: { id: purchase.id, branchId: purchase.branchId },
+        payment: row,
+      })
       await createAuditLog({
         tenantId: params.tenantId,
         actorUserId: params.actorUserId,

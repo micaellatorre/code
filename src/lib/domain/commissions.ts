@@ -3,6 +3,7 @@ import { z } from "zod"
 import prisma from "@/lib/prisma"
 import { createAuditLog } from "@/lib/domain/audit"
 import { decimal } from "@/lib/domain/money"
+import { postCommissionPaymentToCash, reverseSourceCashMovement } from "@/lib/domain/cash"
 
 export const commissionPlanSchema = z.object({
   name: z.string().trim().min(1),
@@ -49,15 +50,61 @@ export async function createCommission(params: { tenantId: string; actorUserId: 
   })
 }
 
-export async function updateCommissionStatus(params: { tenantId: string; commissionId: string; status: CommissionStatus; actorUserId: string; actorRole: UserRole }) {
+export async function updateCommissionStatus(params: {
+  tenantId: string
+  commissionId: string
+  status: CommissionStatus
+  actorUserId: string
+  actorRole: UserRole
+  cashAccountId?: string | null
+  paidAt?: string | null
+}) {
   return prisma.$transaction(async (tx) => {
-    const current = await tx.closerCommission.findFirst({ where: { id: params.commissionId, tenantId: params.tenantId } })
+    const current = await tx.closerCommission.findFirst({
+      where: { id: params.commissionId, tenantId: params.tenantId },
+      include: { sale: { select: { id: true, branchId: true } } },
+    })
     if (!current) throw new Error("Comision no encontrada")
-    if (current.status === "PAID") throw new Error("Una comision pagada no puede modificarse")
+    const paidAt = params.paidAt ? new Date(params.paidAt) : new Date()
+    if (params.paidAt && Number.isNaN(paidAt.getTime())) throw new Error("Fecha de pago invalida")
+    if (params.status === "PAID" && !params.cashAccountId && !current.cashAccountId) {
+      throw new Error("Selecciona una caja para pagar la comision.")
+    }
     const commission = await tx.closerCommission.update({
       where: { id: current.id },
-      data: { status: params.status, paidAt: params.status === "PAID" ? new Date() : current.paidAt },
+      data: {
+        status: params.status,
+        paidAt: params.status === "PAID" ? paidAt : current.paidAt,
+        cashAccountId: params.status === "PAID" ? params.cashAccountId || current.cashAccountId : current.cashAccountId,
+      },
     })
+    if (params.status === "PAID") {
+      await postCommissionPaymentToCash({
+        tx,
+        tenantId: params.tenantId,
+        actorUserId: params.actorUserId,
+        actorRole: params.actorRole,
+        commission: {
+          id: commission.id,
+          saleId: commission.saleId,
+          branchId: current.sale.branchId,
+          amount: commission.amount,
+          currency: commission.currency,
+          paidAt: commission.paidAt ?? paidAt,
+          cashAccountId: commission.cashAccountId,
+        },
+      })
+    } else if (current.status === "PAID") {
+      await reverseSourceCashMovement({
+        tx,
+        tenantId: params.tenantId,
+        actorUserId: params.actorUserId,
+        actorRole: params.actorRole,
+        sourceType: "CLOSER_COMMISSION",
+        sourceId: current.id,
+        reason: `Comision ${current.id} cambio de PAID a ${params.status}`,
+      })
+    }
     await createAuditLog({ tenantId: params.tenantId, actorUserId: params.actorUserId, actorRole: params.actorRole, action: "STATUS_CHANGE", module: "COMMISSION", entityType: "CloserCommission", entityId: commission.id, detail: `Comision ${current.status} -> ${commission.status}` }, tx)
     return commission
   })

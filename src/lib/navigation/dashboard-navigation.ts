@@ -4,6 +4,7 @@ import {
   CalendarIcon,
   CircleStackIcon,
   CurrencyDollarIcon,
+  BanknotesIcon,
   DevicePhoneMobileIcon,
   MapPinIcon,
   ShoppingCartIcon,
@@ -132,6 +133,15 @@ export const dashboardNavigationGroups: DashboardNavigationGroup[] = [
     key: "administration",
     label: "Administración",
     items: [
+      {
+        key: "cash",
+        label: "Caja",
+        href: "/dashboard/cash",
+        icon: BanknotesIcon,
+        allowedRoles: ["ADMIN", "SOCIO"],
+        quickAddHref: "/dashboard/cash/new",
+        quickAddLabel: "Nuevo movimiento",
+      },
       {
         key: "branches",
         label: "Sucursales",

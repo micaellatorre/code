@@ -6,6 +6,8 @@ import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { createAuditLog } from "@/lib/domain/audit"
 import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
+import { isMonetaryPaymentMethod, postSalePaymentToCash, reverseSourceCashMovement } from "@/lib/domain/cash"
+import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money"
 
 export const runtime = "nodejs"
 
@@ -49,9 +51,12 @@ const ALLOWED_FIELDS = new Set<string>([
 type Ctx = { params: Promise<{ id: string }> }
 
 type PaymentInput = {
+  id?: string | null
   method?: string
   currency?: string
   amount?: string | number | Prisma.Decimal | null
+  exchangeRate?: string | number | Prisma.Decimal | null
+  cashAccountId?: string | null
   note?: string | null
   paidAt?: string | Date | null
 }
@@ -74,6 +79,16 @@ function toDecimal(v: unknown): Prisma.Decimal | null {
 
 function decimal(v: unknown): Prisma.Decimal {
   return toDecimal(v) ?? new Prisma.Decimal(0)
+}
+
+function decimalEquals(left: unknown, right: unknown) {
+  if (left == null && right == null) return true
+  if (left == null || right == null) return false
+  return decimal(left).equals(decimal(right))
+}
+
+function dateEquals(left: Date | null | undefined, right: Date | null | undefined) {
+  return (left?.getTime() ?? null) === (right?.getTime() ?? null)
 }
 
 function nextProductState(type: string, stock: number, state: ProductState): ProductState {
@@ -706,6 +721,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
       if (Array.isArray(body.payments)) {
         const payments = body.payments as PaymentInput[]
+        const existingPayments = new Map(sale.payments.map((payment) => [payment.id, payment]))
+        const keptPaymentIds = new Set<string>()
 
         const paymentsData = payments.map((payment) => {
           const amount = toDecimal(payment.amount)
@@ -719,10 +736,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           }
 
           return {
+            id: payment.id == null || String(payment.id).trim() === "" ? null : String(payment.id),
             saleId: id,
             method: payment.method as any,
             currency: payment.currency as any,
             amount,
+            exchangeRate: optionalDecimal(payment.exchangeRate),
+            amountUsd: normalizeAmountUsd(amount, String(payment.currency), optionalDecimal(payment.exchangeRate)),
+            cashAccountId: isMonetaryPaymentMethod(payment.method) ? payment.cashAccountId || null : null,
             note:
               payment.note == null || String(payment.note).trim() === ""
                 ? null
@@ -738,12 +759,67 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
         balanceDue = total.sub(amountPaid)
 
-        await tx.payment.deleteMany({ where: { saleId: id } })
-
         for (const paymentData of paymentsData) {
-          await tx.payment.create({
-            data: paymentData,
+          const existing = paymentData.id ? existingPayments.get(paymentData.id) : null
+          const data = {
+            saleId: id,
+            method: paymentData.method,
+            currency: paymentData.currency,
+            amount: paymentData.amount,
+            exchangeRate: paymentData.exchangeRate,
+            amountUsd: paymentData.amountUsd,
+            cashAccountId: paymentData.cashAccountId,
+            note: paymentData.note,
+            paidAt: paymentData.paidAt,
+          }
+          const persisted = existing
+            ? await tx.payment.update({ where: { id: existing.id }, data })
+            : await tx.payment.create({ data })
+          keptPaymentIds.add(persisted.id)
+
+          const changedFinancially = !existing ||
+            existing.method !== persisted.method ||
+            existing.currency !== persisted.currency ||
+            !decimalEquals(existing.amount, persisted.amount) ||
+            !decimalEquals(existing.exchangeRate, persisted.exchangeRate) ||
+            !decimalEquals(existing.amountUsd, persisted.amountUsd) ||
+            existing.cashAccountId !== persisted.cashAccountId ||
+            !dateEquals(existing.paidAt, persisted.paidAt)
+
+          if (!changedFinancially || isMonetaryPaymentMethod(persisted.method)) {
+            await postSalePaymentToCash({
+              tx,
+              tenantId: sale.tenantId,
+              actorUserId: auth.session.user.id,
+              actorRole: auth.session.user.activeRole as UserRole,
+              sale: { id: sale.id, branchId: sale.branchId },
+              payment: persisted,
+            })
+          } else if (existing) {
+            await reverseSourceCashMovement({
+              tx,
+              tenantId: sale.tenantId,
+              actorUserId: auth.session.user.id,
+              actorRole: auth.session.user.activeRole as UserRole,
+              sourceType: "SALE_PAYMENT",
+              sourceId: existing.id,
+              reason: `Pago de venta ${existing.id} convertido a metodo no monetario`,
+            })
+          }
+        }
+
+        for (const existing of sale.payments) {
+          if (keptPaymentIds.has(existing.id)) continue
+          await reverseSourceCashMovement({
+            tx,
+            tenantId: sale.tenantId,
+            actorUserId: auth.session.user.id,
+            actorRole: auth.session.user.activeRole as UserRole,
+            sourceType: "SALE_PAYMENT",
+            sourceId: existing.id,
+            reason: `Pago de venta ${existing.id} eliminado`,
           })
+          await tx.payment.delete({ where: { id: existing.id } })
         }
       }
 
@@ -835,6 +911,10 @@ function serializeSale(sale: any) {
       ? sale.payments.map((p: any) => ({
           ...p,
           amount: p.amount != null ? String(p.amount) : null,
+          exchangeRate: p.exchangeRate != null ? String(p.exchangeRate) : null,
+          amountUsd: p.amountUsd != null ? String(p.amountUsd) : null,
+          cashAccountId: p.cashAccountId ?? null,
+          originReservationPaymentId: p.originReservationPaymentId ?? null,
         }))
       : [],
     items: Array.isArray(sale.items)

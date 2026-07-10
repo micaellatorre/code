@@ -7,11 +7,13 @@ import { toArgDateTimeInputValue } from "@/lib/timezone"
 type Buyer = { id: string; name: string; surname?: string | null; businessName?: string | null }
 type Product = { id: string; modelName: string; imei?: string | null; salePrice?: string | null }
 type Gift = { label: string }
+type CashAccount = { id: string; name: string; currency: string; scope: string; branch?: { name: string } | null }
 
 export default function ReservationForm() {
   const router = useRouter()
   const [buyers, setBuyers] = useState<Buyer[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [giftText, setGiftText] = useState("")
@@ -31,14 +33,16 @@ export default function ReservationForm() {
     paymentCurrency: "USD",
     paymentAmount: "",
     paymentExchangeRate: "",
+    paymentCashAccountId: "",
     paymentNote: "",
   })
 
   useEffect(() => {
     async function load() {
-      const [buyersRes, productsRes] = await Promise.all([fetch("/api/buyers"), fetch("/api/products?sellable=true&limit=200")])
+      const [buyersRes, productsRes, accountsRes] = await Promise.all([fetch("/api/buyers"), fetch("/api/products?sellable=true&limit=200"), fetch("/api/cash-accounts")])
       if (buyersRes.ok) setBuyers(await buyersRes.json())
       if (productsRes.ok) setProducts((await productsRes.json()).products ?? [])
+      if (accountsRes.ok) setCashAccounts((await accountsRes.json()).accounts ?? [])
     }
     load()
   }, [])
@@ -52,6 +56,9 @@ export default function ReservationForm() {
         next.imeiSerial = product?.imei ?? next.imeiSerial
         next.unitPrice = product?.salePrice ?? next.unitPrice
         next.agreedTotal = product?.salePrice ?? next.agreedTotal
+      }
+      if (field === "paymentCurrency") {
+        next.paymentCashAccountId = ""
       }
       return next
     })
@@ -73,6 +80,7 @@ export default function ReservationForm() {
           currency: form.paymentCurrency,
           amount: form.paymentAmount,
           exchangeRate: form.paymentExchangeRate || null,
+          cashAccountId: form.paymentCashAccountId || null,
           note: form.paymentNote || null,
         }]
       : []
@@ -162,6 +170,7 @@ export default function ReservationForm() {
           <label className="form-control"><span className="label-text">Metodo</span><select className="select select-bordered" value={form.paymentMethod} onChange={(event) => setField("paymentMethod", event.target.value)}><option>EFECTIVO_USD</option><option>EFECTIVO_PESOS</option><option>TRANSFERENCIA_USD</option><option>TRANSFERENCIA_ARS</option><option>TARJETA</option><option>USDT</option></select></label>
           <label className="form-control"><span className="label-text">Moneda</span><select className="select select-bordered" value={form.paymentCurrency} onChange={(event) => setField("paymentCurrency", event.target.value)}><option>USD</option><option>ARS</option><option>USDT</option></select></label>
           <label className="form-control"><span className="label-text">Tipo de cambio</span><input type="number" step="0.01" className="input input-bordered" value={form.paymentExchangeRate} onChange={(event) => setField("paymentExchangeRate", event.target.value)} /></label>
+          <label className="form-control"><span className="label-text">Caja de la seña</span><select className="select select-bordered" value={form.paymentCashAccountId} onChange={(event) => setField("paymentCashAccountId", event.target.value)}><option value="">Seleccionar caja</option>{cashAccounts.filter((account) => account.currency === form.paymentCurrency).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}{account.scope === "BRANCH" && account.branch?.name ? ` · ${account.branch.name}` : ""}</option>)}</select></label>
           <label className="form-control md:col-span-2"><span className="label-text">Notas</span><textarea className="textarea textarea-bordered" value={form.notes} onChange={(event) => setField("notes", event.target.value)} /></label>
         </div>
       </fieldset>

@@ -1,16 +1,37 @@
 import { NextResponse } from "next/server"
 import { UserRole } from "@prisma/client"
-import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
 import { cashAccountSchema, createCashAccount } from "@/lib/domain/cash"
+import { resolveUserBranchContext } from "@/lib/domain/user-branches"
+import prisma from "@/lib/prisma"
 
-export async function GET() {
-  const auth = await requireRoleApi(["ADMIN", "SOCIO"])
+export async function GET(request: Request) {
+  const auth = await requireRoleApi(["ADMIN", "SOCIO", "VENDEDOR", "STOCK"])
   if (!auth.ok) return Response.json({ error: "Unauthorized" }, { status: auth.status })
   const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
   if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
-  const accounts = await prisma.cashAccount.findMany({ where: { tenantId }, orderBy: [{ isActive: "desc" }, { name: "asc" }] })
+  const url = new URL(request.url)
+  const all = url.searchParams.get("all") === "1" && auth.session.user.activeRole === "ADMIN"
+  const context = await resolveUserBranchContext({
+    userId: auth.session.user.id,
+    tenantId,
+    role: auth.session.user.activeRole,
+  })
+  const accounts = await prisma.cashAccount.findMany({
+    where: all || !context.currentBranch
+      ? { tenantId }
+      : {
+        tenantId,
+        isActive: true,
+        OR: [
+          { scope: "TENANT" },
+          { scope: "BRANCH", branchId: context.currentBranch.id },
+        ],
+      },
+    include: { branch: { select: { id: true, name: true, code: true } } },
+    orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
+  })
   return NextResponse.json({ accounts })
 }
 

@@ -3,7 +3,7 @@
 
 import type { PaymentDraft } from '@/components/sales/types';
 import type { PaymentMethod, Currency } from '@prisma/client';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface PaymentsSectionProps {
     payments: PaymentDraft[];
@@ -23,11 +23,27 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 ];
 const CURRENCIES: Currency[] = ['ARS', 'USD', 'USDT'];
 
+type CashAccountOption = {
+  id: string
+  name: string
+  currency: Currency
+  scope: "TENANT" | "BRANCH"
+  branch?: { name: string } | null
+}
+
 export default function PaymentsSection({ payments, setPayments, total, disabled = false }: PaymentsSectionProps) {
+    const [accounts, setAccounts] = useState<CashAccountOption[]>([]);
 
     const totalPaid = useMemo(() => payments.reduce((acc, p) => acc + parseFloat(p.amount || '0'), 0), [payments]);
 
     const remaining = useMemo(() => parseFloat(total) - totalPaid, [total, totalPaid]);
+
+    useEffect(() => {
+        fetch("/api/cash-accounts", { cache: "no-store" })
+            .then((response) => response.ok ? response.json() : { accounts: [] })
+            .then((payload) => setAccounts(Array.isArray(payload.accounts) ? payload.accounts : []))
+            .catch(() => setAccounts([]));
+    }, []);
 
     const addPayment = () => {
         if (disabled) return;
@@ -37,6 +53,7 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
             amount: remaining > 0 ? remaining.toFixed(2) : '0.00',
             method: 'EFECTIVO_USD',
             currency: 'USD',
+            cashAccountId: accounts.find((account) => account.currency === 'USD')?.id,
         };
         setPayments([...payments, newPayment]);
     };
@@ -63,7 +80,7 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
 
             <div className="flex flex-col gap-2 mt-4">
                 {payments.map(p => (
-                    <div key={p._id} className="grid grid-cols-1 md:grid-cols-4 gap-2 p-2 bg-base-200 rounded-box">
+                    <div key={p._id} className="grid grid-cols-1 md:grid-cols-5 gap-2 p-2 bg-base-200 rounded-box">
                         <div className="form-control">
                             <label className="label-text pb-1">Importe</label>
                             <input 
@@ -90,7 +107,7 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
                             <label className="label-text pb-1">Moneda</label>
                              <select 
                                 value={p.currency}
-                                onChange={e => updatePayment(p._id, { currency: e.target.value as Currency })}
+                                onChange={e => updatePayment(p._id, { currency: e.target.value as Currency, cashAccountId: undefined })}
                                 className="select select-bordered select-sm"
                                 disabled={disabled}
                             >
@@ -108,6 +125,24 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
                                     className="input input-bordered input-sm"
                                     disabled={disabled}
                                 />
+                            </div>
+                        )}
+                        {p.method !== 'PLAN_CANJE' && (
+                            <div className="form-control">
+                                <label className="label-text pb-1">Caja</label>
+                                <select
+                                    value={p.cashAccountId || ''}
+                                    onChange={e => updatePayment(p._id, { cashAccountId: e.target.value || undefined })}
+                                    className="select select-bordered select-sm"
+                                    disabled={disabled}
+                                >
+                                    <option value="">Seleccionar caja</option>
+                                    {accounts.filter((account) => account.currency === p.currency).map((account) => (
+                                        <option key={account.id} value={account.id}>
+                                            {account.name} · {account.currency}{account.scope === "BRANCH" && account.branch?.name ? ` · ${account.branch.name}` : ""}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         )}
                         <div className="flex items-end gap-1">

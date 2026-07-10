@@ -458,7 +458,7 @@ export default function DatabaseModule({ data, range, activeTab, period, dateFro
         </div>
       </div>
 
-      {tabActions[activeTab]?.length ? (
+      {tabActions[activeTab]?.length && (activeTab !== "cash" || canSeeFinancials) ? (
         <div className="flex flex-wrap gap-2">
           {tabActions[activeTab]?.map((action) => (
             <Link key={action.href} href={action.href} className={`btn btn-sm ${action.primary ? "btn-primary" : "btn-outline"}`}>

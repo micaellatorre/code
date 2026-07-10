@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client";
 import { resolveSessionTenantId } from "@/lib/tenant";
 import { resolveOperationBranch } from "@/lib/domain/user-branches";
+import { isMonetaryPaymentMethod, postSalePaymentToCash } from "@/lib/domain/cash";
+import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money";
 
 type SaleOperationType = "CONFIRM_SALE" | "RESERVE";
 
@@ -62,6 +64,8 @@ interface PaymentInput {
   method: string;
   currency: string;
   amount: number | string;
+  exchangeRate?: number | string | null;
+  cashAccountId?: string | null;
   note?: string;
   paidAt?: string;
 }
@@ -280,6 +284,9 @@ export async function POST(request: Request) {
           method: p.method as any,
           currency: p.currency as any,
           amount: decimal(p.amount),
+          exchangeRate: optionalDecimal(p.exchangeRate),
+          amountUsd: normalizeAmountUsd(decimal(p.amount), String(p.currency), optionalDecimal(p.exchangeRate)),
+          cashAccountId: isMonetaryPaymentMethod(p.method) ? p.cashAccountId || null : null,
           note: p.note,
           paidAt: p.paidAt ? new Date(p.paidAt) : new Date(),
         }));
@@ -308,6 +315,18 @@ export async function POST(request: Request) {
           },
           select: { id: true },
         });
+
+        const createdPayments = await tx.payment.findMany({ where: { saleId: sale.id } });
+        for (const payment of createdPayments) {
+          await postSalePaymentToCash({
+            tx,
+            tenantId: tenant.id,
+            actorUserId: auth.session.user.id,
+            actorRole: auth.session.user.activeRole as UserRole,
+            sale: { id: sale.id, branchId: operationBranch.id, customerName },
+            payment,
+          });
+        }
 
         if (appointmentId && operationType === "CONFIRM_SALE") {
           await tx.appointment.update({
