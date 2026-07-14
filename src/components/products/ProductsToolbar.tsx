@@ -8,7 +8,8 @@ import type { ProductsInventory } from "./useProductsInventory"
 type ProductsToolbarProps = { inventory: ProductsInventory }
 
 export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
-  const { inventorySegment, selectInventorySegment, setDrawerOpen, viewMode, setViewMode, filteredProducts, totalProducts, groupedCounts, typeFilter, setTypeFilter, isTableExpanded, setIsTableExpanded, mutate, isLoading, canCreateProducts, error, search, setSearch, stateFilter, setStateFilter, stateOptions, stateLabelMap, conditionFilter, setConditionFilter, conditionOptions, conditionLabelMap, capacityFilter, setCapacityFilter, capacities, locationFilter, setLocationFilter, locations, imeiSearch, setImeiSearch, clearFilters, showSensitiveColumns, setShowSensitiveColumns, hasNext, setCursor, data, orderBy, setOrderBy, senadoFilter, setSenadoFilter, brandFilter, setBrandFilter, colorFilter, setColorFilter, originFilter, setOriginFilter, batteryMin, setBatteryMin, batteryMax, setBatteryMax } = inventory
+  const { inventorySegment, selectInventorySegment, setDrawerOpen, viewMode, setViewMode, filteredProducts, operationalProducts, totalProducts, groupedCounts, typeFilter, setTypeFilter, isTableExpanded, setIsTableExpanded, mutate, isLoading, canCreateProducts, error, search, setSearch, stateFilter, setStateFilter, stateOptions, stateLabelMap, conditionFilter, setConditionFilter, conditionOptions, conditionLabelMap, capacityFilter, setCapacityFilter, capacities, locationFilter, setLocationFilter, locations, imeiSearch, setImeiSearch, clearFilters, showSensitiveColumns, setShowSensitiveColumns, hasNext, setCursor, data, orderBy, setOrderBy, senadoFilter, setSenadoFilter, brandFilter, setBrandFilter, colorFilter, setColorFilter, originFilter, setOriginFilter, batteryMin, setBatteryMin, batteryMax, setBatteryMax } = inventory
+  const visibleProducts = inventorySegment === "TRADE_INS" ? operationalProducts : filteredProducts
 
   return (
     <>
@@ -140,7 +141,7 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
       <div className="flex flex-wrap gap-2 items-center justify-between">
         {viewMode === "DETAIL" ? (
           <div className="flex flex-row items-center gap-1">
-            <span className="ml-1 text-sm text-base-content/60">Resultados {isLoading ? <span className="loading loading-spinner loading-xs"></span> : filteredProducts.length}</span>
+            <span className="ml-1 text-sm text-base-content/60">Resultados {isLoading ? <span className="loading loading-spinner loading-xs"></span> : visibleProducts.length}</span>
             <span className="text-sm text-base-content/30">de</span>
             <span className="text-sm text-base-content/60">{totalProducts}</span>
               {hasNext ? <button type="button" className="ml-2 btn btn-outline btn-xs sm:btn-sm" disabled={isLoading} onClick={() => setCursor(data?.nextCursor ?? null)}>Cargar más</button> : null}

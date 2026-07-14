@@ -1,6 +1,7 @@
 // code/src/components/products/useProductsInventory.ts
 
 import { createElement, useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 import { useSession } from "next-auth/react"
 import { fromArgDateInputValue } from "@/lib/timezone"
@@ -23,8 +24,16 @@ const fetcher = async (url: string) => {
 }
 
 const DEFAULT_STATE_FILTER = "EN_STOCK"
+const TRADE_IN_STATE_FILTER = "EN_REVISION"
+
+function isTradeInOrigin(origin: string | null) {
+  return origin?.trim().toUpperCase().replace(/[\s-]+/g, "_") === "PLAN_CANJE"
+}
 
 export function useProductsInventory() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const confirmDialog = useConfirmDialog()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
@@ -43,14 +52,15 @@ export function useProductsInventory() {
   const isReadOnly = !canEditProducts
   const hasProductActions = canEditProducts || canDuplicateProducts || canDeleteProducts
 
+  const initialSegment = searchParams.get("segment") === "TRADE_INS" ? "TRADE_INS" : searchParams.get("segment") === "ACCESSORIES" ? "ACCESSORIES" : "PHONES"
   const [viewMode, setViewMode] = useState<"DETAIL" | "GENERAL">("DETAIL")
-  const [inventorySegment, setInventorySegment] = useState<InventorySegment>("PHONES")
+  const [inventorySegment, setInventorySegment] = useState<InventorySegment>(initialSegment)
 
   // server-backed filters (hit the API)
-  const [search, setSearch] = useState("")
-  const [typeFilter, setTypeFilter] = useState<string>("PHONE")
-  const [stateFilter, setStateFilter] = useState<string>(DEFAULT_STATE_FILTER)
-  const [senadoFilter, setSenadoFilter] = useState<string>("")
+  const [search, setSearch] = useState(searchParams.get("q") ?? "")
+  const [typeFilter, setTypeFilter] = useState<string>(initialSegment === "ACCESSORIES" ? "ACCESSORY" : "PHONE")
+  const [stateFilter, setStateFilter] = useState<string>(searchParams.get("state") ?? (initialSegment === "TRADE_INS" ? TRADE_IN_STATE_FILTER : DEFAULT_STATE_FILTER))
+  const [senadoFilter, setSenadoFilter] = useState<string>(searchParams.get("senado") ?? "")
 
   // client-side filters (work on already-fetched page)
   const [brandFilter, setBrandFilter] = useState<string>("")
@@ -96,6 +106,27 @@ export function useProductsInventory() {
     setCursor(null)
   }, [search, typeFilter, stateFilter, senadoFilter])
 
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams.toString())
+
+    if (inventorySegment === "PHONES") next.delete("segment")
+    else next.set("segment", inventorySegment)
+
+    if (stateFilter && stateFilter !== DEFAULT_STATE_FILTER) next.set("state", stateFilter)
+    else next.delete("state")
+
+    if (search.trim()) next.set("q", search.trim())
+    else next.delete("q")
+
+    if (senadoFilter) next.set("senado", senadoFilter)
+    else next.delete("senado")
+
+    const query = next.toString()
+    const href = query ? `${pathname}?${query}` : pathname
+    const current = searchParams.toString()
+    if (query !== current) router.replace(href, { scroll: false })
+  }, [inventorySegment, pathname, router, search, searchParams, senadoFilter, stateFilter])
+
   const apiUrl = useMemo(() => {
     const sp = new URLSearchParams()
     if (typeFilter) sp.set("type", typeFilter)
@@ -137,13 +168,14 @@ export function useProductsInventory() {
   }, [isAdmin])
 
   // enums + labels
-  const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "DISPONIBLE", "FUERA_DE_STOCK", "VENDIDO"] as const
+  const stateOptions = ["EN_STOCK", "EN_CAMINO", "EN_REPARACION", "CON_CLIENTE", "DISPONIBLE", "EN_REVISION", "FUERA_DE_STOCK", "VENDIDO"] as const
   const stateColorMap: Record<string, string> = {
     EN_STOCK: "badge-success",
     EN_CAMINO: "badge-info",
     EN_REPARACION: "badge-warning",
     CON_CLIENTE: "badge-primary",
     DISPONIBLE: "badge-accent",
+    EN_REVISION: "badge-warning",
     VENDIDO: "badge-outline",
     FUERA_DE_STOCK: "badge-error",
   }
@@ -153,6 +185,7 @@ export function useProductsInventory() {
     EN_REPARACION: "En reparacion",
     CON_CLIENTE: "Con cliente",
     DISPONIBLE: "Disponible para venta",
+    EN_REVISION: "En revision",
     VENDIDO: "Vendido",
     FUERA_DE_STOCK: "Fuera de stock",
   }
@@ -227,7 +260,7 @@ export function useProductsInventory() {
   const operationalProducts = useMemo(
     () =>
       inventorySegment === "TRADE_INS"
-        ? filteredProducts.filter((p) => (p.origin ?? "").trim().toUpperCase() === "PLAN_CANJE")
+        ? filteredProducts.filter((p) => isTradeInOrigin(p.origin))
         : filteredProducts,
     [filteredProducts, inventorySegment],
   )
@@ -303,13 +336,14 @@ export function useProductsInventory() {
     setOriginFilter("")
     setLocationFilter("")
     setImeiSearch("")
-    setStateFilter(DEFAULT_STATE_FILTER)
+    setStateFilter(inventorySegment === "TRADE_INS" ? TRADE_IN_STATE_FILTER : DEFAULT_STATE_FILTER)
     setSenadoFilter("")
   }
 
   function selectInventorySegment(segment: InventorySegment) {
     setInventorySegment(segment)
     setTypeFilter(segment === "ACCESSORIES" ? "ACCESSORY" : "PHONE")
+    if (segment === "TRADE_INS") setStateFilter(TRADE_IN_STATE_FILTER)
   }
 
   function toggleProductSelection(id: string) {
