@@ -343,7 +343,7 @@ export function useProductsInventory() {
   function selectInventorySegment(segment: InventorySegment) {
     setInventorySegment(segment)
     setTypeFilter(segment === "ACCESSORIES" ? "ACCESSORY" : "PHONE")
-    if (segment === "TRADE_INS") setStateFilter(TRADE_IN_STATE_FILTER)
+    setStateFilter(segment === "TRADE_INS" ? TRADE_IN_STATE_FILTER : DEFAULT_STATE_FILTER)
   }
 
   function toggleProductSelection(id: string) {
