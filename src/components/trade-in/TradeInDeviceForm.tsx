@@ -25,6 +25,8 @@ export default function TradeInDeviceForm({ batteryRanges, deductionRules, price
   const [condition, setCondition] = useState("")
   const [notes, setNotes] = useState("")
   const [manualReferencePrice, setManualReferencePrice] = useState("")
+  const [isReferencePriceOverridden, setIsReferencePriceOverridden] = useState(false)
+  const [isEditingReferencePrice, setIsEditingReferencePrice] = useState(false)
   const [selectedRules, setSelectedRules] = useState<Record<TradeInDeductionCategory, string>>({
     PANTALLA_MODULO: "",
     TAPA: "",
@@ -44,6 +46,8 @@ export default function TradeInDeviceForm({ batteryRanges, deductionRules, price
     setCondition(editingDevice.condition ?? "")
     setNotes(editingDevice.notes ?? "")
     setManualReferencePrice(String(editingDevice.referencePrice))
+    setIsReferencePriceOverridden(true)
+    setIsEditingReferencePrice(false)
     setSelectedRules({
       PANTALLA_MODULO: editingDevice.deductions.find((d) => d.category === "PANTALLA_MODULO")?.id ?? "",
       TAPA: editingDevice.deductions.find((d) => d.category === "TAPA")?.id ?? "",
@@ -59,7 +63,7 @@ export default function TradeInDeviceForm({ batteryRanges, deductionRules, price
     const price = prices.find((item) => item.modelName === modelName && item.capacityGB === Number(capacityGB) && item.batteryRangeId === batteryRangeId)
     return price ? parseApiMoney(price.referencePrice) : 0
   }, [batteryRangeId, capacityGB, modelName, prices])
-  const referencePrice = referenceFromConfig > 0 ? referenceFromConfig : parseApiMoney(manualReferencePrice)
+  const referencePrice = isReferencePriceOverridden || referenceFromConfig <= 0 ? parseApiMoney(manualReferencePrice) : referenceFromConfig
   const selectedDeductions = Object.values(selectedRules)
     .map((id) => deductionRules.find((rule) => rule.id === id))
     .filter(Boolean)
@@ -75,8 +79,23 @@ export default function TradeInDeviceForm({ batteryRanges, deductionRules, price
     setCondition("")
     setNotes("")
     setManualReferencePrice("")
+    setIsReferencePriceOverridden(false)
+    setIsEditingReferencePrice(false)
     setSelectedRules({ PANTALLA_MODULO: "", TAPA: "", CAMARA: "", FUNCIONAMIENTO: "", OTRO: "" })
     setError(null)
+  }
+
+  const resetReferencePriceOverride = () => {
+    setManualReferencePrice("")
+    setIsReferencePriceOverridden(false)
+    setIsEditingReferencePrice(false)
+  }
+
+  const startEditingReferencePrice = () => {
+    if (!isAdmin) return
+    setManualReferencePrice(totals.referencePrice > 0 ? String(totals.referencePrice) : "")
+    setIsReferencePriceOverridden(true)
+    setIsEditingReferencePrice(true)
   }
 
   const submit = () => {
@@ -130,7 +149,7 @@ export default function TradeInDeviceForm({ batteryRanges, deductionRules, price
         <div className="grid gap-3 md:grid-cols-3">
           <label className="form-control">
             <span className="label-text">Modelo</span>
-            <select className="select select-bordered" value={modelName} onChange={(e) => { setModelName(e.target.value); setCapacityGB(""); setSelectedRules({ PANTALLA_MODULO: "", TAPA: "", CAMARA: "", FUNCIONAMIENTO: "", OTRO: "" }) }}>
+            <select className="select select-bordered" value={modelName} onChange={(e) => { setModelName(e.target.value); setCapacityGB(""); resetReferencePriceOverride(); setSelectedRules({ PANTALLA_MODULO: "", TAPA: "", CAMARA: "", FUNCIONAMIENTO: "", OTRO: "" }) }}>
               <option value="">Seleccionar</option>
               {IPHONE_TRADE_IN_CATALOG.map((series) => (
                 <optgroup key={series.series} label={series.series}>
@@ -141,14 +160,14 @@ export default function TradeInDeviceForm({ batteryRanges, deductionRules, price
           </label>
           <label className="form-control">
             <span className="label-text">Capacidad</span>
-            <select className="select select-bordered" value={capacityGB} onChange={(e) => { setCapacityGB(e.target.value); setSelectedRules({ PANTALLA_MODULO: "", TAPA: "", CAMARA: "", FUNCIONAMIENTO: "", OTRO: "" }) }} disabled={!selectedCatalogModel}>
+            <select className="select select-bordered" value={capacityGB} onChange={(e) => { setCapacityGB(e.target.value); resetReferencePriceOverride(); setSelectedRules({ PANTALLA_MODULO: "", TAPA: "", CAMARA: "", FUNCIONAMIENTO: "", OTRO: "" }) }} disabled={!selectedCatalogModel}>
               <option value="">Seleccionar</option>
               {selectedCatalogModel?.capacities.map((capacity) => <option key={capacity} value={capacity}>{capacity} GB</option>)}
             </select>
           </label>
           <label className="form-control">
             <span className="label-text">Rango bateria</span>
-            <select className="select select-bordered" value={batteryRangeId} onChange={(e) => setBatteryRangeId(e.target.value)}>
+            <select className="select select-bordered" value={batteryRangeId} onChange={(e) => { setBatteryRangeId(e.target.value); resetReferencePriceOverride() }}>
               <option value="">Seleccionar</option>
               {batteryRanges.map((range) => <option key={range.id} value={range.id}>{range.label}</option>)}
             </select>
@@ -170,19 +189,37 @@ export default function TradeInDeviceForm({ batteryRanges, deductionRules, price
         <textarea className="textarea textarea-bordered" placeholder="Detalle funcional, marcas o comentarios internos" value={notes || condition} onChange={(e) => { setNotes(e.target.value); setCondition(e.target.value) }} />
       </label>
 
-      {isAdmin && referenceFromConfig <= 0 ? (
-        <label className="form-control max-w-xs">
-          <span className="label-text">Valor manual USD</span>
-          <input className="input input-bordered" type="number" min={0} value={manualReferencePrice} onChange={(e) => setManualReferencePrice(e.target.value)} />
-        </label>
-      ) : null}
-
       <div className="rounded-lg border border-base-300 bg-base-200 p-3">
         <h3 className="font-semibold">Valor reconocido</h3>
         <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
-          <div><span className="block text-base-content/60">Referencia</span><span className="font-semibold">{formatUsd(totals.referencePrice)}</span></div>
-          <div><span className="block text-base-content/60">Descuentos</span><span className="font-semibold">{formatUsd(totals.deductionTotal)}</span></div>
-          <div><span className="block text-base-content/60">Credito final</span><span className="text-lg font-bold text-primary">{formatUsd(totals.finalValue)}</span></div>
+          <div className="flex flex-col gap-1">
+            <span className="block text-base-content/60">Referencia</span>
+            {isAdmin && isEditingReferencePrice ? (
+              <input
+                autoFocus
+                className="input input-bordered input-sm mt-1 w-32 font-semibold"
+                type="number"
+                min={0}
+                value={manualReferencePrice}
+                onChange={(e) => {
+                  setManualReferencePrice(e.target.value)
+                  setIsReferencePriceOverridden(true)
+                }}
+                onBlur={() => setIsEditingReferencePrice(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur()
+                }}
+              />
+            ) : isAdmin ? (
+              <button type="button" className="badge text-left font-semibold" onClick={startEditingReferencePrice}>
+                {formatUsd(totals.referencePrice)}
+              </button>
+            ) : (
+              <span className="font-semibold">{formatUsd(totals.referencePrice)}</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1"><span className="block text-base-content/60">Descuentos</span><span className="font-semibold">{formatUsd(totals.deductionTotal)}</span></div>
+          <div className="flex flex-col"><span className="block text-base-content/60">Credito final</span><span className="text-lg font-bold text-primary">{formatUsd(totals.finalValue)}</span></div>
         </div>
         <div className="mt-3 flex justify-end gap-2">
           {editingDevice ? <button type="button" className="btn btn-sm" onClick={() => { reset(); onCancelEdit() }}>Cancelar</button> : null}
