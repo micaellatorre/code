@@ -47,7 +47,16 @@ export default function SaleTradeInStep({
       />
       <TradeInCreditReceipt devices={devices} total={total} onEdit={onEdit} onRemove={onRemove} />
       <div className="alert alert-info py-3 text-sm">
-        Al confirmar la venta, estos equipos ingresan al inventario como origen Plan Canje en estado EN_REVISION.
+        <p className="inline">
+          Al confirmar la venta, estos equipos ingresan al inventario como origen <span className="italic">"Plan Canje"</span> en estado <strong>EN_REVISION</strong>.{" "}
+          <span>
+            Podes verlos desde la sección{" "}
+            <a href="/dashboard/products?segment=TRADE_INS&state=EN_REVISION" className="inline font-semibold text-primary underline">
+              Productos / Canjes
+            </a>{" "}
+            y luego de la revisión del equipo, podes cambiar su estado a <strong>EN_STOCK</strong> para que puedan ser vendidos.
+          </span>
+        </p>
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { ClockIcon } from "@heroicons/react/24/outline"
+import { useEffect, useState } from "react"
+import { ArrowPathIcon, ClockIcon } from "@heroicons/react/24/outline"
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE } from "@/lib/timezone"
 import PurchaseTimelineModal from "./PurchaseTimelineModal"
@@ -25,7 +25,10 @@ export type PurchaseRow = {
 
 type Props = {
   purchases: PurchaseRow[]
+  canUpdatePaymentStatus?: boolean
 }
+
+const paymentStatusOptions: PurchaseRow["paymentStatus"][] = ["PAID", "PARTIAL", "CURRENT_ACCOUNT"]
 
 function paymentLabel(status: PurchaseRow["paymentStatus"]) {
   if (status === "PAID") return "Pagada"
@@ -33,8 +36,45 @@ function paymentLabel(status: PurchaseRow["paymentStatus"]) {
   return "Cuenta corriente"
 }
 
-export default function PurchasesTable({ purchases }: Props) {
+export default function PurchasesTable({ purchases, canUpdatePaymentStatus = false }: Props) {
   const [timelinePurchaseId, setTimelinePurchaseId] = useState<string | null>(null)
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const [paymentStatuses, setPaymentStatuses] = useState<Record<string, PurchaseRow["paymentStatus"]>>({})
+  const [savingPaymentId, setSavingPaymentId] = useState<string | null>(null)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setPaymentStatuses(Object.fromEntries(purchases.map((purchase) => [purchase.id, purchase.paymentStatus])))
+  }, [purchases])
+
+  async function updatePaymentStatus(purchase: PurchaseRow, nextStatus: PurchaseRow["paymentStatus"]) {
+    const previousStatus = paymentStatuses[purchase.id] ?? purchase.paymentStatus
+    if (nextStatus === previousStatus) {
+      setEditingPaymentId(null)
+      return
+    }
+
+    setPaymentError(null)
+    setSavingPaymentId(purchase.id)
+    setPaymentStatuses((current) => ({ ...current, [purchase.id]: nextStatus }))
+
+    try {
+      const response = await fetch(`/api/purchases/${purchase.id}/payment-status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentStatus: nextStatus }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.error ?? "No se pudo actualizar el estado de pago")
+      setPaymentStatuses((current) => ({ ...current, [purchase.id]: data.purchase.paymentStatus }))
+      setEditingPaymentId(null)
+    } catch (error) {
+      setPaymentStatuses((current) => ({ ...current, [purchase.id]: previousStatus }))
+      setPaymentError(error instanceof Error ? error.message : "No se pudo actualizar el estado de pago")
+    } finally {
+      setSavingPaymentId(null)
+    }
+  }
 
   return (
     <>
@@ -66,7 +106,42 @@ export default function PurchasesTable({ purchases }: Props) {
                 </td>
                 <td>{purchase.currency} {Number(purchase.totalCost).toFixed(2)}</td>
                 <td>{purchase.branch?.name ?? "Sin sucursal"}</td>
-                <td><span className="badge badge-outline">{paymentLabel(purchase.paymentStatus)}</span></td>
+                <td>
+                  {!canUpdatePaymentStatus ? (
+                    <span className="badge badge-outline">{paymentLabel(paymentStatuses[purchase.id] ?? purchase.paymentStatus)}</span>
+                  ) : editingPaymentId === purchase.id ? (
+                    <select
+                      className="select select-bordered select-xs w-40"
+                      aria-label="Estado de pago"
+                      autoFocus
+                      value={paymentStatuses[purchase.id] ?? purchase.paymentStatus}
+                      disabled={savingPaymentId === purchase.id}
+                      onBlur={() => setEditingPaymentId(null)}
+                      onChange={(event) => updatePaymentStatus(purchase, event.target.value as PurchaseRow["paymentStatus"])}
+                    >
+                      {paymentStatusOptions.map((status) => (
+                        <option key={status} value={status}>{paymentLabel(status)}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <button
+                      type="button"
+                      className="badge badge-outline group min-w-32 cursor-pointer justify-center gap-1 transition-colors hover:border-primary hover:bg-primary hover:text-primary-content"
+                      title="Actualizar estado de pago"
+                      aria-label={`Actualizar estado de pago: ${paymentLabel(paymentStatuses[purchase.id] ?? purchase.paymentStatus)}`}
+                      disabled={savingPaymentId === purchase.id}
+                      onClick={() => setEditingPaymentId(purchase.id)}
+                    >
+                      <span className="group-hover:hidden">
+                        {paymentLabel(paymentStatuses[purchase.id] ?? purchase.paymentStatus)}
+                      </span>
+                      <span className="hidden items-center gap-1 group-hover:inline-flex">
+                        <ArrowPathIcon className="size-3" />
+                        Actualizar
+                      </span>
+                    </button>
+                  )}
+                </td>
                 <td>
                   <button
                     type="button"
@@ -86,6 +161,7 @@ export default function PurchasesTable({ purchases }: Props) {
           </tbody>
         </table>
       </div>
+      {paymentError ? <div className="alert alert-error mt-3 text-sm">{paymentError}</div> : null}
       <PurchaseTimelineModal purchaseId={timelinePurchaseId} onClose={() => setTimelinePurchaseId(null)} />
     </>
   )

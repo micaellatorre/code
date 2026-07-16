@@ -50,7 +50,7 @@ export default async function PurchasesPage({ searchParams }: PurchasesPageProps
           <button type="submit" className="btn btn-outline">Buscar</button>
         </form>
 
-        <PurchasesTable purchases={purchases} />
+        <PurchasesTable purchases={purchases} canUpdatePaymentStatus={session.user.activeRole === "ADMIN"} />
       </div>
     </DashboardLayout>
   )

@@ -410,16 +410,17 @@ model Purchase {
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   supplier   Supplier @relation(fields: [supplierId], references: [id])
 
-  date        DateTime          @default(now())
-  downPayment Decimal?          @db.Decimal(12, 2) // seña o adelanto
-  currency    Currency          @default(USD)
-  totalCost   Decimal           @db.Decimal(12, 2)
-  branchId    String?
-  branch      Branch?           @relation(fields: [branchId], references: [id])
-  notes       String?
-  createdAt   DateTime          @default(now())
-  items       PurchaseItem[]
-  payments    PurchasePayment[]
+  date          DateTime              @default(now())
+  downPayment   Decimal?              @db.Decimal(12, 2) // seña o adelanto
+  currency      Currency              @default(USD)
+  totalCost     Decimal               @db.Decimal(12, 2)
+  paymentStatus PurchasePaymentStatus @default(CURRENT_ACCOUNT)
+  branchId      String?
+  branch        Branch?               @relation(fields: [branchId], references: [id])
+  notes         String?
+  createdAt     DateTime              @default(now())
+  items         PurchaseItem[]
+  payments      PurchasePayment[]
 
   @@index([tenantId, supplierId, date])
   @@index([branchId])
@@ -1047,6 +1048,12 @@ enum Currency {
   ARS
   USD
   USDT
+}
+
+enum PurchasePaymentStatus {
+  PAID
+  PARTIAL
+  CURRENT_ACCOUNT
 }
 
 /// Estado operativo de la cita.

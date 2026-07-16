@@ -24,6 +24,23 @@ function titleForAction(action: string) {
   }
 }
 
+function derivedPaymentStatus(purchase: {
+  currency: string
+  downPayment: unknown
+  totalCost: unknown
+  paymentStatus: "PAID" | "PARTIAL" | "CURRENT_ACCOUNT"
+  payments: Array<{ amountUsd: unknown }>
+}) {
+  const paymentsUsd = purchase.payments.reduce((acc, payment) => acc + Number(payment.amountUsd ?? 0), 0)
+  const legacyDownPaymentUsd = purchase.currency === "USD" || purchase.currency === "USDT"
+    ? Number(purchase.downPayment ?? 0)
+    : 0
+  const paidUsd = paymentsUsd + legacyDownPaymentUsd
+  const totalCost = Number(purchase.totalCost)
+  const derived = paidUsd >= totalCost ? "PAID" : paidUsd > 0 ? "PARTIAL" : "CURRENT_ACCOUNT"
+  return purchase.paymentStatus === "CURRENT_ACCOUNT" && derived !== "CURRENT_ACCOUNT" ? derived : purchase.paymentStatus
+}
+
 export async function GET(_request: NextRequest, { params }: Ctx) {
   const auth = await requireRoleApi(["ADMIN", "SOCIO", "STOCK"])
   if (!auth.ok) return Response.json({ error: "Unauthorized" }, { status: auth.status })
@@ -49,10 +66,6 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
     include: { actorUser: { select: { id: true, name: true, email: true } } },
   })
 
-  const paidUsd = purchase.payments.reduce((acc, payment) => acc + Number(payment.amountUsd ?? 0), 0)
-  const totalCost = Number(purchase.totalCost)
-  const paymentStatus = paidUsd >= totalCost ? "PAID" : paidUsd > 0 ? "PARTIAL" : "CURRENT_ACCOUNT"
-
   return NextResponse.json({
     purchase: {
       id: purchase.id,
@@ -63,7 +76,7 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
       currency: purchase.currency,
       totalUnits: purchase.items.reduce((acc, item) => acc + item.units, 0),
       productTypes: Array.from(new Set(purchase.items.map((item) => item.product.type))),
-      paymentStatus,
+      paymentStatus: derivedPaymentStatus(purchase),
     },
     events: events.map((event) => ({
       id: event.id,

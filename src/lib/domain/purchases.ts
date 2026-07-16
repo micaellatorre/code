@@ -26,6 +26,10 @@ export const purchasePaymentSchema = z.object({
   note: z.string().optional().nullable(),
 })
 
+const purchasePaymentStatuses = ["PAID", "PARTIAL", "CURRENT_ACCOUNT"] as const
+export const purchasePaymentStatusSchema = z.enum(purchasePaymentStatuses)
+type PurchasePaymentStatusValue = z.infer<typeof purchasePaymentStatusSchema>
+
 const purchaseBaseItemSchema = z.object({
   modelName: z.string().trim().min(1, "El modelo/articulo es obligatorio").max(180),
   color: z.string().trim().max(80).optional().nullable(),
@@ -89,10 +93,16 @@ function serializeDecimal(value: Prisma.Decimal | null | undefined) {
   return value == null ? null : value.toString()
 }
 
-function paymentStatus(totalCost: Prisma.Decimal, paidUsd: Prisma.Decimal): "PAID" | "PARTIAL" | "CURRENT_ACCOUNT" {
+function derivePaymentStatus(totalCost: Prisma.Decimal, paidUsd: Prisma.Decimal): PurchasePaymentStatusValue {
   if (paidUsd.greaterThanOrEqualTo(totalCost)) return "PAID"
   if (paidUsd.greaterThan(0)) return "PARTIAL"
   return "CURRENT_ACCOUNT"
+}
+
+function legacyDownPaymentUsd(row: { currency: Currency; downPayment: Prisma.Decimal | null }) {
+  if (!row.downPayment) return new Prisma.Decimal(0)
+  if (row.currency !== "USD" && row.currency !== "USDT") return new Prisma.Decimal(0)
+  return row.downPayment
 }
 
 export function serializePurchase(row: Prisma.PurchaseGetPayload<{
@@ -103,7 +113,10 @@ export function serializePurchase(row: Prisma.PurchaseGetPayload<{
     payments: true
   }
 }>) {
-  const paidUsd = row.payments.reduce((acc, payment) => acc.add(payment.amountUsd ?? 0), new Prisma.Decimal(0))
+  const paidUsd = row.payments
+    .reduce((acc, payment) => acc.add(payment.amountUsd ?? 0), new Prisma.Decimal(0))
+    .add(legacyDownPaymentUsd(row))
+  const derivedPaymentStatus = derivePaymentStatus(row.totalCost, paidUsd)
 
   return {
     id: row.id,
@@ -118,7 +131,9 @@ export function serializePurchase(row: Prisma.PurchaseGetPayload<{
     downPayment: serializeDecimal(row.downPayment),
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
-    paymentStatus: paymentStatus(row.totalCost, paidUsd),
+    paymentStatus: row.paymentStatus === "CURRENT_ACCOUNT" && derivedPaymentStatus !== "CURRENT_ACCOUNT"
+      ? derivedPaymentStatus
+      : row.paymentStatus,
     paidUsd: paidUsd.toString(),
     totalUnits: row.items.reduce((acc, item) => acc + item.units, 0),
     productTypes: Array.from(new Set(row.items.map((item) => item.product.type))),
@@ -379,6 +394,12 @@ export async function createPurchaseWithPayments(params: {
       }, tx)
     }
 
+    const finalPaymentStatus = derivePaymentStatus(totalCost, paymentRows.reduce((acc, payment) => acc.add(payment.amountUsd ?? 0), new Prisma.Decimal(0)))
+    await tx.purchase.update({
+      where: { id: purchase.id },
+      data: { paymentStatus: finalPaymentStatus },
+    })
+
     await createAuditLog({
       tenantId: params.tenantId,
       actorUserId: params.actorUserId,
@@ -412,8 +433,49 @@ export async function createPurchaseWithPayments(params: {
         totalCost: totalCost.toString(),
         totalUnits,
         productCount: createdProductIds.length,
-        paymentStatus: paymentStatus(totalCost, paymentRows.reduce((acc, payment) => acc.add(payment.amountUsd ?? 0), new Prisma.Decimal(0))),
+        paymentStatus: finalPaymentStatus,
       },
     }
+  })
+}
+
+export async function updatePurchasePaymentStatus(params: {
+  tenantId: string
+  purchaseId: string
+  paymentStatus: PurchasePaymentStatusValue
+  actorUserId: string
+  actorRole: UserRole
+  actorRealRole?: UserRole
+}) {
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.purchase.findFirst({
+      where: { id: params.purchaseId, tenantId: params.tenantId },
+      select: { id: true, paymentStatus: true },
+    })
+    if (!current) throw new Error("Compra no encontrada")
+    if (current.paymentStatus === params.paymentStatus) return current
+
+    const purchase = await tx.purchase.update({
+      where: { id: current.id },
+      data: { paymentStatus: params.paymentStatus },
+      select: { id: true, paymentStatus: true },
+    })
+
+    await createAuditLog({
+      tenantId: params.tenantId,
+      actorUserId: params.actorUserId,
+      actorRole: params.actorRole,
+      action: "UPDATE",
+      module: "PURCHASE",
+      entityType: "Purchase",
+      entityId: purchase.id,
+      detail: `Estado de pago actualizado: ${current.paymentStatus} -> ${purchase.paymentStatus}`,
+      oldValue: { paymentStatus: current.paymentStatus },
+      newValue: { paymentStatus: purchase.paymentStatus },
+      executedByAdminInSimulation: params.actorRealRole === "ADMIN" && params.actorRole !== "ADMIN",
+      simulatedRole: params.actorRealRole === "ADMIN" && params.actorRole !== "ADMIN" ? params.actorRole : null,
+    }, tx)
+
+    return purchase
   })
 }
