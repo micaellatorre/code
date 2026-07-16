@@ -963,7 +963,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                 {visibleImeiColumn ? <th>IMEI</th> : null}
                 <th>Modelo</th>
                 <th>Bateria %</th>
-                <th>Color</th>
+                <th>Color </th>
                 <th>Capacidad (GB)</th>
                 <th>Condición</th>
                 {visibleCostColumn ? <th>Costo (USD)</th> : null}
