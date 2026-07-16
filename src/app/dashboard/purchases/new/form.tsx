@@ -314,7 +314,7 @@ export default function NewPurchaseForm() {
         <div className="mx-auto max-w-2xl rounded border border-success/30 bg-success/5 p-6 text-center">
           <h1 className="text-2xl font-bold">Compra registrada con exito</h1>
           <p className="mt-2 text-base-content/70">
-            {successUnitsLabel || `${success.summary.totalUnits} unidades`} ingresados al inventario - Total: {success.summary.currency} {Number(success.summary.totalCost).toFixed(2)}
+            {successUnitsLabel || `${success.summary.totalUnits} unidades`} creados en productos con estado En camino - Total: {success.summary.currency} {Number(success.summary.totalCost).toFixed(2)}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link className="btn btn-primary" href="/dashboard/purchases">Ver compras</Link>

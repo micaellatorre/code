@@ -28,7 +28,6 @@ function derivedPaymentStatus(purchase: {
   currency: string
   downPayment: unknown
   totalCost: unknown
-  paymentStatus: "PAID" | "PARTIAL" | "CURRENT_ACCOUNT"
   payments: Array<{ amountUsd: unknown }>
 }) {
   const paymentsUsd = purchase.payments.reduce((acc, payment) => acc + Number(payment.amountUsd ?? 0), 0)
@@ -37,8 +36,7 @@ function derivedPaymentStatus(purchase: {
     : 0
   const paidUsd = paymentsUsd + legacyDownPaymentUsd
   const totalCost = Number(purchase.totalCost)
-  const derived = paidUsd >= totalCost ? "PAID" : paidUsd > 0 ? "PARTIAL" : "CURRENT_ACCOUNT"
-  return purchase.paymentStatus === "CURRENT_ACCOUNT" && derived !== "CURRENT_ACCOUNT" ? derived : purchase.paymentStatus
+  return paidUsd >= totalCost ? "PAID" : paidUsd > 0 ? "PARTIAL" : "CURRENT_ACCOUNT"
 }
 
 export async function GET(_request: NextRequest, { params }: Ctx) {
@@ -51,7 +49,17 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
   const { id } = await params
   const purchase = await prisma.purchase.findFirst({
     where: { id, tenantId },
-    include: { supplier: true, branch: true, payments: true, items: { include: { product: true } } },
+    select: {
+      id: true,
+      date: true,
+      supplier: { select: { id: true, name: true } },
+      branch: { select: { id: true, name: true } },
+      totalCost: true,
+      downPayment: true,
+      currency: true,
+      payments: { select: { amountUsd: true } },
+      items: { select: { units: true, product: { select: { type: true } } } },
+    },
   })
   if (!purchase) return NextResponse.json({ error: "Compra no encontrada" }, { status: 404 })
 
