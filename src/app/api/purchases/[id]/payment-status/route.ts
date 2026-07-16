@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { UserRole } from "@prisma/client"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
-import { purchasePaymentStatusSchema, updatePurchasePaymentStatus } from "@/lib/domain/purchases"
+import { purchasePaymentStatusUpdateSchema, updatePurchasePaymentStatus } from "@/lib/domain/purchases"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -14,15 +14,15 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
 
   const body = await request.json().catch(() => null)
-  const parsed = purchasePaymentStatusSchema.safeParse(body?.paymentStatus)
-  if (!parsed.success) return NextResponse.json({ error: "Estado de pago invalido" }, { status: 400 })
+  const parsed = purchasePaymentStatusUpdateSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: "Datos invalidos", fieldErrors: parsed.error.flatten().fieldErrors }, { status: 400 })
 
   const { id } = await params
   try {
     const purchase = await updatePurchasePaymentStatus({
       tenantId,
       purchaseId: id,
-      paymentStatus: parsed.data,
+      input: parsed.data,
       actorUserId: auth.session.user.id,
       actorRole: auth.session.user.activeRole as UserRole,
       actorRealRole: auth.session.user.role as UserRole,
