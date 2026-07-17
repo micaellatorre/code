@@ -12,6 +12,7 @@ type SalesTableProps = {
   canEdit: boolean
   canEditConfirmed: boolean
   onReceipt: (sale: SerializedSale) => void
+  receiptLoadingSaleId: string | null
   onTransport: (sale: SerializedSale) => void
   onCancel: (sale: SerializedSale) => void
   sellerEditor: {
@@ -63,6 +64,7 @@ export default function SalesTable(props: SalesTableProps) {
               canEdit={props.canEdit}
               canEditConfirmed={props.canEditConfirmed}
               onReceipt={() => props.onReceipt(sale)}
+              isReceiptLoading={props.receiptLoadingSaleId === sale.id}
               onTransport={() => props.onTransport(sale)}
               onCancel={() => props.onCancel(sale)}
               sellerProps={{

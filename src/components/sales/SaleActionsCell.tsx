@@ -10,17 +10,25 @@ type SaleActionsCellProps = {
   canEdit: boolean
   canEditConfirmed: boolean
   onReceipt: () => void
+  isReceiptLoading: boolean
   onTransport: () => void
   onCancel: () => void
 }
 
-export default function SaleActionsCell({ sale, canCancel, canEdit, canEditConfirmed, onReceipt, onTransport, onCancel }: SaleActionsCellProps) {
+export default function SaleActionsCell({ sale, canCancel, canEdit, canEditConfirmed, onReceipt, isReceiptLoading, onTransport, onCancel }: SaleActionsCellProps) {
   const editAllowed = canEdit && (sale.status !== "CONFIRMADA" || canEditConfirmed)
 
   return (
     <div className="flex items-center gap-1">
-      <button type="button" className="btn btn-square btn-ghost btn-xs" title="Recibo" onClick={onReceipt}>
-        <DocumentTextIcon className="size-4" />
+      <button
+        type="button"
+        className="btn btn-square btn-ghost btn-xs"
+        title="Ver e imprimir factura"
+        aria-label="Ver e imprimir factura"
+        onClick={onReceipt}
+        disabled={isReceiptLoading}
+      >
+        {isReceiptLoading ? <span className="loading loading-spinner loading-xs" /> : <DocumentTextIcon className="size-4" />}
       </button>
       <button type="button" className="btn btn-square btn-ghost btn-xs" title="Transporte" onClick={onTransport}>
         <TruckIcon className="size-4" />

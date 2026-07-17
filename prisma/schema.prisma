@@ -28,18 +28,19 @@ model User {
   updatedAt       DateTime  @default(now()) @updatedAt
   lastLoginAt     DateTime?
 
-  appointments         Appointment[]
-  sales                Sale[]               @relation("SaleCreatedBy")
-  closedSales          Sale[]               @relation("SaleCloser")
-  reservations         Reservation[]
-  serviceOrders        ServiceOrder[]       @relation("ServiceOrderTechnician")
-  createdServiceOrders ServiceOrder[]       @relation("ServiceOrderCreatedBy")
-  auditLogs            AuditLog[]           @relation("AuditLogActor")
-  cashMovements        CashMovement[]
-  cashTransfers        CashTransfer[]
-  closedCashDays       CashDailyClose[]     @relation("CashDailyCloseClosedBy")
-  closerCommissions    CloserCommission[]   @relation("CloserCommissionCloser")
-  branchCoverages      UserBranchCoverage[]
+  appointments          Appointment[]
+  sales                 Sale[]               @relation("SaleCreatedBy")
+  closedSales           Sale[]               @relation("SaleCloser")
+  reservations          Reservation[]
+  serviceOrders         ServiceOrder[]       @relation("ServiceOrderTechnician")
+  createdServiceOrders  ServiceOrder[]       @relation("ServiceOrderCreatedBy")
+  auditLogs             AuditLog[]           @relation("AuditLogActor")
+  generatedSaleReceipts SaleReceipt[]        @relation("SaleReceiptGeneratedBy")
+  cashMovements         CashMovement[]
+  cashTransfers         CashTransfer[]
+  closedCashDays        CashDailyClose[]     @relation("CashDailyCloseClosedBy")
+  closerCommissions     CloserCommission[]   @relation("CloserCommissionCloser")
+  branchCoverages       UserBranchCoverage[]
 
   @@index([currentBranchId])
 }
@@ -221,6 +222,7 @@ model Sale {
 
   items             SaleItem[]
   payments          Payment[]
+  receipt           SaleReceipt?
   closerCommissions CloserCommission[]
 
   // NUEVO: citas que terminaron en esta venta (en la práctica suele ser 0 o 1)
@@ -245,6 +247,21 @@ model Sale {
   @@index([closerId])
   @@index([branchId])
   @@index([saleType])
+}
+
+model SaleReceipt {
+  id Int @id @default(autoincrement())
+
+  saleId String @unique
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Restrict)
+
+  generatedAt DateTime @default(now())
+
+  generatedById String?
+  generatedBy   User?   @relation("SaleReceiptGeneratedBy", fields: [generatedById], references: [id], onDelete: SetNull)
+
+  @@index([generatedAt])
+  @@index([generatedById])
 }
 
 /// Renglón de una venta.

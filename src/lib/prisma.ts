@@ -15,6 +15,7 @@ const cachedPrismaHasCurrentSchema =
   "tradeInBatteryRange" in cachedPrisma &&
   "tradeInDeductionRule" in cachedPrisma &&
   "auditLog" in cachedPrisma &&
+  "saleReceipt" in cachedPrisma &&
   "cashMovement" in cachedPrisma &&
   "serviceOrder" in cachedPrisma
 

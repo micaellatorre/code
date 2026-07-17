@@ -7,7 +7,7 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import { AR_TIME_ZONE } from "@/lib/timezone"
 import { formatInTimeZone } from "date-fns-tz"
 import { displaySaleUser, getSaleOrigin, getSaleSearchText, toNumber } from "./salesUtils"
-import type { SaleOriginFilter, SalesKpisValue, SaleStatusFilter, SerializedSale, UserSearchResult } from "./types"
+import type { ReceiptPreview, SaleOriginFilter, SalesKpisValue, SaleStatusFilter, SerializedSale, SerializedSaleReceipt, UserSearchResult } from "./types"
 import type { BranchOption } from "@/components/branches/BranchAutocomplete"
 
 export function useSalesList(initial: SerializedSale[]) {
@@ -30,7 +30,9 @@ export function useSalesList(initial: SerializedSale[]) {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [isExportOpen, setIsExportOpen] = useState(false)
-  const [receiptSale, setReceiptSale] = useState<SerializedSale | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<ReceiptPreview | null>(null)
+  const [receiptLoadingSaleId, setReceiptLoadingSaleId] = useState<string | null>(null)
+  const [receiptError, setReceiptError] = useState<string | null>(null)
   const [transportSale, setTransportSale] = useState<SerializedSale | null>(null)
   const [editingSellerId, setEditingSellerId] = useState<string | null>(null)
   const [userSearchQuery, setUserSearchQuery] = useState("")
@@ -41,6 +43,7 @@ export function useSalesList(initial: SerializedSale[]) {
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [savingBranchSaleId, setSavingBranchSaleId] = useState<string | null>(null)
   const sellerEditorRef = useRef<HTMLDivElement | null>(null)
+  const receiptRequestRef = useRef<string | null>(null)
 
   useEffect(() => {
     setSales(initial)
@@ -171,6 +174,36 @@ export function useSalesList(initial: SerializedSale[]) {
     setUserSearchResults([])
   }
 
+  async function openReceipt(sale: SerializedSale) {
+    if (receiptRequestRef.current) return
+
+    setReceiptError(null)
+    receiptRequestRef.current = sale.id
+    setReceiptLoadingSaleId(sale.id)
+
+    try {
+      const response = await fetch(`/api/sales/${sale.id}/receipt`, {
+        method: "POST",
+        cache: "no-store",
+      })
+      const body = (await response.json().catch(() => null)) as { receipt?: SerializedSaleReceipt; error?: string } | null
+
+      if (!response.ok || !body?.receipt) {
+        throw new Error(body?.error ?? "No se pudo generar el comprobante.")
+      }
+
+      const nextSale = { ...sale, receipt: body.receipt }
+      setSales((prev) => prev.map((item) => (item.id === sale.id ? nextSale : item)))
+      setReceiptPreview({ sale: nextSale, receipt: body.receipt })
+    } catch (error) {
+      console.error("Failed to open sale receipt", error)
+      setReceiptError(error instanceof Error ? error.message : "No se pudo generar el comprobante.")
+    } finally {
+      receiptRequestRef.current = null
+      setReceiptLoadingSaleId(null)
+    }
+  }
+
   async function handleSelectSeller(saleId: string, user: UserSearchResult) {
     if (!isAdmin) return
 
@@ -277,8 +310,11 @@ export function useSalesList(initial: SerializedSale[]) {
     isSeller,
     isExportOpen,
     setIsExportOpen,
-    receiptSale,
-    setReceiptSale,
+    receiptPreview,
+    setReceiptPreview,
+    receiptLoadingSaleId,
+    receiptError,
+    openReceipt,
     transportSale,
     setTransportSale,
     sellerEditor: {

@@ -62,6 +62,12 @@ export type SalePaymentSummary = {
   note?: string | null
 }
 
+export type SerializedSaleReceipt = {
+  number: number
+  formattedNumber: string
+  generatedAt: string
+}
+
 export type SerializedSale = {
   id: string
   tenantId: string
@@ -86,7 +92,13 @@ export type SerializedSale = {
   createdByUser: SaleUserSummary | null
   items: SaleItemSummary[]
   payments: SalePaymentSummary[]
+  receipt?: SerializedSaleReceipt | null
   appointments?: { id: string }[]
+}
+
+export type ReceiptPreview = {
+  sale: SerializedSale
+  receipt: SerializedSaleReceipt
 }
 
 export type SaleOriginFilter = "ALL" | "Directa" | "Reserva" | "Instagram" | "Local" | "Otro"
