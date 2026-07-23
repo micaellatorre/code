@@ -48,6 +48,8 @@ const ALLOWED_FIELDS = new Set<string>([
   "tradeInDevices",
 ])
 
+const SELLER_CONFIRMED_SALE_ALLOWED_FIELDS = new Set(["buyerId", "buyer", "customerName", "saleType"])
+
 type Ctx = { params: Promise<{ id: string }> }
 
 type PaymentInput = {
@@ -272,7 +274,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
       if (
         sale.status === "CONFIRMADA" &&
-        auth.session.user.activeRole !== "ADMIN"
+        auth.session.user.activeRole !== "ADMIN" &&
+        !keys.every((key) => SELLER_CONFIRMED_SALE_ALLOWED_FIELDS.has(key))
       ) {
         throw new Error(
           "La venta confirmada solo puede modificarse con rol activo ADMIN.",

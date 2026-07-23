@@ -20,8 +20,9 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url)
   const q = searchParams.get("q")?.trim()
+  const type = searchParams.get("type")
 
-  if (!q) {
+  if (!q || q.length < 3) {
     return NextResponse.json({ results: [] })
   }
 
@@ -31,6 +32,7 @@ export async function GET(req: Request) {
     const results = await prisma.buyer.findMany({
       where: {
         ...(tenantId ? { tenantId } : {}),
+        ...(type === "MINORISTA" || type === "MAYORISTA" ? { type } : {}),
         OR: [
           { name: { contains: q, mode: "insensitive" } },
           { surname: { contains: q, mode: "insensitive" } },

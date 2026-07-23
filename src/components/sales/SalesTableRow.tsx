@@ -23,6 +23,7 @@ type SalesTableRowProps = {
   onTransport: () => void
   onCancel: () => void
   onOpenStatusModal: () => void
+  onOpenCustomerModal: () => void
   sellerProps: {
     isEditing: boolean
     isSearchingUsers: boolean
@@ -76,7 +77,7 @@ export default function SalesTableRow(props: SalesTableRowProps) {
         <SaleItemsCell items={sale.items} />
       </td>
       <td className="align-top">
-        <SaleBuyerCell sale={sale} />
+        <SaleBuyerCell sale={sale} canEditCustomer={props.canEdit} onOpenCustomerModal={props.onOpenCustomerModal} />
       </td>
       <td className="align-top flex flex-col items-start gap-1">
         <SaleAmountCell total={sale.total} />

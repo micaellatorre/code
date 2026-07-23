@@ -16,6 +16,7 @@ type SalesTableProps = {
   onTransport: (sale: SerializedSale) => void
   onCancel: (sale: SerializedSale) => void
   onOpenStatusModal: (sale: SerializedSale) => void
+  onOpenCustomerModal: (sale: SerializedSale) => void
   sellerEditor: {
     editingSellerId: string | null
     isSearchingUsers: boolean
@@ -69,6 +70,7 @@ export default function SalesTable(props: SalesTableProps) {
               onTransport={() => props.onTransport(sale)}
               onCancel={() => props.onCancel(sale)}
               onOpenStatusModal={() => props.onOpenStatusModal(sale)}
+              onOpenCustomerModal={() => props.onOpenCustomerModal(sale)}
               sellerProps={{
                 isEditing: props.sellerEditor.editingSellerId === sale.id,
                 isSearchingUsers: props.sellerEditor.isSearchingUsers,

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import ExportSalesModal from "./ExportSalesModal"
 import ReceiptModal from "./ReceiptModal"
+import SaleCustomerUpdateModal from "./SaleCustomerUpdateModal"
 import SaleStatusUpdateModal from "./SaleStatusUpdateModal"
 import SalesFilters from "./SalesFilters"
 import SalesHeader from "./SalesHeader"
@@ -39,8 +40,12 @@ function TransportModal({ sale, onClose }: { sale: SerializedSale | null; onClos
 export default function SalesDashboard({ initial }: { initial: SerializedSale[] }) {
   const list = useSalesList(initial)
   const [statusModalSale, setStatusModalSale] = useState<SerializedSale | null>(null)
+  const [customerModalSale, setCustomerModalSale] = useState<SerializedSale | null>(null)
   const currentStatusModalSale = statusModalSale
     ? list.sales.find((sale) => sale.id === statusModalSale.id) ?? statusModalSale
+    : null
+  const currentCustomerModalSale = customerModalSale
+    ? list.sales.find((sale) => sale.id === customerModalSale.id) ?? customerModalSale
     : null
 
   return (
@@ -81,6 +86,7 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
         onTransport={list.setTransportSale}
         onCancel={list.cancelSale}
         onOpenStatusModal={setStatusModalSale}
+        onOpenCustomerModal={setCustomerModalSale}
         sellerEditor={list.sellerEditor}
         branchEditor={list.branchEditor}
       />
@@ -93,6 +99,14 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
           open={Boolean(currentStatusModalSale)}
           canSave={list.isAdmin || currentStatusModalSale.status !== "CONFIRMADA"}
           onClose={() => setStatusModalSale(null)}
+          onSaved={list.updateSale}
+        />
+      ) : null}
+      {currentCustomerModalSale ? (
+        <SaleCustomerUpdateModal
+          sale={currentCustomerModalSale}
+          open={Boolean(currentCustomerModalSale)}
+          onClose={() => setCustomerModalSale(null)}
           onSaved={list.updateSale}
         />
       ) : null}

@@ -79,6 +79,7 @@ export type SerializedSale = {
   payment: string | null
   notes: string | null
   status: SaleStatus | string | null
+  saleType?: "MINORISTA" | "MAYORISTA" | string | null
   amountPaid: string | null
   balanceDue: string | null
   subtotal: string | null

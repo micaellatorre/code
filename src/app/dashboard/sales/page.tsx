@@ -69,6 +69,7 @@ export default async function SalesPage() {
     payment: sale.payments.length > 0 ? sale.payments[0].method : null,
     notes: sale.notes,
     status: sale.status,
+    saleType: sale.saleType,
     amountPaid: toStr(sale.amountPaid),
     balanceDue: toStr(sale.balanceDue),
     subtotal: toStr(sale.subtotal),

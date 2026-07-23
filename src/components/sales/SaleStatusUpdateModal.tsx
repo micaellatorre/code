@@ -112,9 +112,6 @@ function formatUsd(value: number) {
 export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, onSaved }: Props) {
   const { data: session } = useSession()
   const [status, setStatus] = useState<SaleStatusValue>(asStatus(sale.status))
-  const [customerName, setCustomerName] = useState(sale.customerName ?? "")
-  const [buyerName, setBuyerName] = useState(sale.buyer?.name ?? "")
-  const [buyerSurname, setBuyerSurname] = useState(sale.buyer?.surname ?? "")
   const [notes, setNotes] = useState(sale.notes ?? "")
   const [payments, setPayments] = useState<PaymentDraft[]>([])
   const [cashAccounts, setCashAccounts] = useState<CashAccountOption[]>([])
@@ -130,9 +127,6 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
   useEffect(() => {
     if (!open) return
     setStatus(asStatus(sale.status))
-    setCustomerName(sale.customerName ?? "")
-    setBuyerName(sale.buyer?.name ?? "")
-    setBuyerSurname(sale.buyer?.surname ?? "")
     setNotes(sale.notes ?? "")
     setPayments(sale.payments.map(paymentToDraft))
     setError(null)
@@ -161,9 +155,6 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
       const body = {
         status,
         notes: notes || null,
-        ...(sale.buyer
-          ? { buyer: { name: buyerName, surname: buyerSurname } }
-          : { customerName: customerName || "Consumidor Final" }),
         payments: payments.map((payment) => ({
           id: payment.id || null,
           method: payment.method,
@@ -236,24 +227,6 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
                   {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                 </select>
               </label>
-              {sale.buyer ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="form-control">
-                    <span className="label-text">Comprador</span>
-                    <input className="input input-bordered input-sm" value={buyerName} onChange={(event) => setBuyerName(event.target.value)} disabled={saving || !canSave} />
-                  </label>
-                  <label className="form-control">
-                    <span className="label-text">Apellido</span>
-                    <input className="input input-bordered input-sm" value={buyerSurname} onChange={(event) => setBuyerSurname(event.target.value)} disabled={saving || !canSave} />
-                  </label>
-                  <div className="sm:col-span-2 text-xs text-base-content/60">buyerId: {sale.buyer.id ?? "-"}</div>
-                </div>
-              ) : (
-                <label className="form-control">
-                  <span className="label-text">Cliente</span>
-                  <input className="input input-bordered input-sm" value={customerName} onChange={(event) => setCustomerName(event.target.value)} disabled={saving || !canSave} />
-                </label>
-              )}
               <label className="form-control">
                 <span className="label-text">Notas</span>
                 <textarea className="textarea textarea-bordered min-h-24" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving || !canSave} />
