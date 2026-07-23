@@ -31,7 +31,7 @@ export default async function SalesPage() {
       user: { select: { id: true, name: true, email: true } },
       branch: { select: { id: true, code: true, name: true } },
       buyer: { select: { id: true, type: true, name: true, surname: true, businessName: true, phone: true, instagram: true, email: true } },
-      payments: { select: { id: true, method: true, currency: true, amount: true, paidAt: true, note: true }, orderBy: { paidAt: "asc" } },
+      payments: { select: { id: true, method: true, currency: true, amount: true, exchangeRate: true, amountUsd: true, cashAccountId: true, paidAt: true, note: true }, orderBy: { paidAt: "asc" } },
       appointments: { select: { id: true } },
       items: {
         include: {
@@ -103,6 +103,9 @@ export default async function SalesPage() {
       method: payment.method,
       currency: payment.currency,
       amount: toStr(payment.amount),
+      exchangeRate: toStr(payment.exchangeRate),
+      amountUsd: toStr(payment.amountUsd),
+      cashAccountId: payment.cashAccountId,
       paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
       note: payment.note,
     })),

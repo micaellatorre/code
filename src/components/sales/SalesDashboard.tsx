@@ -1,7 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import ExportSalesModal from "./ExportSalesModal"
 import ReceiptModal from "./ReceiptModal"
+import SaleStatusUpdateModal from "./SaleStatusUpdateModal"
 import SalesFilters from "./SalesFilters"
 import SalesHeader from "./SalesHeader"
 import SalesKpis from "./SalesKpis"
@@ -36,6 +38,10 @@ function TransportModal({ sale, onClose }: { sale: SerializedSale | null; onClos
 
 export default function SalesDashboard({ initial }: { initial: SerializedSale[] }) {
   const list = useSalesList(initial)
+  const [statusModalSale, setStatusModalSale] = useState<SerializedSale | null>(null)
+  const currentStatusModalSale = statusModalSale
+    ? list.sales.find((sale) => sale.id === statusModalSale.id) ?? statusModalSale
+    : null
 
   return (
     <div className="space-y-4">
@@ -74,12 +80,22 @@ export default function SalesDashboard({ initial }: { initial: SerializedSale[] 
         receiptLoadingSaleId={list.receiptLoadingSaleId}
         onTransport={list.setTransportSale}
         onCancel={list.cancelSale}
+        onOpenStatusModal={setStatusModalSale}
         sellerEditor={list.sellerEditor}
         branchEditor={list.branchEditor}
       />
       <ExportSalesModal open={list.isExportOpen} onClose={() => list.setIsExportOpen(false)} sales={list.filteredSales} canSeeMargin={list.canSeeMargin} />
       <ReceiptModal preview={list.receiptPreview} onClose={() => list.setReceiptPreview(null)} />
       <TransportModal sale={list.transportSale} onClose={() => list.setTransportSale(null)} />
+      {currentStatusModalSale ? (
+        <SaleStatusUpdateModal
+          sale={currentStatusModalSale}
+          open={Boolean(currentStatusModalSale)}
+          canSave={list.isAdmin || currentStatusModalSale.status !== "CONFIRMADA"}
+          onClose={() => setStatusModalSale(null)}
+          onSaved={list.updateSale}
+        />
+      ) : null}
     </div>
   )
 }

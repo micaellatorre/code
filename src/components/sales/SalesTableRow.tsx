@@ -1,5 +1,6 @@
 "use client"
 
+import { ArrowPathIcon } from "@heroicons/react/24/outline"
 import { formatSaleDate, getSaleOrigin, getStatusBadgeClass, isTodayInArgentina } from "./salesUtils"
 import SaleActionsCell from "./SaleActionsCell"
 import SaleAmountCell from "./SaleAmountCell"
@@ -21,6 +22,7 @@ type SalesTableRowProps = {
   isReceiptLoading: boolean
   onTransport: () => void
   onCancel: () => void
+  onOpenStatusModal: () => void
   sellerProps: {
     isEditing: boolean
     isSearchingUsers: boolean
@@ -43,6 +45,7 @@ type SalesTableRowProps = {
 export default function SalesTableRow(props: SalesTableRowProps) {
   const { sale } = props
   const origin = getSaleOrigin(sale)
+  const canOpenStatusModal = props.canEdit
 
   return (
     <tr className="hover">
@@ -77,7 +80,23 @@ export default function SalesTableRow(props: SalesTableRowProps) {
       </td>
       <td className="align-top flex flex-col items-start gap-1">
         <SaleAmountCell total={sale.total} />
-        <div className={`badge badge-sm mt-1 ${getStatusBadgeClass(sale.status)}`}>{sale.status ?? "CONFIRMADA"}</div>
+        {canOpenStatusModal ? (
+          <button
+            type="button"
+            className={`badge badge-sm mt-1 group min-w-28 cursor-pointer justify-center gap-1 transition-colors hover:border-primary hover:bg-primary hover:text-primary-content ${getStatusBadgeClass(sale.status)}`}
+            title="Actualizar estado de venta"
+            aria-label={`Actualizar estado de venta: ${sale.status ?? "CONFIRMADA"}`}
+            onClick={props.onOpenStatusModal}
+          >
+            <span className="group-hover:hidden">{sale.status ?? "CONFIRMADA"}</span>
+            <span className="hidden items-center gap-1 group-hover:inline-flex">
+              <ArrowPathIcon className="size-3" />
+              Actualizar
+            </span>
+          </button>
+        ) : (
+          <div className={`badge badge-sm mt-1 ${getStatusBadgeClass(sale.status)}`}>{sale.status ?? "CONFIRMADA"}</div>
+        )}
       </td>
       {props.canSeeMargin && (
         <td className="align-top">

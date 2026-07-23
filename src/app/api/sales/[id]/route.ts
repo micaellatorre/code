@@ -823,6 +823,19 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         }
       }
 
+      if (targetStatus === "CONFIRMADA" && !amountPaid.equals(total)) {
+        throw new Error(`El total de pagos (${amountPaid.toFixed(2)}) debe coincidir con el total de la venta (${total.toFixed(2)}).`)
+      }
+
+      if (targetStatus === "SENADA") {
+        if (amountPaid.lessThanOrEqualTo(0)) {
+          throw new Error("La sena debe tener al menos un pago mayor a 0.")
+        }
+        if (amountPaid.greaterThan(total)) {
+          throw new Error("La sena no puede superar el total de la venta.")
+        }
+      }
+
       saleData.status = targetStatus
       saleData.subtotal = subtotal
       saleData.extraCosts = extraCosts
@@ -854,7 +867,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       }
 
       return updatedSale
-    })
+    }, { timeout: 15000, maxWait: 5000 })
 
     return NextResponse.json({ sale: serializeSale(updated) })
   } catch (e: unknown) {

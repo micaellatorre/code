@@ -286,6 +286,10 @@ export function useSalesList(initial: SerializedSale[]) {
     })
   }
 
+  function updateSale(nextSale: SerializedSale) {
+    setSales((prev) => prev.map((sale) => (sale.id === nextSale.id ? nextSale : sale)))
+  }
+
   return {
     sales,
     filteredSales,
@@ -344,6 +348,7 @@ export function useSalesList(initial: SerializedSale[]) {
     openSellerEditor,
     closeSellerEditor,
     handleSelectSeller,
+    updateSale,
     cancelSale,
   }
 }
