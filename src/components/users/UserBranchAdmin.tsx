@@ -3,6 +3,10 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import {
+  MapPinIcon,
+  ClipboardDocumentCheckIcon,
+} from "@heroicons/react/24/outline"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 
 type UserRow = {
@@ -101,10 +105,13 @@ export default function UserBranchAdmin({
                 <td>
                   <div className="flex flex-wrap gap-2">
                     <Link href={`/dashboard/users/${user.id}/edit`} className="btn btn-ghost btn-xs">Editar</Link>
-                    <button type="button" className="btn btn-outline btn-xs" onClick={() => setEditingId(user.id)}>Sucursales</button>
+                    <button type="button" className="btn btn-outline btn-xs" onClick={() => setEditingId(user.id)}>Sucursales
+                      <MapPinIcon className="h-4 w-4" />
+                    </button>
                     {user.role === "VENDEDOR" ? (
-                      <button type="button" className="badge badge-primary badge-outline cursor-pointer hover:badge-primary" onClick={() => openCommissions(user)}>
+                      <button type="button" className="btn btn-outline btn-xs" onClick={() => openCommissions(user)}>
                         Comision
+                        <ClipboardDocumentCheckIcon className="h-4 w-4" />
                       </button>
                     ) : null}
                   </div>

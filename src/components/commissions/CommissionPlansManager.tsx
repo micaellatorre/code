@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { RiVipCrownLine } from "@remixicon/react"
 import type { CommissionPlanDto, CommissionSellerDto } from "@/lib/domain/commissions"
 
 export default function CommissionPlansManager({
@@ -55,10 +56,17 @@ export default function CommissionPlansManager({
                 </tr>
               </thead>
               <tbody>
-                {sellers.length ? sellers.map((seller) => (
+                {sellers.length ? sellers.map((seller, index) => (
                   <tr key={seller.id}>
                     <td>
-                      <div className="font-medium">{seller.name}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        <span>{seller.name}</span>
+                        {index === 0 ? (
+                          <span className="badge badge-warning badge-outline badge-xs gap-1" title="Top vendedor">
+                            <RiVipCrownLine className="size-3" aria-hidden="true" />
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-xs text-base-content/60">{seller.email}</div>
                     </td>
                     <td>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { RiVipCrownFill } from "@remixicon/react"
 
 export type SellerScoreRow = {
   sellerId: string
@@ -90,8 +91,8 @@ export default function UsersTopSellersTable({ rows }: { rows: SellerScoreRow[] 
     <section className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Score points / Analisis</h2>
-          <p className="text-sm text-base-content/60">Top sellers por ventas no canceladas, cobranza y margen.</p>
+          <h2 className="text-lg font-semibold">Pódio Vendedores</h2>
+          <p className="text-sm text-base-content/60">Tabla de clasificación de top-vendedores por ventas no canceladas, cobranza y margen.</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-base-content/70">Sucursales:</span>
@@ -135,7 +136,14 @@ export default function UsersTopSellersTable({ rows }: { rows: SellerScoreRow[] 
               <tr key={`${row.sellerId}-${row.branchId ?? "all"}`}>
                 <td><span className="badge badge-ghost badge-sm">{index + 1}</span></td>
                 <td>
-                  <div className="font-medium">{row.sellerName}</div>
+                  <div className="flex items-center gap-2 font-medium">
+                    <span>{row.sellerName}</span>
+                    {index === 0 ? (
+                      <span className="badge badge-warning badge-sm gap-1" title="Top vendedor">
+                        <RiVipCrownFill className="size-3" aria-hidden="true" />
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="text-xs text-base-content/60">{row.sellerEmail}</div>
                 </td>
                 <td>
