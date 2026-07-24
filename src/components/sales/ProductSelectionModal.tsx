@@ -4,7 +4,7 @@ import type { SaleItemDraft } from '@/components/sales/types'
 import ImeiDisplay from '@/components/common/ImeiDisplay'
 import type { Role } from '@/lib/auth/roles'
 import type { Product, ProductType, ProductStatus } from '@prisma/client'
-import { ChevronDownIcon, PencilIcon } from '@heroicons/react/24/solid'
+import { ChevronDownIcon, PencilIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/solid'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Fragment, useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -146,6 +146,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
   const [orderBy, setOrderBy] = useState<'alpha_asc' | 'alpha_desc' | 'created_desc' | 'created_asc' | 'updated_desc' | 'updated_asc'>('alpha_asc')
   const [selection, setSelection] = useState<Record<string, SelectionDraft>>({})
   const [expandedClusters, setExpandedClusters] = useState<Record<string, boolean>>({})
+  const [isSelectionCartExpanded, setIsSelectionCartExpanded] = useState(false)
 
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -224,18 +225,20 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     debouncedFetch(query, typeFilter, stateFilter)
   }, [query, typeFilter, stateFilter, orderBy, debouncedFetch])
 
+  const getAvailableStockForProduct = useCallback((product: Pick<ApiProduct, 'id' | 'stockAvailable' | 'stock'>) => {
+    const existingUnits = existingItems
+      .filter((item) => item.productId === product.id)
+      .reduce((sum, item) => sum + item.units, 0)
+
+    return Math.max(0, (product.stockAvailable ?? product.stock ?? 0) - existingUnits)
+  }, [existingItems])
+
   const availableStock = useMemo(() => {
     const stockMap = new Map<string, number>()
-    products.forEach((p) => stockMap.set(p.id, p.stockAvailable ?? p.stock ?? 0))
-
-    existingItems.forEach((item) => {
-      if (stockMap.has(item.productId)) {
-        stockMap.set(item.productId, (stockMap.get(item.productId) ?? 0) - item.units)
-      }
-    })
+    products.forEach((p) => stockMap.set(p.id, getAvailableStockForProduct(p)))
 
     return stockMap
-  }, [products, existingItems])
+  }, [products, getAvailableStockForProduct])
 
   const productClusters = useMemo<ProductCluster[]>(() => {
     const clusterMap = new Map<string, ApiProduct[]>()
@@ -262,8 +265,22 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     [productClusters, selection],
   )
 
+  const selectedEntries = useMemo(() => Object.entries(selection), [selection])
+  const selectedUnits = useMemo(
+    () => selectedEntries.reduce((sum, [, draft]) => sum + draft.units, 0),
+    [selectedEntries],
+  )
+
   const toggleCluster = (clusterKey: string) => {
     setExpandedClusters((prev) => ({ ...prev, [clusterKey]: !prev[clusterKey] }))
+  }
+
+  const removeSelection = (clusterKey: string) => {
+    setSelection((prev) => {
+      const next = { ...prev }
+      delete next[clusterKey]
+      return next
+    })
   }
 
   const handleToggleSelection = (cluster: ProductCluster, isSelected: boolean) => {
@@ -289,9 +306,16 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
   }
 
   const handleQuantityChange = (clusterKey: string, units: number) => {
+    const draft = selection[clusterKey]
+    if (!draft) return
+
     const cluster = productClusters.find((item) => item.key === clusterKey)
-    const stock = cluster?.totalStock ?? 0
-    const cappedUnits = Math.max(1, Math.min(units, stock))
+    const stock = draft
+      ? draft.products.reduce((sum, product) => sum + getAvailableStockForProduct(product), 0)
+      : cluster?.totalStock ?? 0
+    const requestedUnits = Number.isFinite(units) ? units : 1
+    const cappedUnits = Math.max(1, Math.min(requestedUnits, Math.max(1, stock)))
+
     setSelection((prev) => ({
       ...prev,
       [clusterKey]: { ...prev[clusterKey], units: cappedUnits },
@@ -305,7 +329,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
       return draft.products.flatMap((product, index) => {
         if (remaining <= 0) return []
 
-        const stock = Math.max(0, availableStock.get(product.id) ?? 0)
+        const stock = getAvailableStockForProduct(product)
         const units = Math.min(remaining, stock)
         if (units <= 0) return []
 
@@ -323,6 +347,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
         }]
       })
     })
+    if (newItems.length === 0) return
+
     onAddItems(newItems)
   }
 
@@ -383,6 +409,124 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
             </select>
           </div>
         </div>
+
+        {selectedEntries.length > 0 ? (
+          <div className="mb-4 rounded-box border border-primary/30 bg-primary/10 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-content">
+                  <ShoppingCartIcon className="size-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-primary">Items seleccionados</p>
+                  <p className="text-xs text-base-content/60">
+                    {selectedUnits} {selectedUnits === 1 ? 'item listo' : 'items listos'} para agregar a la venta
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-outline btn-sm gap-2"
+                onClick={() => setIsSelectionCartExpanded((prev) => !prev)}
+              >
+                {isSelectionCartExpanded ? 'Ocultar detalle' : 'Ver detalle'}
+                <ChevronDownIcon className={`size-4 transition-transform ${isSelectionCartExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedEntries.map(([clusterKey, draft]) => (
+                <span key={clusterKey} className="badge badge-primary badge-outline h-auto min-h-7 max-w-full gap-1 py-1 pl-3 pr-1">
+                  <span className="max-w-[18rem] truncate">
+                    {draft.product.modelName}{draft.units > 1 ? ` x${draft.units}` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-circle size-5 min-h-0"
+                    onClick={() => removeSelection(clusterKey)}
+                    aria-label={`Quitar ${draft.product.modelName}`}
+                    title="Quitar seleccion"
+                  >
+                    <XMarkIcon className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            {isSelectionCartExpanded ? (
+              <div className="mt-3 overflow-x-auto rounded-box border border-primary/20 bg-base-100/80">
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>IMEI</th>
+                      <th>Estado</th>
+                      <th>Stock disp.</th>
+                      <th>% Bateria</th>
+                      <th>Precio</th>
+                      <th>Cantidad</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedEntries.map(([clusterKey, draft]) => {
+                      const representative = draft.products[0]
+                      const stock = draft.products.reduce((sum, product) => sum + getAvailableStockForProduct(product), 0)
+                      const isCluster = draft.products.length > 1
+
+                      return (
+                        <tr key={clusterKey}>
+                          <td>
+                            <Link href={productEditHref(representative.id)} className="link link-hover link-primary font-medium">
+                              {representative.modelName}
+                            </Link>
+                            <div className="text-xs opacity-60">
+                              {representative.color || ''} {representative.capacityGB ? `${representative.capacityGB}GB` : ''}
+                            </div>
+                          </td>
+                          <td>
+                            <ImeiDisplay imei={isCluster ? null : representative.imei} fallback={isCluster ? `${draft.products.length} items` : 'N/A'} />
+                          </td>
+                          <td>
+                            <span className={`text-nowrap badge badge-sm ${getStateBadgeClass(representative.state)}`}>
+                              {representative.state.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge badge-ghost ${stock <= 0 ? 'badge-error' : ''}`}>{stock}</span>
+                          </td>
+                          <td>{representative.batteryPct != null ? `${representative.batteryPct}%` : 'N/A'}</td>
+                          <td>${draft.unitPrice ?? representative.salePrice ?? '0'}</td>
+                          <td>
+                            <input
+                              type="number"
+                              value={draft.units}
+                              onChange={(e) => handleQuantityChange(clusterKey, parseInt(e.target.value, 10))}
+                              className="input input-bordered input-xs w-20"
+                              min={1}
+                              max={Math.max(1, stock)}
+                            />
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs btn-square text-error"
+                              onClick={() => removeSelection(clusterKey)}
+                              title="Quitar seleccion"
+                              aria-label={`Quitar ${representative.modelName}`}
+                            >
+                              <XMarkIcon className="size-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="overflow-x-auto h-96">
           {isLoading && products.length === 0 ? (
@@ -482,7 +626,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                             <input
                               type="number"
                               value={selection[cluster.key].units}
-                              onChange={(e) => handleQuantityChange(cluster.key, parseInt(e.target.value))}
+                              onChange={(e) => handleQuantityChange(cluster.key, parseInt(e.target.value, 10))}
                               className="input input-bordered input-xs w-20"
                               min={1}
                               max={currentStock}
@@ -575,8 +719,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
 
         <div className="modal-action">
           <button onClick={onClose} className="btn btn-ghost">Cancelar</button>
-          <button onClick={handleConfirm} className="btn btn-primary" disabled={Object.keys(selection).length === 0}>
-            Agregar {Object.keys(selection).length} Items
+          <button onClick={handleConfirm} className="btn btn-primary" disabled={selectedEntries.length === 0}>
+            Agregar {selectedUnits} {selectedUnits === 1 ? 'item' : 'items'}
           </button>
         </div>
       </div>
