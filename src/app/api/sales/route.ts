@@ -183,8 +183,8 @@ export async function POST(request: Request) {
           entityLabel: "venta",
         }, tx);
         if (closerId) {
-          const closer = await tx.user.findFirst({ where: { id: closerId, tenantId: tenant.id, isActive: true }, select: { id: true } });
-          if (!closer) throw apiError("Closer no disponible", 400);
+          const closer = await tx.user.findFirst({ where: { id: closerId, tenantId: tenant.id, role: "VENDEDOR", isActive: true }, select: { id: true } });
+          if (!closer) throw apiError("Closer no disponible. Debe ser un usuario vendedor activo.", 400);
         }
 
         const productIds = items.map((it) => String(it.productId));

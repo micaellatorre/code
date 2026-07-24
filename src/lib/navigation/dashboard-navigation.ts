@@ -5,6 +5,7 @@ import {
   CircleStackIcon,
   CurrencyDollarIcon,
   BanknotesIcon,
+  ClipboardDocumentCheckIcon,
   DevicePhoneMobileIcon,
   MapPinIcon,
   ShoppingCartIcon,
@@ -141,6 +142,15 @@ export const dashboardNavigationGroups: DashboardNavigationGroup[] = [
         allowedRoles: ["ADMIN", "SOCIO"],
         quickAddHref: "/dashboard/cash/new",
         quickAddLabel: "Nuevo movimiento",
+      },
+      {
+        key: "commissions",
+        label: "Comisiones",
+        href: "/dashboard/commissions",
+        icon: ClipboardDocumentCheckIcon,
+        allowedRoles: ["ADMIN", "SOCIO"],
+        quickAddHref: "/dashboard/commissions/new",
+        quickAddLabel: "Nuevo plan",
       },
       {
         key: "branches",

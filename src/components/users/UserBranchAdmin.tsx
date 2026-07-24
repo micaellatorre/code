@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 
 type UserRow = {
@@ -14,10 +16,20 @@ type UserRow = {
   coverageBranchIds: string[]
 }
 
-export default function UserBranchAdmin({ users, branches }: { users: UserRow[]; branches: BranchOption[] }) {
+export default function UserBranchAdmin({
+  users,
+  branches,
+  hasCommissionPlans = false,
+}: {
+  users: UserRow[]
+  branches: BranchOption[]
+  hasCommissionPlans?: boolean
+}) {
+  const router = useRouter()
   const [rows, setRows] = useState(users)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const editing = rows.find((row) => row.id === editingId) ?? null
 
   async function save(user: UserRow) {
@@ -42,8 +54,27 @@ export default function UserBranchAdmin({ users, branches }: { users: UserRow[];
     setRows((prev) => prev.map((row) => (row.id === userId ? updater(row) : row)))
   }
 
+  function openCommissions(user: UserRow) {
+    if (!hasCommissionPlans) {
+      setToastMessage("No existe un plan de comision activo. Crea uno para este vendedor.")
+      window.setTimeout(() => setToastMessage(null), 3200)
+      window.setTimeout(() => router.push(`/dashboard/commissions/new?closerId=${encodeURIComponent(user.id)}`), 900)
+      return
+    }
+
+    router.push(`/dashboard/commissions/${user.id}/edit`)
+  }
+
   return (
     <div className="space-y-4">
+      {toastMessage ? (
+        <div className="toast toast-top toast-end z-[120]">
+          <div className="alert alert-warning text-sm shadow-lg">
+            <span>{toastMessage}</span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="overflow-x-auto rounded-lg border border-base-300 bg-base-100">
         <table className="table table-sm w-full">
           <thead>
@@ -67,7 +98,17 @@ export default function UserBranchAdmin({ users, branches }: { users: UserRow[];
                 <td>{user.currentBranch?.name ?? branches.find((branch) => branch.id === user.currentBranchId)?.name ?? "-"}</td>
                 <td>{user.role === "ADMIN" ? "Todas las sucursales" : coverageLabel(user.coverageBranchIds, branches)}</td>
                 <td>{user.isActive ? <span className="badge badge-success badge-sm">Activo</span> : <span className="badge badge-ghost badge-sm">Inactivo</span>}</td>
-                <td><button type="button" className="btn btn-outline btn-xs" onClick={() => setEditingId(user.id)}>Editar sucursales</button></td>
+                <td>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/dashboard/users/${user.id}/edit`} className="btn btn-ghost btn-xs">Editar</Link>
+                    <button type="button" className="btn btn-outline btn-xs" onClick={() => setEditingId(user.id)}>Sucursales</button>
+                    {user.role === "VENDEDOR" ? (
+                      <button type="button" className="badge badge-primary badge-outline cursor-pointer hover:badge-primary" onClick={() => openCommissions(user)}>
+                        Comision
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -101,7 +142,7 @@ export default function UserBranchAdmin({ users, branches }: { users: UserRow[];
 
 function coverageLabel(ids: string[], branches: BranchOption[]) {
   const names = ids.map((id) => branches.find((branch) => branch.id === id)?.name).filter(Boolean)
-  return names.length ? names.join(" · ") : "Sin cobertura"
+  return names.length ? names.join(" / ") : "Sin cobertura"
 }
 
 function UserCoverageEditor({

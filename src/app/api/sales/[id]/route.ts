@@ -366,8 +366,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         if (!closerId) {
           saleData.closer = { disconnect: true }
         } else {
-          const closer = await tx.user.findFirst({ where: { id: closerId, tenantId: sale.tenantId, isActive: true }, select: { id: true } })
-          if (!closer) throw new Error("Closer no disponible")
+          const closer = await tx.user.findFirst({ where: { id: closerId, tenantId: sale.tenantId, role: "VENDEDOR", isActive: true }, select: { id: true } })
+          if (!closer) throw new Error("Closer no disponible. Debe ser un usuario vendedor activo.")
           saleData.closer = { connect: { id: closer.id } }
         }
       }
