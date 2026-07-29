@@ -51,8 +51,12 @@ export default function SaleSummaryStep({
       <div className="rounded-lg border border-base-300 p-3">
         <p className="text-xs font-semibold uppercase text-base-content/50">Items</p>
         {items.map((item) => (
-          <div key={item._id} className="flex justify-between gap-3 border-b border-base-300 py-2 text-sm last:border-b-0">
-            <span>{item.product.modelName} x{item.units}</span>
+          <div key={item._id} className={`flex justify-between gap-3 border-b border-base-300 py-2 text-sm last:border-b-0 ${item.parentClientLineId ? "border-l-2 border-primary pl-3" : ""}`}>
+            <span>
+              {item.parentClientLineId ? <span className="mr-1 text-primary">↳</span> : null}
+              {item.product.modelName} x{item.units}
+              {item.parentClientLineId ? <span className="ml-2 text-xs text-primary">Accesorio sugerido</span> : null}
+            </span>
             <span>{formatUsd(Number(item.unitPrice) * item.units)}</span>
           </div>
         ))}

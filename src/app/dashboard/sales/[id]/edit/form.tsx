@@ -42,6 +42,8 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
 
         const items: SaleItemDraft[] = Array.isArray(sale.items)
           ? sale.items.map((item: any) => ({
+              clientLineId: String(item.id ?? `${item.productId}-${crypto.randomUUID()}`),
+              parentClientLineId: item.parentItemId ?? null,
               productId: String(item.productId),
               product: item.product,
               units: Number(item.units || 1),

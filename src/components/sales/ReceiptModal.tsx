@@ -77,26 +77,65 @@ function getSaleTime(date: string | null) {
   return formatSaleDate(date, "HH:mm")
 }
 
-function getPrintableLogo() {
+type ReceiptBranding = NonNullable<ReceiptPreview["branding"]>
+
+function getBrandName(branding?: ReceiptBranding) {
+  return branding?.tenantName?.trim() || "GP Importaciones"
+}
+
+function getPrintableLogo(branding?: ReceiptBranding) {
+  if (branding?.logoDataUrl) {
+    return `<img class="brand-image" src="${escapeHtml(branding.logoDataUrl)}" alt="${escapeHtml(getBrandName(branding))}" />`
+  }
+
   return printableLogo
 }
 
-function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"]) {
+function orderReceiptItems(items: SaleItemSummary[]) {
+  const byId = new Set(items.map((item) => item.id))
+  const childrenByParent = new Map<string, SaleItemSummary[]>()
+  const roots: SaleItemSummary[] = []
+
+  for (const item of items) {
+    if (item.parentItemId && byId.has(item.parentItemId)) {
+      childrenByParent.set(item.parentItemId, [...(childrenByParent.get(item.parentItemId) ?? []), item])
+    } else {
+      roots.push(item)
+    }
+  }
+
+  const ordered: { item: SaleItemSummary; depth: number }[] = []
+
+  function append(item: SaleItemSummary, depth: number) {
+    ordered.push({ item, depth })
+    for (const child of childrenByParent.get(item.id) ?? []) {
+      append(child, depth + 1)
+    }
+  }
+
+  for (const root of roots) append(root, 0)
+  return ordered
+}
+
+function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"], branding?: ReceiptBranding) {
   const currentSale = sale
   const buyer = getSaleBuyerName(currentSale)
   const invoiceNumber = receipt.formattedNumber
   const saleDate = getSaleDateOnly(currentSale.date)
   const saleTime = getSaleTime(currentSale.date)
+  const brandName = getBrandName(branding)
+  const warrantyPolicyText = branding?.warrantyPolicyText?.trim()
 
-  const itemRows = currentSale.items
-    .map((item) => {
+  const itemRows = orderReceiptItems(currentSale.items)
+    .map(({ item, depth }) => {
       const quantity = getItemQuantity(item)
       const unitPrice = getItemUnitPrice(item)
       const lineTotal = toSafeNumber(item.lineTotal)
 
       return `
-        <tr>
+        <tr class="${depth > 0 ? "item-child" : ""}">
           <td class="description">
+            ${depth > 0 ? '<span class="child-label">Accesorio sugerido</span>' : ""}
             ${escapeHtml(item.product.modelName)}
           </td>
           <td class="number quantity">
@@ -180,6 +219,13 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"]) 
             font-weight: 700;
             letter-spacing: 0.18em;
             text-transform: uppercase;
+          }
+
+          .brand-image {
+            display: block;
+            max-width: 42mm;
+            max-height: 18mm;
+            object-fit: contain;
           }
 
           .metadata {
@@ -298,6 +344,21 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"]) 
             overflow-wrap: anywhere;
           }
 
+          .item-child .description {
+            padding-left: 6mm;
+            color: #4b5563;
+          }
+
+          .child-label {
+            display: block;
+            margin-bottom: 0.8mm;
+            color: #8b9199;
+            font-size: 7px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
           .number {
             text-align: right;
             white-space: nowrap;
@@ -389,9 +450,9 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"]) 
           <header class="brand">
             <div>
               <div class="brand-logo">
-                ${getPrintableLogo()}
+                ${getPrintableLogo(branding)}
               </div>
-              <div class="brand-name">GP Importaciones</div>
+              <div class="brand-name">${escapeHtml(brandName)}</div>
             </div>
           </header>
 
@@ -451,9 +512,10 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"]) 
           </section>
 
           <footer class="footer">
-            <strong>GP Importaciones</strong><br />
+            <strong>${escapeHtml(brandName)}</strong><br />
             Comprobante interno correspondiente a la operacion registrada
             en el sistema.
+            ${warrantyPolicyText ? `<br />${escapeHtml(warrantyPolicyText)}` : ""}
           </footer>
         </main>
 
@@ -491,10 +553,12 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"]) 
 export default function ReceiptModal({ preview, onClose }: ReceiptModalProps) {
   if (!preview) return null
 
-  const { sale, receipt } = preview
+  const { sale, receipt, branding } = preview
   const buyer = getSaleBuyerName(sale)
   const saleDate = getSaleDateOnly(sale.date)
   const saleTime = getSaleTime(sale.date)
+  const brandName = getBrandName(branding)
+  const receiptRows = orderReceiptItems(sale.items)
 
   return (
     <dialog className="modal modal-open">
@@ -503,10 +567,15 @@ export default function ReceiptModal({ preview, onClose }: ReceiptModalProps) {
           <header className="flex min-h-20 items-start">
             <div>
               <div className="flex items-center text-[#10233f]">
-                <PrintableLogoMark className="fill-current" />
+                {branding?.logoDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={branding.logoDataUrl} alt={brandName} className="max-h-14 max-w-40 object-contain" />
+                ) : (
+                  <PrintableLogoMark className="fill-current" />
+                )}
               </div>
               <div className="mt-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#10233f]">
-                GP Importaciones
+                {brandName}
               </div>
             </div>
           </header>
@@ -546,9 +615,14 @@ export default function ReceiptModal({ preview, onClose }: ReceiptModalProps) {
                 </tr>
               </thead>
               <tbody>
-                {sale.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.product.modelName}</td>
+                {receiptRows.map(({ item, depth }) => (
+                  <tr key={item.id} className={depth > 0 ? "bg-base-200/50" : undefined}>
+                    <td>
+                      <div className={depth > 0 ? "pl-5 text-base-content/70" : ""}>
+                        {depth > 0 ? <div className="text-[10px] font-medium uppercase text-base-content/50">Accesorio sugerido</div> : null}
+                        {item.product.modelName}
+                      </div>
+                    </td>
                     <td className="text-center">{getItemQuantity(item)}</td>
                     <td className="text-right">{formatUsd(getItemUnitPrice(item))}</td>
                     <td className="text-right font-medium">{formatUsd(item.lineTotal)}</td>
@@ -564,9 +638,15 @@ export default function ReceiptModal({ preview, onClose }: ReceiptModalProps) {
           </section>
 
           <footer className="pt-8 text-center text-xs text-base-content/50">
-            <strong>GP Importaciones</strong>
+            <strong>{brandName}</strong>
             <br />
             Comprobante interno correspondiente a la operacion registrada en el sistema.
+            {branding?.warrantyPolicyText ? (
+              <>
+                <br />
+                {branding.warrantyPolicyText}
+              </>
+            ) : null}
           </footer>
         </div>
 
@@ -577,7 +657,7 @@ export default function ReceiptModal({ preview, onClose }: ReceiptModalProps) {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => printReceipt(sale, receipt)}
+            onClick={() => printReceipt(sale, receipt, branding)}
           >
             Imprimir
           </button>

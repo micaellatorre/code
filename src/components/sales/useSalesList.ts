@@ -186,7 +186,7 @@ export function useSalesList(initial: SerializedSale[]) {
         method: "POST",
         cache: "no-store",
       })
-      const body = (await response.json().catch(() => null)) as { receipt?: SerializedSaleReceipt; error?: string } | null
+      const body = (await response.json().catch(() => null)) as Pick<ReceiptPreview, "branding"> & { receipt?: SerializedSaleReceipt; error?: string } | null
 
       if (!response.ok || !body?.receipt) {
         throw new Error(body?.error ?? "No se pudo generar el comprobante.")
@@ -194,7 +194,7 @@ export function useSalesList(initial: SerializedSale[]) {
 
       const nextSale = { ...sale, receipt: body.receipt }
       setSales((prev) => prev.map((item) => (item.id === sale.id ? nextSale : item)))
-      setReceiptPreview({ sale: nextSale, receipt: body.receipt })
+      setReceiptPreview({ sale: nextSale, receipt: body.receipt, branding: body.branding })
     } catch (error) {
       console.error("Failed to open sale receipt", error)
       setReceiptError(error instanceof Error ? error.message : "No se pudo generar el comprobante.")

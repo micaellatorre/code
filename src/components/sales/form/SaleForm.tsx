@@ -105,7 +105,15 @@ export default function SaleForm({
       key: "items",
       title: "Items",
       summary: `${form.items.length} items`,
-      node: <SaleItemsStep items={form.items} setItems={form.setItems} disabled={form.saleIsLocked} />,
+      node: (
+        <SaleItemsStep
+          items={form.items}
+          setItems={form.setItems}
+          disabled={form.saleIsLocked}
+          branchId={form.selectedBranchId}
+          saleType={form.customerKind === "wholesale" ? "MAYORISTA" : "MINORISTA"}
+        />
+      ),
     },
     {
       key: "payments",

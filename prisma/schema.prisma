@@ -27,6 +27,11 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @default(now()) @updatedAt
   lastLoginAt     DateTime?
+  invitedAt       DateTime?
+  joinedAt        DateTime?
+  invitedById     String?
+  invitedBy       User?     @relation("UserInvitations", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedUsers    User[]    @relation("UserInvitations")
 
   appointments          Appointment[]
   sales                 Sale[]               @relation("SaleCreatedBy")
@@ -43,6 +48,7 @@ model User {
   branchCoverages       UserBranchCoverage[]
 
   @@index([currentBranchId])
+  @@index([invitedById])
 }
 
 /// Pensado para SaaS a futuro. En R1 podés crear 1 Tenant por defecto y listo.
@@ -71,10 +77,184 @@ model Tenant {
   cashDailyCloses       CashDailyClose[]
   closerCommissionPlans CloserCommissionPlan[]
   closerCommissions     CloserCommission[]
+  settings              TenantSettings?
+  assets                TenantAsset[]
+  catalogModels         ProductCatalogModel[]
+  catalogCapacities     ProductCatalogCapacity[]
+  catalogMeasures       ProductCatalogMeasure[]
+  catalogColors         ProductCatalogColor[]
+  catalogColorAliases   ProductCatalogColorAlias[]
+  modelCompatibilities  ProductModelCompatibility[]
 
   tradeInBatteryRanges  TradeInBatteryRange[]
   tradeInPrices         TradeInPrice[]
   tradeInDeductionRules TradeInDeductionRule[]
+}
+
+model TenantSettings {
+  id       String @id @default(cuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  servicePickupAlertDays Int @default(15)
+
+  stockRotationHighMaxDays   Int @default(15)
+  stockRotationMediumMaxDays Int @default(30)
+
+  accessoryLowStockThreshold Int @default(5)
+
+  wholesalePricesEnabled Boolean @default(false)
+
+  closerCommissionsEnabled Boolean @default(false)
+
+  financialFeeEnabled Boolean @default(false)
+  financialFeeRatePct Decimal @default(0) @db.Decimal(5, 2)
+
+  usedDeviceWarrantyDays Int    @default(30)
+  warrantyPolicyText     String @default("") @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TenantAsset {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  kind      TenantAssetKind
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  data      Bytes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, kind])
+  @@index([tenantId])
+}
+
+model ProductCatalogModel {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type           ProductType
+  name           String
+  normalizedName String
+  source         CatalogSource @default(CUSTOM)
+  isActive       Boolean       @default(true)
+  sortOrder      Int           @default(0)
+
+  products                 Product[]
+  phoneCompatibilities     ProductModelCompatibility[] @relation("CompatiblePhoneModel")
+  accessoryCompatibilities ProductModelCompatibility[] @relation("CompatibleAccessoryModel")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, type, normalizedName])
+  @@index([tenantId, type, isActive])
+}
+
+model ProductCatalogCapacity {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  capacityGB Int
+  label      String
+  source     CatalogSource @default(CUSTOM)
+  isActive   Boolean       @default(true)
+  sortOrder  Int           @default(0)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, capacityGB])
+  @@index([tenantId, isActive])
+}
+
+model ProductCatalogMeasure {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  label       String
+  millimeters Decimal       @db.Decimal(8, 2)
+  source      CatalogSource @default(CUSTOM)
+  isActive    Boolean       @default(true)
+  sortOrder   Int           @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, millimeters])
+  @@index([tenantId, isActive])
+}
+
+model ProductCatalogColor {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name           String
+  normalizedName String
+  hexColor       String
+  source         CatalogSource @default(CUSTOM)
+  isActive       Boolean       @default(true)
+  sortOrder      Int           @default(0)
+
+  aliases  ProductCatalogColorAlias[]
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, isActive])
+}
+
+model ProductCatalogColorAlias {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  colorId String
+  color   ProductCatalogColor @relation(fields: [colorId], references: [id], onDelete: Cascade)
+
+  alias           String
+  normalizedAlias String
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, normalizedAlias])
+  @@index([colorId])
+}
+
+model ProductModelCompatibility {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  phoneModelId String
+  phoneModel   ProductCatalogModel @relation("CompatiblePhoneModel", fields: [phoneModelId], references: [id], onDelete: Cascade)
+
+  accessoryModelId String
+  accessoryModel   ProductCatalogModel @relation("CompatibleAccessoryModel", fields: [accessoryModelId], references: [id], onDelete: Cascade)
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, phoneModelId, accessoryModelId])
+  @@index([tenantId, phoneModelId, isActive])
+  @@index([tenantId, accessoryModelId, isActive])
 }
 
 model Province {
@@ -97,32 +277,39 @@ model Product {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  type           ProductType // PHONE | ACCESSORY
-  brand          String? // p.ej. "Apple" (opcional en accesorios)
-  imei           String? // opcional, sólo si se maneja por IMEI
-  modelName      String // p.ej. "iPhone 15 Pro", "Funda 14 Pro Max"
-  capacityGB     Int? // sólo aplica a PHONE
-  condition      Condition? // A_PLUS | OEM | ASIS | ASIS_PLUS | SEALED (para PHONE)
-  color          String?
-  batteryPct     Int? // sólo PHONE; si aplica
-  purchaseDate   DateTime? // fecha_de_compra
-  costPrice      Decimal       @db.Decimal(12, 2) // costo_x_unidad
-  salePrice      Decimal       @db.Decimal(12, 2) // precio_venta_x_unidad (precio sugerido/base)
-  shippingCost   Decimal?      @db.Decimal(12, 2) // costo_envio (si es fijo/por unidad)
-  status         ProductStatus @default(AVAILABLE)
-  state          ProductState  @default(EN_CAMINO) // estado actual del producto
-  senado         Boolean       @default(false)
-  senadoAt       DateTime?
-  stockInitial   Int           @default(1) // stock inicial
-  stock          Int           @default(1) // stock actual
-  stockAvailable Int           @default(1) // stock disponible para venta
-  location       String? // opcional, para saber dónde está el producto, después se puede usar para filtrar por ubicación y agregar un modelo Sede con datos de ubiacion, contacto, direccion, etc.
-  branchId       String?
-  branch         Branch?       @relation(fields: [branchId], references: [id])
-  supplierId     String?
-  supplier       Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  origin         String? // "Proveedor Alex", "Compra en ML", "Trade-in Apple", "Plan Canje", etc.
-  notes          String?
+  type              ProductType // PHONE | ACCESSORY
+  brand             String? // p.ej. "Apple" (opcional en accesorios)
+  imei              String? // opcional, sólo si se maneja por IMEI
+  modelName         String // p.ej. "iPhone 15 Pro", "Funda 14 Pro Max"
+  capacityGB        Int? // sólo aplica a PHONE
+  condition         Condition? // A_PLUS | OEM | ASIS | ASIS_PLUS | SEALED (para PHONE)
+  color             String?
+  batteryPct        Int? // sólo PHONE; si aplica
+  purchaseDate      DateTime? // fecha_de_compra
+  costPrice         Decimal                 @db.Decimal(12, 2) // costo_x_unidad
+  salePrice         Decimal                 @db.Decimal(12, 2) // precio_venta_x_unidad (precio sugerido/base)
+  shippingCost      Decimal?                @db.Decimal(12, 2) // costo_envio (si es fijo/por unidad)
+  wholesalePrice    Decimal?                @db.Decimal(12, 2)
+  status            ProductStatus           @default(AVAILABLE)
+  state             ProductState            @default(EN_CAMINO) // estado actual del producto
+  senado            Boolean                 @default(false)
+  senadoAt          DateTime?
+  stockInitial      Int                     @default(1) // stock inicial
+  stock             Int                     @default(1) // stock actual
+  stockAvailable    Int                     @default(1) // stock disponible para venta
+  location          String? // opcional, para saber dónde está el producto, después se puede usar para filtrar por ubicación y agregar un modelo Sede con datos de ubiacion, contacto, direccion, etc.
+  branchId          String?
+  branch            Branch?                 @relation(fields: [branchId], references: [id])
+  supplierId        String?
+  supplier          Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  origin            String? // "Proveedor Alex", "Compra en ML", "Trade-in Apple", "Plan Canje", etc.
+  notes             String?
+  catalogModelId    String?
+  catalogModel      ProductCatalogModel?    @relation(fields: [catalogModelId], references: [id], onDelete: SetNull)
+  catalogCapacityId String?
+  catalogCapacity   ProductCatalogCapacity? @relation(fields: [catalogCapacityId], references: [id], onDelete: SetNull)
+  catalogColorId    String?
+  catalogColor      ProductCatalogColor?    @relation(fields: [catalogColorId], references: [id], onDelete: SetNull)
 
   saleItems    SaleItem[]
   createdAt    DateTime       @default(now())
@@ -138,6 +325,9 @@ model Product {
   @@index([tenantId, modelName, capacityGB, condition])
   @@index([branchId])
   @@index([supplierId])
+  @@index([catalogModelId])
+  @@index([catalogCapacityId])
+  @@index([catalogColorId])
 }
 
 model Buyer {
@@ -1160,6 +1350,8 @@ enum AuditAction {
 
 enum AuditModule {
   AUTH
+  CONFIG
+  CATALOG
   PRODUCT
   SALE
   PURCHASE
@@ -1232,6 +1424,16 @@ enum CommissionStatus {
   APPROVED
   PAID
   CANCELLED
+}
+
+enum TenantAssetKind {
+  LOGO
+}
+
+enum CatalogSource {
+  BASE
+  CUSTOM
+  LEGACY
 }
 
 model TradeInBatteryRange {

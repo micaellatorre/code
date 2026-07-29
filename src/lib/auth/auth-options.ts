@@ -30,9 +30,13 @@ export const authOptions: NextAuthOptions = {
       if (!dbUser) return false
       if (!dbUser.isActive) return false
 
+      const now = new Date()
       await prisma.user.update({
         where: { email: user.email },
-        data: { lastLoginAt: new Date() },
+        data: {
+          lastLoginAt: now,
+          joinedAt: dbUser.joinedAt ?? now,
+        },
       })
 
       return true

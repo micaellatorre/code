@@ -102,6 +102,8 @@ export default function SaleReservationStep({
     setBuyer(appointment.buyer)
     setItems(
       appointment.interests.map((interest) => ({
+        clientLineId: `reservation-${appointment.id}-${interest.productId}`,
+        parentClientLineId: null,
         _id: `reservation-${appointment.id}-${interest.productId}`,
         productId: interest.productId,
         product: interest.product,

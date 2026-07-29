@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
 import { formatReceiptNumber } from "@/lib/sales/receipts"
+import { getTenantBranding } from "@/lib/config/branding"
 
 export const runtime = "nodejs"
 
@@ -80,7 +81,9 @@ export async function POST(_: NextRequest, { params }: Ctx) {
       }
     }
 
-    return NextResponse.json({ receipt: serializeReceipt(receipt) })
+    const branding = await getTenantBranding(tenantId)
+
+    return NextResponse.json({ receipt: serializeReceipt(receipt), branding })
   } catch (error) {
     console.error("Failed to get or create sale receipt", error)
     return NextResponse.json(

@@ -114,6 +114,7 @@ export default async function SalesPage() {
       id: item.id,
       saleId: item.saleId,
       productId: item.productId,
+      parentItemId: item.parentItemId,
       units: item.units,
       kind: item.kind,
       unitPrice: toStr(item.unitPrice),

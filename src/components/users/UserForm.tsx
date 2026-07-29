@@ -96,9 +96,9 @@ export default function UserForm(props: UserFormProps) {
 
     const userId = payload?.user?.id
     if (props.mode === "create" && userId) {
-      router.push(`/dashboard/users/new/success?userId=${encodeURIComponent(userId)}`)
+      router.push(`/dashboard/config/users/new/success?userId=${encodeURIComponent(userId)}`)
     } else {
-      router.push("/dashboard/users")
+      router.push("/dashboard/config?tab=equipo")
     }
     router.refresh()
   }
@@ -188,7 +188,7 @@ export default function UserForm(props: UserFormProps) {
       </section>
 
       <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-base-300 bg-base-100/95 px-1 py-3 backdrop-blur">
-        <button type="button" className="btn btn-ghost" onClick={() => router.push("/dashboard/users")} disabled={saving}>Cancelar</button>
+        <button type="button" className="btn btn-ghost" onClick={() => router.push("/dashboard/config?tab=equipo")} disabled={saving}>Cancelar</button>
         <button type="submit" className="btn btn-primary" disabled={saving || !form.currentBranchId}>
           {saving ? <span className="loading loading-spinner loading-xs" /> : null}
           {props.mode === "create" ? "Crear usuario" : "Guardar cambios"}

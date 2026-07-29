@@ -36,6 +36,9 @@ export default function SaleStickySummary({
         <div>
           <p className="text-base-content/50">Items</p>
           <p className="font-medium">{items.length}</p>
+          {items.some((item) => item.parentClientLineId) ? (
+            <p className="text-xs text-primary">{items.filter((item) => item.parentClientLineId).length} accesorios asociados</p>
+          ) : null}
         </div>
         <div className="divide-y divide-base-300 rounded-lg border border-base-300">
           <p className="flex justify-between p-2"><span>Total</span><span>{formatUsd(total)}</span></p>

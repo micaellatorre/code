@@ -7,6 +7,7 @@ import { resolveSessionTenantId } from "@/lib/tenant";
 import { resolveOperationBranch } from "@/lib/domain/user-branches";
 import { isMonetaryPaymentMethod, postSalePaymentToCash } from "@/lib/domain/cash";
 import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money";
+import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue";
 
 type SaleOperationType = "CONFIRM_SALE" | "RESERVE";
 
@@ -53,6 +54,8 @@ export async function GET() {
 }
 
 interface SaleItemInput {
+  clientLineId?: string | null;
+  parentClientLineId?: string | null;
   productId: string;
   kind: SaleItemKind;
   units: number;
@@ -115,6 +118,66 @@ function isAllowedToConfirmSale(state: ProductState) {
 
 function isAllowedToReserve(state: ProductState) {
   return state === "EN_STOCK" || state === "EN_CAMINO";
+}
+
+async function resolveProductCatalogModelId(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  product: { catalogModelId?: string | null; type: string; modelName: string },
+) {
+  if (product.catalogModelId) return product.catalogModelId;
+  const catalog = await tx.productCatalogModel.findFirst({
+    where: {
+      tenantId,
+      type: product.type as any,
+      normalizedName: normalizeCatalogValue(product.modelName),
+    },
+    select: { id: true },
+  });
+  return catalog?.id ?? null;
+}
+
+async function assertParentLinks(params: {
+  tx: Prisma.TransactionClient;
+  tenantId: string;
+  items: (SaleItemInput & { clientLineId: string })[];
+  productMap: Map<string, any>;
+}) {
+  const itemByClientLineId = new Map(params.items.map((item) => [item.clientLineId, item]));
+
+  for (const item of params.items) {
+    if (!item.parentClientLineId) continue;
+    if (item.parentClientLineId === item.clientLineId) {
+      throw apiError("No se permite una asociacion circular.", 400);
+    }
+
+    const parent = itemByClientLineId.get(item.parentClientLineId);
+    if (!parent) throw apiError("El accesorio asociado no tiene un equipo padre valido.", 400);
+
+    const parentProduct = params.productMap.get(String(parent.productId));
+    const childProduct = params.productMap.get(String(item.productId));
+    if (!parentProduct || !childProduct) throw apiError("Producto asociado no disponible.", 400);
+    if (parentProduct.type !== "PHONE") throw apiError("El item padre debe ser un equipo PHONE.", 400);
+    if (childProduct.type !== "ACCESSORY") throw apiError("El item asociado debe ser un accesorio.", 400);
+
+    const phoneCatalogModelId = await resolveProductCatalogModelId(params.tx, params.tenantId, parentProduct);
+    const accessoryCatalogModelId = await resolveProductCatalogModelId(params.tx, params.tenantId, childProduct);
+    if (!phoneCatalogModelId || !accessoryCatalogModelId) {
+      throw apiError("Los items asociados deben tener modelo de catalogo compatible.", 400);
+    }
+
+    const compatibility = await params.tx.productModelCompatibility.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        phoneModelId: phoneCatalogModelId,
+        accessoryModelId: accessoryCatalogModelId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!compatibility) throw apiError("El accesorio no es compatible con el equipo seleccionado.", 400);
+  }
 }
 
 export async function POST(request: Request) {
@@ -188,12 +251,18 @@ export async function POST(request: Request) {
         }
 
         const productIds = items.map((it) => String(it.productId));
+        const normalizedItems = items.map((item, index) => ({
+          ...item,
+          clientLineId: item.clientLineId || `server-line-${index}`,
+          parentClientLineId: item.parentClientLineId || null,
+        }));
         const products = await tx.product.findMany({
           where: { id: { in: productIds }, tenantId: tenant.id },
           select: {
             id: true,
             modelName: true,
             type: true,
+            catalogModelId: true,
             imei: true,
             stock: true,
             stockAvailable: true,
@@ -204,12 +273,13 @@ export async function POST(request: Request) {
         });
 
         const productMap = new Map(products.map((p) => [p.id, p]));
+        await assertParentLinks({ tx, tenantId: tenant.id, items: normalizedItems, productMap });
 
         let subtotal = new Prisma.Decimal(0);
         let costTotal = new Prisma.Decimal(0);
         let extraCosts = new Prisma.Decimal(0);
 
-        for (const raw of items) {
+        for (const raw of normalizedItems) {
           const prod = productMap.get(String(raw.productId));
           if (!prod) {
             throw apiError(`No se encontró el producto ${raw.productId}`, 400);
@@ -370,7 +440,13 @@ export async function POST(request: Request) {
           }
         }
 
-        for (const raw of items) {
+        const createdSaleItemIds = new Map<string, string>();
+        const creationOrder = [
+          ...normalizedItems.filter((item) => !item.parentClientLineId),
+          ...normalizedItems.filter((item) => item.parentClientLineId),
+        ];
+
+        for (const raw of creationOrder) {
           const prod = productMap.get(String(raw.productId))!;
           const unitsNum = Number(raw.units);
           const unitsDec = new Prisma.Decimal(unitsNum);
@@ -386,10 +462,11 @@ export async function POST(request: Request) {
           const lineCost = unitCost.add(extra).mul(unitsDec);
           const lineProfit = lineTotal.sub(lineCost);
 
-          await tx.saleItem.create({
+          const createdItem = await tx.saleItem.create({
             data: {
               saleId: sale.id,
               productId: prod.id,
+              parentItemId: raw.parentClientLineId ? createdSaleItemIds.get(raw.parentClientLineId) ?? null : null,
               kind: raw.kind,
               units: unitsNum,
               unitPrice,
@@ -400,6 +477,7 @@ export async function POST(request: Request) {
               lineProfit,
             },
           });
+          createdSaleItemIds.set(raw.clientLineId, createdItem.id);
 
           if (operationType === "RESERVE") {
             await tx.product.update({
@@ -455,7 +533,7 @@ export async function POST(request: Request) {
               total: total.toString(),
               amountPaid: totalPaid.toString(),
               balanceDue: balanceDue.toString(),
-              items: items.length,
+              items: normalizedItems.length,
             },
           },
         });

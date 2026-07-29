@@ -8,9 +8,12 @@ import { ChevronDownIcon, PencilIcon, ShoppingCartIcon, XMarkIcon } from '@heroi
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Fragment, useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import type { MouseEvent } from 'react'
 
 interface ProductSelectionModalProps {
   existingItems: SaleItemDraft[]
+  branchId?: string | null
+  saleType?: 'MINORISTA' | 'MAYORISTA'
   onClose: () => void
   onAddItems: (items: SaleItemDraft[]) => void
 }
@@ -38,7 +41,11 @@ type ApiProduct = {
   purchaseDate: string | null
   costPrice: string | null
   salePrice: string | null
+  wholesalePrice: string | null
   shippingCost: string | null
+  catalogModelId: string | null
+  catalogCapacityId: string | null
+  catalogColorId: string | null
   state: string
   senado: boolean
   senadoAt: string | null
@@ -67,6 +74,15 @@ type ProductCluster = {
   totalStock: number
 }
 
+type AccessorySuggestion = {
+  catalogModelId: string
+  modelName: string
+  stockAvailable: number
+  suggestedUnitPrice: string
+  productIds: string[]
+  products: ApiProduct[]
+}
+
 // ✅ Convert DTO -> Prisma Product (enums + Date + Decimal)
 // NOTE: This is for UI state only. If you depend on Decimal methods, this can be annoying.
 function apiToPrismaProduct(p: ApiProduct): Product {
@@ -86,7 +102,11 @@ function apiToPrismaProduct(p: ApiProduct): Product {
     // Prisma Decimal
     costPrice: p.costPrice != null ? (p.costPrice as any) : null,
     salePrice: p.salePrice != null ? (p.salePrice as any) : null,
+    wholesalePrice: p.wholesalePrice != null ? (p.wholesalePrice as any) : null,
     shippingCost: p.shippingCost != null ? (p.shippingCost as any) : null,
+    catalogModelId: p.catalogModelId,
+    catalogCapacityId: p.catalogCapacityId,
+    catalogColorId: p.catalogColorId,
 
     state: p.state as any,
     senado: p.senado,
@@ -134,7 +154,11 @@ function productClusterKey(product: ApiProduct) {
   ].join('|')
 }
 
-export default function ProductSelectionModal({ existingItems, onClose, onAddItems }: ProductSelectionModalProps) {
+function newClientLineId(prefix = 'line') {
+  return `${prefix}-${crypto.randomUUID()}`
+}
+
+export default function ProductSelectionModal({ existingItems, branchId, saleType = 'MINORISTA', onClose, onAddItems }: ProductSelectionModalProps) {
   const { data: session } = useSession()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
   const canOpenProductEdit = activeRole === 'ADMIN' || activeRole === 'STOCK' || activeRole === 'VENDEDOR'
@@ -147,6 +171,9 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
   const [selection, setSelection] = useState<Record<string, SelectionDraft>>({})
   const [expandedClusters, setExpandedClusters] = useState<Record<string, boolean>>({})
   const [isSelectionCartExpanded, setIsSelectionCartExpanded] = useState(false)
+  const [suggestionsByPhoneId, setSuggestionsByPhoneId] = useState<Record<string, AccessorySuggestion[]>>({})
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -163,6 +190,7 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     if (type !== 'ALL') params.set('type', type)
     if (cursor) params.set('cursor', cursor)
     params.set('orderBy', orderBy)
+    params.set('saleType', saleType)
     return `/api/products?${params.toString()}`
   }
 
@@ -260,6 +288,39 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
     })
   }, [products, availableStock])
 
+  useEffect(() => {
+    const phoneIds = productClusters
+      .filter((cluster) => cluster.product.type === 'PHONE')
+      .map((cluster) => cluster.product.id)
+
+    if (!phoneIds.length) {
+      setSuggestionsByPhoneId({})
+      return
+    }
+
+    const controller = new AbortController()
+    setSuggestionsLoading(true)
+    const params = new URLSearchParams()
+    params.set('phoneProductIds', phoneIds.join(','))
+    params.set('saleType', saleType)
+    if (branchId) params.set('branchId', branchId)
+
+    fetch(`/api/sales/accessory-suggestions?${params.toString()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body) => setSuggestionsByPhoneId(body?.suggestionsByPhoneProductId ?? {}))
+      .catch((error) => {
+        if (error?.name !== 'AbortError') setSuggestionsByPhoneId({})
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSuggestionsLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [branchId, productClusters, saleType])
+
   const unavailableCount = useMemo(
     () => productClusters.filter((cluster) => cluster.totalStock <= 0 && !selection[cluster.key]).length,
     [productClusters, selection],
@@ -290,6 +351,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
       const prismaProduct = apiToPrismaProduct(product)
 
       newSelection[cluster.key] = {
+        clientLineId: newClientLineId('product'),
+        parentClientLineId: null,
         productId: prismaProduct.id,
         product: prismaProduct,
         products: cluster.products,
@@ -303,6 +366,82 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
       delete newSelection[cluster.key]
     }
     setSelection(newSelection)
+  }
+
+  const showToast = (message: string) => {
+    setToastMessage(message)
+    window.setTimeout(() => setToastMessage(null), 3000)
+  }
+
+  const getPhoneLineId = (cluster: ProductCluster) => {
+    const selected = selection[cluster.key]
+    if (selected) return selected.clientLineId
+
+    const clusterProductIds = new Set(cluster.products.map((product) => product.id))
+    return existingItems.find((item) => clusterProductIds.has(item.productId))?.clientLineId ?? null
+  }
+
+  const getSuggestionSelected = (suggestion: AccessorySuggestion, parentClientLineId: string | null) => {
+    if (!parentClientLineId) return false
+    return [
+      ...Object.values(selection),
+      ...existingItems,
+    ].some((item) =>
+      item.parentClientLineId === parentClientLineId &&
+      suggestion.productIds.includes(item.productId)
+    )
+  }
+
+  const getSuggestionAvailableStock = (suggestion: AccessorySuggestion) => {
+    const used = [...Object.values(selection), ...existingItems]
+      .filter((item) => suggestion.productIds.includes(item.productId))
+      .reduce((sum, item) => sum + item.units, 0)
+    return Math.max(0, suggestion.stockAvailable - used)
+  }
+
+  const addSuggestedAccessory = (event: MouseEvent<HTMLButtonElement>, cluster: ProductCluster, suggestion: AccessorySuggestion) => {
+    event.stopPropagation()
+
+    const parentClientLineId = getPhoneLineId(cluster)
+    if (!parentClientLineId) {
+      showToast('Agrega primero el equipo para asociar este accesorio.')
+      return
+    }
+
+    const available = getSuggestionAvailableStock(suggestion)
+    if (available <= 0) {
+      showToast('Sin stock disponible para ese accesorio.')
+      return
+    }
+
+    const key = `suggestion:${parentClientLineId}:${suggestion.catalogModelId}`
+    const existing = selection[key]
+    if (existing) {
+      setSelection((prev) => ({
+        ...prev,
+        [key]: { ...existing, units: Math.min(existing.units + 1, existing.units + available) },
+      }))
+      return
+    }
+
+    const firstProduct = suggestion.products[0]
+    if (!firstProduct) return
+    const prismaProduct = apiToPrismaProduct(firstProduct)
+    setSelection((prev) => ({
+      ...prev,
+      [key]: {
+        clientLineId: newClientLineId('suggestion'),
+        parentClientLineId,
+        productId: prismaProduct.id,
+        product: prismaProduct,
+        products: suggestion.products,
+        units: 1,
+        unitPrice: suggestion.suggestedUnitPrice,
+        unitCost: firstProduct.costPrice ?? '0',
+        extraCost: '0',
+        kind: 'NORMAL',
+      },
+    }))
   }
 
   const handleQuantityChange = (clusterKey: string, units: number) => {
@@ -336,6 +475,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
         remaining -= units
         const prismaProduct = apiToPrismaProduct(product)
         return [{
+          clientLineId: index === 0 ? draft.clientLineId : `${draft.clientLineId}-${product.id}-${index}`,
+          parentClientLineId: draft.parentClientLineId ?? null,
           productId: prismaProduct.id,
           product: prismaProduct,
           units,
@@ -372,6 +513,13 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
   return (
     <div className="modal modal-open">
       <div className="modal-box w-11/12 max-w-5xl">
+        {toastMessage ? (
+          <div className="toast toast-top toast-end z-[130]">
+            <div className="alert alert-warning text-sm shadow-lg">
+              <span>{toastMessage}</span>
+            </div>
+          </div>
+        ) : null}
         <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">X</button>
         <h3 className="font-bold text-lg">Agregar Items a la Venta</h3>
 
@@ -565,6 +713,8 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                     const isUnavailable = currentStock <= 0 && !isSelected
                     const isCluster = cluster.products.length > 1
                     const isExpanded = !!expandedClusters[cluster.key]
+                    const suggestions = p.type === 'PHONE' ? suggestionsByPhoneId[p.id] ?? [] : []
+                    const parentClientLineId = p.type === 'PHONE' ? getPhoneLineId(cluster) : null
 
                     return (
                       <Fragment key={cluster.key}>
@@ -605,6 +755,30 @@ export default function ProductSelectionModal({ existingItems, onClose, onAddIte
                           <div className="text-xs opacity-70">
                             {p.color || ''} {p.capacityGB ? `${p.capacityGB}GB` : ''}
                           </div>
+                          {suggestions.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              <span className="text-[11px] font-semibold text-base-content/50">Sugeridos:</span>
+                              {suggestions.map((suggestion) => {
+                                const available = getSuggestionAvailableStock(suggestion)
+                                const selected = getSuggestionSelected(suggestion, parentClientLineId)
+                                const disabled = available <= 0
+                                return (
+                                  <button
+                                    key={suggestion.catalogModelId}
+                                    type="button"
+                                    className={`badge h-auto min-h-6 gap-1 py-1 transition ${selected ? 'badge-primary' : disabled ? 'badge-ghost opacity-50' : 'badge-outline hover:badge-primary'}`}
+                                    disabled={disabled}
+                                    title={disabled ? 'Sin stock' : `Stock disponible: ${available}`}
+                                    aria-label={disabled ? `${suggestion.modelName} sin stock` : `Agregar ${suggestion.modelName} a la venta`}
+                                    onClick={(event) => addSuggestedAccessory(event, cluster, suggestion)}
+                                  >
+                                    <span>{suggestion.modelName}</span>
+                                    <span aria-hidden="true">+</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          ) : null}
                         </td>
                         <td>
                           <span className={`text-nowrap badge badge-sm ${getStateBadgeClass(p.state)}`}>

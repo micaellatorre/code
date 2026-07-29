@@ -44,3 +44,5 @@ next-env.d.ts
 !/prisma/migrations/
 !/prisma/migrations/20260717120000_add_sale_receipts/
 !/prisma/migrations/20260717120000_add_sale_receipts/migration.sql
+!/prisma/migrations/20260729120000_add_multi_tenant_config/
+!/prisma/migrations/20260729120000_add_multi_tenant_config/migration.sql

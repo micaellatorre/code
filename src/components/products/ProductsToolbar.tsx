@@ -8,7 +8,7 @@ import type { ProductsInventory } from "./useProductsInventory"
 type ProductsToolbarProps = { inventory: ProductsInventory }
 
 export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
-  const { inventorySegment, selectInventorySegment, setDrawerOpen, viewMode, setViewMode, filteredProducts, operationalProducts, totalProducts, groupedCounts, typeFilter, setTypeFilter, isTableExpanded, setIsTableExpanded, mutate, isLoading, canCreateProducts, error, search, setSearch, stateFilter, setStateFilter, stateOptions, stateLabelMap, conditionFilter, setConditionFilter, conditionOptions, conditionLabelMap, capacityFilter, setCapacityFilter, capacities, locationFilter, setLocationFilter, locations, imeiSearch, setImeiSearch, clearFilters, showSensitiveColumns, setShowSensitiveColumns, hasNext, setCursor, data, orderBy, setOrderBy, senadoFilter, setSenadoFilter, brandFilter, setBrandFilter, colorFilter, setColorFilter, originFilter, setOriginFilter, batteryMin, setBatteryMin, batteryMax, setBatteryMax } = inventory
+  const { inventorySegment, selectInventorySegment, setDrawerOpen, viewMode, setViewMode, filteredProducts, operationalProducts, totalProducts, groupedCounts, typeFilter, setTypeFilter, isTableExpanded, setIsTableExpanded, mutate, isLoading, canCreateProducts, error, search, setSearch, stateFilter, setStateFilter, stateOptions, stateLabelMap, conditionFilter, setConditionFilter, conditionOptions, conditionLabelMap, capacityFilter, setCapacityFilter, capacities, locationFilter, setLocationFilter, locations, imeiSearch, setImeiSearch, clearFilters, showSensitiveColumns, setShowSensitiveColumns, hasNext, setCursor, data, orderBy, setOrderBy, senadoFilter, setSenadoFilter, brandFilter, setBrandFilter, colorFilter, setColorFilter, originFilter, setOriginFilter, batteryMin, setBatteryMin, batteryMax, setBatteryMax, stockSettings, lowStockAccessoryProducts } = inventory
   const visibleProducts = inventorySegment === "TRADE_INS" ? operationalProducts : filteredProducts
 
   return (
@@ -21,6 +21,14 @@ export default function ProductsToolbar({ inventory }: ProductsToolbarProps) {
       {error ? (
         <div role="alert" className="alert alert-error">
           <span>Error cargando productos: {String((error as any)?.message ?? error)}</span>
+        </div>
+      ) : null}
+
+      {inventorySegment === "ACCESSORIES" && lowStockAccessoryProducts.length > 0 ? (
+        <div role="alert" className="alert alert-warning py-2 text-sm">
+          <span>
+            Accesorios bajo stock: {lowStockAccessoryProducts.length} con disponible menor o igual a {stockSettings.accessoryLowStockThreshold}.
+          </span>
         </div>
       ) : null}
 

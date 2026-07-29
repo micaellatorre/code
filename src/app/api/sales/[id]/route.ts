@@ -8,6 +8,7 @@ import { createAuditLog } from "@/lib/domain/audit"
 import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
 import { isMonetaryPaymentMethod, postSalePaymentToCash, reverseSourceCashMovement } from "@/lib/domain/cash"
 import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money"
+import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue"
 
 export const runtime = "nodejs"
 
@@ -64,6 +65,8 @@ type PaymentInput = {
 }
 
 type SaleItemInput = {
+  clientLineId?: string | null
+  parentClientLineId?: string | null
   productId?: string
   kind?: string
   units?: number | string
@@ -139,6 +142,63 @@ function aggregateUnits(items: Array<{ productId: string; units: number }>) {
   return unitsByProduct
 }
 
+async function resolveProductCatalogModelId(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  product: { catalogModelId?: string | null; type: string; modelName: string },
+) {
+  if (product.catalogModelId) return product.catalogModelId
+  const catalog = await tx.productCatalogModel.findFirst({
+    where: {
+      tenantId,
+      type: product.type as any,
+      normalizedName: normalizeCatalogValue(product.modelName),
+    },
+    select: { id: true },
+  })
+  return catalog?.id ?? null
+}
+
+async function assertParentLinks(params: {
+  tx: Prisma.TransactionClient
+  tenantId: string
+  items: (SaleItemInput & { clientLineId: string; productId: string })[]
+  productMap: Map<string, any>
+}) {
+  const itemByClientLineId = new Map(params.items.map((item) => [item.clientLineId, item]))
+
+  for (const item of params.items) {
+    if (!item.parentClientLineId) continue
+    if (item.parentClientLineId === item.clientLineId) throw new Error("No se permite una asociacion circular.")
+    const parent = itemByClientLineId.get(item.parentClientLineId)
+    if (!parent) throw new Error("El accesorio asociado no tiene un equipo padre valido.")
+
+    const parentProduct = params.productMap.get(parent.productId)
+    const childProduct = params.productMap.get(item.productId)
+    if (!parentProduct || !childProduct) throw new Error("Producto asociado no disponible.")
+    if (parentProduct.type !== "PHONE") throw new Error("El item padre debe ser un equipo PHONE.")
+    if (childProduct.type !== "ACCESSORY") throw new Error("El item asociado debe ser un accesorio.")
+
+    const phoneCatalogModelId = await resolveProductCatalogModelId(params.tx, params.tenantId, parentProduct)
+    const accessoryCatalogModelId = await resolveProductCatalogModelId(params.tx, params.tenantId, childProduct)
+    if (!phoneCatalogModelId || !accessoryCatalogModelId) {
+      throw new Error("Los items asociados deben tener modelo de catalogo compatible.")
+    }
+
+    const compatibility = await params.tx.productModelCompatibility.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        phoneModelId: phoneCatalogModelId,
+        accessoryModelId: accessoryCatalogModelId,
+        isActive: true,
+      },
+      select: { id: true },
+    })
+
+    if (!compatibility) throw new Error("El accesorio no es compatible con el equipo seleccionado.")
+  }
+}
+
 function saleInclude() {
   return {
     buyer: true,
@@ -157,9 +217,11 @@ export async function GET(_: NextRequest, { params }: Ctx) {
   }
 
   const { id } = await params
+  const tenantId = auth.session.user.tenantId
+  if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
 
-  const sale = await prisma.sale.findUnique({
-    where: { id },
+  const sale = await prisma.sale.findFirst({
+    where: { id, tenantId },
     include: saleInclude(),
   })
 
@@ -178,10 +240,12 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
   }
 
   const { id } = await params
+  const tenantId = auth.session.user.tenantId
+  if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
 
   try {
     await prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.findUnique({ where: { id }, include: { items: { include: { product: true } } } })
+      const sale = await tx.sale.findFirst({ where: { id, tenantId }, include: { items: { include: { product: true } } } })
       if (!sale) throw new Error("Venta no encontrada")
       if (sale.status === "CANCELADA") return
 
@@ -227,6 +291,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   const { id } = await params
+  const tenantId = auth.session.user.tenantId
+  if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
 
   const keys = Object.keys(body || {})
@@ -269,6 +335,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       })
 
       if (!sale) {
+        throw new Error("Venta no encontrada")
+      }
+      if (sale.tenantId !== tenantId) {
         throw new Error("Venta no encontrada")
       }
 
@@ -479,6 +548,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         ? (body.items as SaleItemInput[])
         : sale.items.map((item) => ({
             productId: item.productId,
+            clientLineId: item.id,
+            parentClientLineId: item.parentItemId,
             kind: item.kind,
             units: item.units,
             unitPrice: item.unitPrice,
@@ -497,6 +568,15 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             .filter((productId): productId is string => Boolean(productId)),
         ),
       )
+      const normalizedIncomingItems = incomingItems.map((item, index) => {
+        const productId = String(item.productId || "").trim()
+        return {
+          ...item,
+          productId,
+          clientLineId: item.clientLineId || `server-line-${index}`,
+          parentClientLineId: item.parentClientLineId || null,
+        }
+      })
 
       const oldProductIds = sale.items.map((item) => item.productId)
 
@@ -513,6 +593,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           id: true,
           type: true,
           modelName: true,
+          catalogModelId: true,
           costPrice: true,
           stock: true,
           stockAvailable: true,
@@ -528,6 +609,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           throw new Error(`No se encontró el producto ${productId}`)
         }
       }
+      await assertParentLinks({ tx, tenantId: sale.tenantId, items: normalizedIncomingItems, productMap })
 
       const oldUnitsByProduct = aggregateUnits(
         sale.items.map((item) => ({
@@ -542,7 +624,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       let costTotal = new Prisma.Decimal(0)
       let extraCosts = new Prisma.Decimal(0)
 
-      const itemCreates = incomingItems.map((raw) => {
+      const itemCreates = normalizedIncomingItems.map((raw) => {
         const productId = String(raw.productId || "").trim()
 
         if (!productId) {
@@ -590,16 +672,20 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         costTotal = costTotal.add(lineCost)
 
         return {
-          saleId: id,
-          productId,
-          kind,
-          units: unitsNum,
-          unitPrice,
-          unitCost,
-          extraCost,
-          lineTotal,
-          lineCost,
-          lineProfit,
+          clientLineId: raw.clientLineId,
+          parentClientLineId: raw.parentClientLineId,
+          data: {
+            saleId: id,
+            productId,
+            kind,
+            units: unitsNum,
+            unitPrice,
+            unitCost,
+            extraCost,
+            lineTotal,
+            lineCost,
+            lineProfit,
+          },
         }
       })
 
@@ -709,10 +795,20 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       if (Array.isArray(body.items)) {
         await tx.saleItem.deleteMany({ where: { saleId: id } })
 
-        for (const itemCreate of itemCreates) {
-          await tx.saleItem.create({
-            data: itemCreate,
+        const createdSaleItemIds = new Map<string, string>()
+        const creationOrder = [
+          ...itemCreates.filter((item) => !item.parentClientLineId),
+          ...itemCreates.filter((item) => item.parentClientLineId),
+        ]
+
+        for (const itemCreate of creationOrder) {
+          const createdItem = await tx.saleItem.create({
+            data: {
+              ...itemCreate.data,
+              parentItemId: itemCreate.parentClientLineId ? createdSaleItemIds.get(itemCreate.parentClientLineId) ?? null : null,
+            },
           })
+          createdSaleItemIds.set(itemCreate.clientLineId, createdItem.id)
         }
       }
 

@@ -14,7 +14,11 @@ type SerializedProduct = {
   purchaseDate: string | null
   costPrice: string | null
   salePrice: string | null
+  wholesalePrice?: string | null
   shippingCost: string | null
+  catalogModelId?: string | null
+  catalogCapacityId?: string | null
+  catalogColorId?: string | null
   state: string
   senado: boolean
   senadoAt: string | null
@@ -37,6 +41,11 @@ type ProductsApiResponse = {
   products: SerializedProduct[]
   nextCursor: string | null
   totalProducts?: number | null
+  settings?: {
+    stockRotationHighMaxDays: number
+    stockRotationMediumMaxDays: number
+    accessoryLowStockThreshold: number
+  }
 }
 
 type InventorySegment = "PHONES" | "ACCESSORIES" | "TRADE_INS"

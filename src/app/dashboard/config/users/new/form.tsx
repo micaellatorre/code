@@ -19,7 +19,7 @@ export default function NewUserForm(props: Props) {
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Mi Equipo", href: "/dashboard/users" },
+          { label: "Configuracion", href: "/dashboard/config?tab=equipo" },
           { label: "Nuevo usuario" },
         ]}
       />

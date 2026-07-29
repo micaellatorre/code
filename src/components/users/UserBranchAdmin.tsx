@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -24,10 +24,12 @@ export default function UserBranchAdmin({
   users,
   branches,
   hasCommissionPlans = false,
+  displayMode = "table",
 }: {
   users: UserRow[]
   branches: BranchOption[]
   hasCommissionPlans?: boolean
+  displayMode?: "table" | "cards"
 }) {
   const router = useRouter()
   const [rows, setRows] = useState(users)
@@ -35,6 +37,10 @@ export default function UserBranchAdmin({
   const [savingId, setSavingId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const editing = rows.find((row) => row.id === editingId) ?? null
+
+  useEffect(() => {
+    setRows(users)
+  }, [users])
 
   async function save(user: UserRow) {
     setSavingId(user.id)
@@ -69,6 +75,31 @@ export default function UserBranchAdmin({
     router.push(`/dashboard/commissions/${user.id}/edit`)
   }
 
+  function ActionButtons({ user }: { user: UserRow }) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/dashboard/config/users/${user.id}/edit`} className="btn btn-ghost btn-xs">Editar</Link>
+        <button type="button" className="btn btn-outline btn-xs" onClick={() => setEditingId(user.id)}>Sucursales
+          <MapPinIcon className="h-4 w-4" />
+        </button>
+        {user.role === "VENDEDOR" ? (
+          <button type="button" className="btn btn-outline btn-xs" onClick={() => openCommissions(user)}>
+            Comision
+            <ClipboardDocumentCheckIcon className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
+  function RoleBadge({ role }: { role: string }) {
+    return <span className="badge badge-outline badge-sm">{role}</span>
+  }
+
+  function StatusBadge({ active }: { active: boolean }) {
+    return active ? <span className="badge badge-success badge-sm">Activo</span> : <span className="badge badge-ghost badge-sm">Inactivo</span>
+  }
+
   return (
     <div className="space-y-4">
       {toastMessage ? (
@@ -79,6 +110,38 @@ export default function UserBranchAdmin({
         </div>
       ) : null}
 
+      {displayMode === "cards" ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {rows.map((user) => (
+            <article key={user.id} className="rounded-lg border border-base-300 bg-base-100 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate font-semibold">{user.name ?? user.email}</h2>
+                  <p className="truncate text-sm text-base-content/60">{user.email}</p>
+                </div>
+                <RoleBadge role={user.role} />
+              </div>
+              <dl className="mt-4 grid gap-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-base-content/50">Sucursal actual</dt>
+                  <dd className="font-medium">{user.currentBranch?.name ?? branches.find((branch) => branch.id === user.currentBranchId)?.name ?? "-"}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-base-content/50">Cobertura</dt>
+                  <dd className="text-right">{user.role === "ADMIN" ? "Todas las sucursales" : coverageLabel(user.coverageBranchIds, branches)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-base-content/50">Estado</dt>
+                  <dd><StatusBadge active={user.isActive} /></dd>
+                </div>
+              </dl>
+              <div className="mt-4">
+                <ActionButtons user={user} />
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
       <div className="overflow-x-auto rounded-lg border border-base-300 bg-base-100">
         <table className="table table-sm w-full">
           <thead>
@@ -98,29 +161,19 @@ export default function UserBranchAdmin({
                   <div className="font-medium">{user.name ?? user.email}</div>
                   <div className="text-xs text-base-content/60">{user.email}</div>
                 </td>
-                <td><span className="badge badge-outline badge-sm">{user.role}</span></td>
+                <td><RoleBadge role={user.role} /></td>
                 <td>{user.currentBranch?.name ?? branches.find((branch) => branch.id === user.currentBranchId)?.name ?? "-"}</td>
                 <td>{user.role === "ADMIN" ? "Todas las sucursales" : coverageLabel(user.coverageBranchIds, branches)}</td>
-                <td>{user.isActive ? <span className="badge badge-success badge-sm">Activo</span> : <span className="badge badge-ghost badge-sm">Inactivo</span>}</td>
+                <td><StatusBadge active={user.isActive} /></td>
                 <td>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href={`/dashboard/users/${user.id}/edit`} className="btn btn-ghost btn-xs">Editar</Link>
-                    <button type="button" className="btn btn-outline btn-xs" onClick={() => setEditingId(user.id)}>Sucursales
-                      <MapPinIcon className="h-4 w-4" />
-                    </button>
-                    {user.role === "VENDEDOR" ? (
-                      <button type="button" className="btn btn-outline btn-xs" onClick={() => openCommissions(user)}>
-                        Comision
-                        <ClipboardDocumentCheckIcon className="h-4 w-4" />
-                      </button>
-                    ) : null}
-                  </div>
+                  <ActionButtons user={user} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      )}
 
       {editing ? (
         <dialog className="modal modal-open">

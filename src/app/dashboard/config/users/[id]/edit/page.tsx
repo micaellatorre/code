@@ -34,7 +34,7 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Mi Equipo", href: "/dashboard/users" },
+          { label: "Configuracion", href: "/dashboard/config?tab=equipo" },
           { label: user.name ?? user.email },
         ]}
       />

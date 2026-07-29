@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client"
 import { createAuditLog } from "@/lib/domain/audit"
 import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
 import { resolveSessionTenantId } from "@/lib/tenant"
+import { buildProductCatalogUpdate, buildWholesalePriceUpdate } from "@/lib/config/productCatalogLinks"
 
 type Ctx = {
   params: Promise<{ id: string }>
@@ -22,6 +23,16 @@ async function resolveProductSupplierId(tenantId: string, value: unknown) {
   return supplier.id
 }
 
+function serializeProduct(product: any, canSeeFinancials: boolean) {
+  return {
+    ...product,
+    costPrice: canSeeFinancials && product.costPrice != null ? String(product.costPrice) : null,
+    salePrice: product.salePrice != null ? String(product.salePrice) : null,
+    wholesalePrice: canSeeFinancials && product.wholesalePrice != null ? String(product.wholesalePrice) : null,
+    shippingCost: canSeeFinancials && product.shippingCost != null ? String(product.shippingCost) : null,
+  }
+}
+
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "STOCK", "SOCIO"])
 
@@ -36,7 +47,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     include: { branch: { select: { id: true, code: true, name: true } }, supplier: { select: { id: true, name: true } } },
   })
   if (!product) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
-  return NextResponse.json(product)
+  const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
+  return NextResponse.json(serializeProduct(product, canSeeFinancials))
 }
 
 export async function PUT(request: NextRequest, { params }: Ctx) {
@@ -47,7 +59,9 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   }
 
   const { id } = await params
-  const body = await request.json()
+    const body = await request.json()
+    delete body.tenantId
+    delete body.tenant
   try {
     const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
     if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
@@ -69,8 +83,14 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     if (Object.prototype.hasOwnProperty.call(body, "supplierId")) {
       body.supplierId = await resolveProductSupplierId(tenantId, body.supplierId)
     }
+    const catalogUpdate = await buildProductCatalogUpdate(tenantId, body, body.type ?? current.type)
+    const wholesaleUpdate = await buildWholesalePriceUpdate({
+      tenantId,
+      actorRole: auth.session.user.activeRole,
+      input: body,
+    })
 
-    const product = await prisma.product.update({ where: { id }, data: body, include: { branch: { select: { id: true, name: true } }, supplier: { select: { id: true, name: true } } } })
+    const product = await prisma.product.update({ where: { id }, data: { ...body, ...catalogUpdate, ...wholesaleUpdate }, include: { branch: { select: { id: true, name: true } }, supplier: { select: { id: true, name: true } } } })
     if (Object.prototype.hasOwnProperty.call(body, "branchId") && current.branchId !== product.branchId) {
       await createAuditLog({
         tenantId,
@@ -85,7 +105,8 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
         newValue: { branchId: product.branchId, branchName: product.branch?.name ?? null },
       })
     }
-    return NextResponse.json(product)
+    const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
+    return NextResponse.json(serializeProduct(product, canSeeFinancials))
   } catch (err: any) {
     console.error(err)
     const message = err instanceof Error ? err.message : "Error actualizando producto"
@@ -102,6 +123,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
   const { id } = await params
   const body = await request.json()
+  delete body.tenantId
+  delete body.tenant
 
   try {
     const updateData: any = {}
@@ -210,7 +233,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
     }
 
-    const allowed = ["modelName", "brand", "condition", "color", "status", "state", "imei", "notes", "location", "origin"] as const
+    const allowed = ["modelName", "brand", "condition", "color", "status", "state", "imei", "notes", "location", "origin", "catalogModelId", "catalogCapacityId", "catalogColorId"] as const
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
         if (["brand", "imei", "color", "notes", "location", "origin"].includes(key) && body[key] === "") {
@@ -237,6 +260,12 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (Object.prototype.hasOwnProperty.call(body, "supplierId")) {
       updateData.supplierId = await resolveProductSupplierId(tenantId, body.supplierId)
     }
+    Object.assign(updateData, await buildProductCatalogUpdate(tenantId, body, body.type ?? current.type))
+    Object.assign(updateData, await buildWholesalePriceUpdate({
+      tenantId,
+      actorRole: auth.session.user.activeRole,
+      input: body,
+    }))
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No hay campos para actualizar" }, { status: 400 })
@@ -257,7 +286,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         newValue: { branchId: product.branchId, branchName: product.branch?.name ?? null },
       })
     }
-    return NextResponse.json(product)
+    const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
+    return NextResponse.json(serializeProduct(product, canSeeFinancials))
   } catch (err: any) {
     console.error(err)
     const message = err instanceof Error ? err.message : "Error actualizando producto"
@@ -274,8 +304,10 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
 
   const { id } = await params
   try {
-    const product = await prisma.product.findUnique({
-      where: { id },
+    const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+    if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
+    const product = await prisma.product.findFirst({
+      where: { id, tenantId },
       include: {
         _count: {
           select: {

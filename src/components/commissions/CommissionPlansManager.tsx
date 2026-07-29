@@ -39,7 +39,7 @@ export default function CommissionPlansManager({
               <h2 className="text-lg font-semibold">Vendedores / Closers</h2>
               <p className="text-sm text-base-content/60">Los closers disponibles son usuarios con rol VENDEDOR.</p>
             </div>
-            <Link href="/dashboard/users/new" className="btn btn-outline btn-sm">Nuevo vendedor</Link>
+            <Link href="/dashboard/config/users/new" className="btn btn-outline btn-sm">Nuevo vendedor</Link>
           </div>
           <div className="overflow-x-auto rounded-lg border border-base-300">
             <table className="table table-sm">

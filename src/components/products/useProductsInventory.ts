@@ -25,6 +25,11 @@ const fetcher = async (url: string) => {
 
 const DEFAULT_STATE_FILTER = "EN_STOCK"
 const TRADE_IN_STATE_FILTER = "EN_REVISION"
+const DEFAULT_STOCK_SETTINGS = {
+  stockRotationHighMaxDays: 15,
+  stockRotationMediumMaxDays: 30,
+  accessoryLowStockThreshold: 5,
+}
 
 function isTradeInOrigin(origin: string | null) {
   return origin?.trim().toUpperCase().replace(/[\s-]+/g, "_") === "PLAN_CANJE"
@@ -147,6 +152,7 @@ export function useProductsInventory() {
   // local list so you can keep all your optimistic UI logic
   const [productsLocal, setProductsLocal] = useState<SerializedProduct[]>([])
   const totalProducts = data?.totalProducts ?? null
+  const stockSettings = data?.settings ?? DEFAULT_STOCK_SETTINGS
 
   useEffect(() => {
     if (!data) return
@@ -324,6 +330,17 @@ export function useProductsInventory() {
     }
     return { groups: grouped.length, instances: filteredProducts.length, totalStock, totalAvail }
   }, [grouped, filteredProducts.length])
+
+  const lowStockAccessoryProducts = useMemo(
+    () =>
+      productsLocal.filter(
+        (product) =>
+          String(product.type).toUpperCase() === "ACCESSORY" &&
+          product.state !== "VENDIDO" &&
+          (product.stockAvailable ?? product.stock ?? 0) <= stockSettings.accessoryLowStockThreshold,
+      ),
+    [productsLocal, stockSettings.accessoryLowStockThreshold],
+  )
 
   function clearFilters() {
     setSearch("")
@@ -876,7 +893,7 @@ export function useProductsInventory() {
     viewMode, setViewMode, inventorySegment, setInventorySegment, search, setSearch, typeFilter, setTypeFilter, stateFilter, setStateFilter, senadoFilter, setSenadoFilter,
     brandFilter, setBrandFilter, conditionFilter, setConditionFilter, batteryMin, setBatteryMin, batteryMax, setBatteryMax, colorFilter, setColorFilter, capacityFilter, setCapacityFilter, originFilter, setOriginFilter, locationFilter, setLocationFilter, imeiSearch, setImeiSearch,
     isTableExpanded, setIsTableExpanded, drawerOpen, setDrawerOpen, expandedGroups, setExpandedGroups, showSensitiveColumns, setShowSensitiveColumns, selectedProductIds, setSelectedProductIds, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, generalColumnCount,
-    editingFields, savingField, savingStateId, savingSenadoId, deletingId, duplicatingId, branches, savingBranchProductId, cursor, setCursor, limit, orderBy, setOrderBy, apiUrl, data, error, isLoading, mutate, productsLocal, setProductsLocal, totalProducts,
+    editingFields, savingField, savingStateId, savingSenadoId, deletingId, duplicatingId, branches, savingBranchProductId, cursor, setCursor, limit, orderBy, setOrderBy, apiUrl, data, error, isLoading, mutate, productsLocal, setProductsLocal, totalProducts, stockSettings, lowStockAccessoryProducts,
     stateOptions, stateColorMap, stateLabelMap, conditionOptions, conditionLabelMap, brands, conditions, colors, capacities, filteredProducts, locations, operationalProducts, phoneSections, grouped, groupedCounts, hasNext,
     clearFilters, selectInventorySegment, toggleProductSelection, canEditField, editableCellProps, startEditField, cancelEditField, updateEditingValue, persistFieldUpdate, commitEditField, isEditing, getEditingValue, persistStockUpdate, startEditStock, changeStockBy, persistStateUpdate, changeState, changeSenado, deleteProduct, duplicateProduct, changeProductBranch, toggleGroup,
   }

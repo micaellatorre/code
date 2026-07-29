@@ -80,6 +80,10 @@ export function useSaleForm({
       .catch(() => setBranches([]))
   }, [initialData?.branchId])
 
+  useEffect(() => {
+    if (selectedBuyer?.type === "MAYORISTA") setCustomerKind("wholesale")
+  }, [selectedBuyer?.type])
+
   const totals = useMemo(() => {
     const subtotal = items
       .filter((item) => item.kind === "NORMAL")
@@ -184,11 +188,14 @@ export function useSaleForm({
       date: meta.date.toISOString(),
       buyerId: selectedBuyer?.id,
       branchId: isAdmin ? selectedBranchId || null : undefined,
+      saleType: customerKind === "wholesale" ? "MAYORISTA" : "MINORISTA",
       customerName: !selectedBuyer ? "Consumidor Final" : null,
       origin: operationFlow === "RESERVATION" ? "Reserva" : meta.origin === "Otro" ? meta.customOrigin : meta.origin,
       notes: meta.notes,
       status: saleStatus,
       items: items.map((item) => ({
+        clientLineId: item.clientLineId,
+        parentClientLineId: item.parentClientLineId ?? null,
         productId: item.productId,
         units: item.units,
         unitPrice: item.unitPrice,

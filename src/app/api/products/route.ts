@@ -4,6 +4,8 @@ import { requireRoleApi } from "@/lib/auth/auth"
 import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { resolveOperationBranch } from "@/lib/domain/user-branches"
+import { buildProductCatalogUpdate, buildWholesalePriceUpdate } from "@/lib/config/productCatalogLinks"
+import { ensureTenantSettings } from "@/lib/config/settings"
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
@@ -82,7 +84,11 @@ const PRODUCT_SELECT = {
   origin: true,
   costPrice: true,
   salePrice: true,
+  wholesalePrice: true,
   shippingCost: true,
+  catalogModelId: true,
+  catalogCapacityId: true,
+  catalogColorId: true,
   stockInitial: true,
   stock: true,
   stockAvailable: true,
@@ -156,6 +162,7 @@ export async function GET(request: Request) {
 
     const qRaw = searchParams.get("q")
     const q = qRaw?.trim() ? qRaw.trim() : null
+    const saleTypeParam = searchParams.get("saleType")
 
     const stateParam = searchParams.get("state")
     const senadoParam = searchParams.get("senado")
@@ -184,6 +191,8 @@ export async function GET(request: Request) {
 
     // IMPORTANT: count must match same filters (where)
     const totalProducts = await prisma.product.count({ where })
+    const settings = await ensureTenantSettings(tenantId)
+    const useWholesaleSuggestion = saleTypeParam === "MAYORISTA" && settings.wholesalePricesEnabled
 
     const rows: ProductRow[] = await prisma.product.findMany({
       where,
@@ -205,6 +214,8 @@ export async function GET(request: Request) {
     const products = page.map((p: ProductRow) => {
       const purchaseSupplier = p.PurchaseItem[0]?.purchase.supplier ?? null
       const supplier = p.supplier ?? purchaseSupplier
+      const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
+      const suggestedSalePrice = useWholesaleSuggestion ? p.wholesalePrice ?? p.salePrice : p.salePrice
 
       return {
       id: p.id,
@@ -234,9 +245,13 @@ export async function GET(request: Request) {
 
       purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
 
-      costPrice: auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO" ? (p.costPrice != null ? String(p.costPrice) : null) : null,
-      salePrice: p.salePrice != null ? String(p.salePrice) : null,
-      shippingCost: auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO" ? (p.shippingCost != null ? String(p.shippingCost) : null) : null,
+      costPrice: canSeeFinancials ? (p.costPrice != null ? String(p.costPrice) : null) : null,
+      salePrice: suggestedSalePrice != null ? String(suggestedSalePrice) : null,
+      wholesalePrice: canSeeFinancials ? (p.wholesalePrice != null ? String(p.wholesalePrice) : null) : null,
+      shippingCost: canSeeFinancials ? (p.shippingCost != null ? String(p.shippingCost) : null) : null,
+      catalogModelId: p.catalogModelId ?? null,
+      catalogCapacityId: p.catalogCapacityId ?? null,
+      catalogColorId: p.catalogColorId ?? null,
 
       stockInitial: p.stockInitial ?? 0,
       stock: p.stock ?? 0,
@@ -249,7 +264,19 @@ export async function GET(request: Request) {
       }
     })
 
-    return NextResponse.json({ products, nextCursor, totalProducts }, { status: 200 })
+    return NextResponse.json(
+      {
+        products,
+        nextCursor,
+        totalProducts,
+        settings: {
+          stockRotationHighMaxDays: settings.stockRotationHighMaxDays,
+          stockRotationMediumMaxDays: settings.stockRotationMediumMaxDays,
+          accessoryLowStockThreshold: settings.accessoryLowStockThreshold,
+        },
+      },
+      { status: 200 },
+    )
   } catch (error) {
     console.error("Error fetching products:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
@@ -265,6 +292,8 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
+    delete body.tenantId
+    delete body.tenant
     const tenantId = await resolveProductTenantId(auth.session.user.tenantId)
     if (!tenantId) {
       return NextResponse.json({ error: "DEFAULT_TENANT_ID not set" }, { status: 500 })
@@ -280,9 +309,15 @@ export async function POST(request: Request) {
       entityLabel: "producto",
     })
     const supplierId = await resolveProductSupplierId(tenantId, body.supplierId)
+    const catalogUpdate = await buildProductCatalogUpdate(tenantId, body, body.type)
+    const wholesaleUpdate = await buildWholesalePriceUpdate({
+      tenantId,
+      actorRole: auth.session.user.activeRole,
+      input: body,
+    })
 
     const product = await prisma.product.create({
-      data: { ...body, tenantId, branchId: branch.id, supplierId },
+      data: { ...body, ...catalogUpdate, ...wholesaleUpdate, tenantId, branchId: branch.id, supplierId },
       include: {
         branch: { select: { id: true, code: true, name: true } },
         supplier: { select: { id: true, name: true } },
@@ -294,6 +329,7 @@ export async function POST(request: Request) {
       ...product,
       costPrice: product.costPrice != null ? String(product.costPrice) : null,
       salePrice: product.salePrice != null ? String(product.salePrice) : null,
+      wholesalePrice: product.wholesalePrice != null ? String(product.wholesalePrice) : null,
       shippingCost: product.shippingCost != null ? String(product.shippingCost) : null,
       purchaseDate: product.purchaseDate ? product.purchaseDate.toISOString() : null,
       createdAt: product.createdAt ? product.createdAt.toISOString() : null,

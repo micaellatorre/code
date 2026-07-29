@@ -7,6 +7,7 @@ import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE, toArgDateInputValue } from "@/lib/timezone"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
 import BranchAutocomplete from "@/components/branches/BranchAutocomplete"
+import { getStockRotation } from "@/lib/config/stockRotation"
 import type { SerializedProduct } from "./types"
 import type { ProductsInventory } from "./useProductsInventory"
 import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } from "./utils"
@@ -14,7 +15,7 @@ import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } f
 type ProductTablesProps = { inventory: ProductsInventory }
 
 export default function ProductTables({ inventory }: ProductTablesProps) {
-  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, startEditField, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup, branches, savingBranchProductId, changeProductBranch } = inventory
+  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, startEditField, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup, branches, savingBranchProductId, changeProductBranch, stockSettings } = inventory
   const [copiedImeiProductId, setCopiedImeiProductId] = React.useState<string | null>(null)
   const copiedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -136,6 +137,30 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
     )
   }
 
+  function getRotationBadgeClass(label: string) {
+    if (label === "Alta") return "badge-success"
+    if (label === "Media") return "badge-warning"
+    return "badge-error"
+  }
+
+  function RotationCell({ product }: { product: SerializedProduct }) {
+    if (!product.createdAt || product.state === "VENDIDO") {
+      return <span className="text-base-content/40">-</span>
+    }
+
+    const rotation = getStockRotation(
+      product.createdAt,
+      stockSettings.stockRotationHighMaxDays,
+      stockSettings.stockRotationMediumMaxDays,
+    )
+
+    return (
+      <span className={`badge badge-sm whitespace-nowrap ${getRotationBadgeClass(rotation.label)}`} title={`${rotation.daysInStock} dias en stock`}>
+        {rotation.label}
+      </span>
+    )
+  }
+
   function ProductRow({ p }: { p: SerializedProduct }) {
     return (
       <tr key={p.id}>
@@ -176,6 +201,10 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               </div>
             </span>
           )}
+        </td>
+
+        <td>
+          <RotationCell product={p} />
         </td>
 
         {visibleOriginColumn ? (
@@ -764,6 +793,9 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
         </td> */}
         <td className="font-mono text-xs">{getProductCode(product)}</td>
         <td>
+          <RotationCell product={product} />
+        </td>
+        <td>
           <OperationalEditableCell product={product} fieldName="modelName">
             <span className={product.notes ? "underline decoration-dotted cursor-help text-nowrap" : ""} title={product.notes ?? ""}>
               {product.modelName}
@@ -872,6 +904,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             <tr>
               {/* <th>Select</th> */}
               <th>Codigo</th>
+              <th>Rotacion</th>
               <th>Modelo</th>
               <th>Proveedor</th>
               {visibleImeiColumn ? <th>IMEI</th> : null}
@@ -957,6 +990,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             <thead>
               <tr>
                 <th>Agregado</th>
+                <th>Rotacion</th>
                 {visibleOriginColumn ? <th>Origen</th> : null}
                 <th>Proveedor</th>
                 {visibleLocationColumn ? <th>Sucursal</th> : null}
@@ -1065,6 +1099,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                                 <thead>
                                   <tr>
                                     <th>Agregado</th>
+                                    <th>Rotacion</th>
                                     {visibleOriginColumn ? <th>Origen</th> : null}
                                     <th>Proveedor</th>
                                     {visibleLocationColumn ? <th>Sucursal</th> : null}

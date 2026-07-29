@@ -38,6 +38,7 @@ export type SaleItemSummary = {
   id: string
   saleId: string
   productId: string
+  parentItemId?: string | null
   units: number
   kind: SaleItemKind | string
   unitPrice: string | null
@@ -100,6 +101,12 @@ export type SerializedSale = {
 export type ReceiptPreview = {
   sale: SerializedSale
   receipt: SerializedSaleReceipt
+  branding?: {
+    tenantName: string
+    logoDataUrl: string | null
+    usedDeviceWarrantyDays: number
+    warrantyPolicyText: string
+  }
 }
 
 export type SaleOriginFilter = "ALL" | "Directa" | "Reserva" | "Instagram" | "Local" | "Otro"
@@ -121,6 +128,8 @@ export type UserSearchResult = {
 }
 
 export type SaleItemDraft = {
+  clientLineId: string
+  parentClientLineId?: string | null
   productId: string
   product: Product
   units: number

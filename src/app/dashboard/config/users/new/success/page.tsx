@@ -33,7 +33,7 @@ export default async function NewUserSuccessPage({ searchParams }: SuccessPagePr
       <Breadcrumbs
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Mi Equipo", href: "/dashboard/users" },
+          { label: "Configuracion", href: "/dashboard/config?tab=equipo" },
           { label: "Usuario creado" },
         ]}
       />
@@ -85,8 +85,8 @@ export default async function NewUserSuccessPage({ searchParams }: SuccessPagePr
         </section>
 
         <div className="flex justify-end gap-2">
-          <Link href="/dashboard/users" className="btn btn-ghost">Volver a Mi Equipo</Link>
-          <Link href={`/dashboard/users/${user.id}/edit`} className="btn btn-primary">Editar usuario</Link>
+          <Link href="/dashboard/config?tab=equipo" className="btn btn-ghost">Volver a Mi equipo</Link>
+          <Link href={`/dashboard/config/users/${user.id}/edit`} className="btn btn-primary">Editar usuario</Link>
         </div>
       </div>
     </DashboardLayout>

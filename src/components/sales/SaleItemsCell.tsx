@@ -9,7 +9,7 @@ function TypeIcon({ type }: { type: string }) {
   return type.toUpperCase() === "PHONE" ? <DevicePhoneMobileIcon className="size-4 shrink-0 mt-1" /> : <ShoppingBagIcon className="size-4 shrink-0 mt-1" />
 }
 
-function ItemLine({ item }: { item: SaleItemSummary }) {
+function ItemLine({ item, nested = false }: { item: SaleItemSummary; nested?: boolean }) {
   const product = item.product
   const details = [
     product.capacityGB ? `${product.capacityGB}GB` : null,
@@ -31,6 +31,7 @@ function ItemLine({ item }: { item: SaleItemSummary }) {
     <Link href={`/dashboard/products/${item.productId}/edit`} className="flex min-w-56 gap-2 rounded-md p-2 hover:bg-base-200">
       <TypeIcon type={product.type ?? ""} />
       <span className="min-w-0">
+        {nested ? <span className="block text-[10px] font-medium uppercase text-accent">Accesorio sugerido</span> : null}
         <span className="block truncate font-medium">{product.modelName}</span>
         <span className="block text-xs text-base-content/60">
           {detailNodes.length
@@ -47,16 +48,42 @@ function ItemLine({ item }: { item: SaleItemSummary }) {
   )
 }
 
+function orderItems(items: SaleItemSummary[]) {
+  const byId = new Set(items.map((item) => item.id))
+  const childrenByParent = new Map<string, SaleItemSummary[]>()
+  const roots: SaleItemSummary[] = []
+
+  for (const item of items) {
+    if (item.parentItemId && byId.has(item.parentItemId)) {
+      childrenByParent.set(item.parentItemId, [...(childrenByParent.get(item.parentItemId) ?? []), item])
+    } else {
+      roots.push(item)
+    }
+  }
+
+  const ordered: { item: SaleItemSummary; nested: boolean }[] = []
+
+  for (const root of roots) {
+    ordered.push({ item: root, nested: false })
+    for (const child of childrenByParent.get(root.id) ?? []) {
+      ordered.push({ item: child, nested: true })
+    }
+  }
+
+  return ordered
+}
+
 export default function SaleItemsCell({ items }: { items: SaleItemSummary[] }) {
   if (!items.length) return <span className="text-base-content/50">Sin items</span>
 
-  const visible = items.slice(0, 1)
-  const hidden = items.slice(1)
+  const ordered = orderItems(items)
+  const visible = ordered.slice(0, 1)
+  const hidden = ordered.slice(1)
 
   return (
     <div className="flex flex-col gap-1 p-2 border border-base-300 rounded-lg bg-base-200 w-auto">
-      {visible.map((item) => (
-        <ItemLine key={item.id} item={item} />
+      {visible.map(({ item, nested }) => (
+        <ItemLine key={item.id} item={item} nested={nested} />
       ))}
       {hidden.length ? (
         <div className="dropdown dropdown-hover">
@@ -64,8 +91,8 @@ export default function SaleItemsCell({ items }: { items: SaleItemSummary[] }) {
             +{hidden.length} mas
           </button>
           <div tabIndex={0} className="dropdown-content z-20 w-72 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
-            {hidden.map((item) => (
-              <ItemLine key={item.id} item={item} />
+            {hidden.map(({ item, nested }) => (
+              <ItemLine key={item.id} item={item} nested={nested} />
             ))}
           </div>
         </div>

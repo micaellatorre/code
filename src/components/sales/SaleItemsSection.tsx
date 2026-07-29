@@ -15,6 +15,8 @@ interface SaleItemsSectionProps {
     items: SaleItemDraft[];
     setItems: (items: SaleItemDraft[]) => void;
     disabled?: boolean;
+    branchId?: string | null;
+    saleType?: 'MINORISTA' | 'MAYORISTA';
 }
 
 function getStateBadgeClass(state: string) {
@@ -24,20 +26,21 @@ function getStateBadgeClass(state: string) {
     return 'badge-ghost';
 }
 
-export default function SaleItemsSection({ items, setItems, disabled = false }: SaleItemsSectionProps) {
+export default function SaleItemsSection({ items, setItems, disabled = false, branchId, saleType = 'MINORISTA' }: SaleItemsSectionProps) {
     const { data: session } = useSession();
     const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole;
     const isAdmin = activeRole === 'ADMIN';
     const confirmDialog = useConfirmDialog();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     const handleAddItems = (newItems: SaleItemDraft[]) => {
         if (disabled) return;
 
         const updatedItems = [...items];
         newItems.forEach(newItem => {
-            const existingIndex = updatedItems.findIndex(i => i.productId === newItem.productId);
+            const existingIndex = updatedItems.findIndex(i => i.productId === newItem.productId && (i.parentClientLineId ?? null) === (newItem.parentClientLineId ?? null));
             if (existingIndex > -1) {
                 // If item exists, just update units
                 const existingItem = updatedItems[existingIndex];
@@ -56,7 +59,16 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
 
     const handleRemoveItem = (itemId: string) => {
         if (disabled) return;
-        setItems(items.filter(i => i._id !== itemId));
+        const removed = items.find(i => i._id === itemId);
+        if (!removed) return;
+        const next = items
+            .filter(i => i._id !== itemId)
+            .map(i => i.parentClientLineId === removed.clientLineId ? { ...i, parentClientLineId: null } : i);
+        setItems(next);
+        if (removed.product.type === 'PHONE' && next.some(i => i.parentClientLineId == null && items.some(original => original.parentClientLineId === removed.clientLineId && original._id === i._id))) {
+            setToastMessage('Los accesorios asociados quedaron como items independientes.');
+            window.setTimeout(() => setToastMessage(null), 3200);
+        }
     }
 
     const handleUpdateItem = (itemId: string, updatedFields: Partial<SaleItemDraft>) => {
@@ -118,6 +130,11 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
 
     return (
         <div className="card bg-base-100 border border-base-content/50 p-4">
+            {toastMessage ? (
+                <div className="toast toast-top toast-end z-[120]">
+                    <div className="alert alert-info text-sm shadow-lg"><span>{toastMessage}</span></div>
+                </div>
+            ) : null}
             <h2 className="font-bold text-lg">Items de Venta</h2>
 
             {items.length === 0 ? (
@@ -146,11 +163,17 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
                                 {items.map(item => {
                                     const availableForItem =
                                         (item.product.stockAvailable ?? item.product.stock ?? 0) + item.units;
+                                    const isSuggestedAccessory = Boolean(item.parentClientLineId);
 
                                     return (
-                                    <tr key={item._id}>
+                                    <tr key={item._id} className={isSuggestedAccessory ? 'bg-primary/5' : ''}>
                                         <td><ImeiDisplay imei={item.product.imei} /></td>
-                                        <td>{item.product.modelName}</td>
+                                        <td>
+                                            <div className={isSuggestedAccessory ? 'border-l-2 border-primary pl-3' : ''}>
+                                                {isSuggestedAccessory ? <div className="text-xs text-primary">↳ Accesorio sugerido</div> : null}
+                                                <span>{item.product.modelName}</span>
+                                            </div>
+                                        </td>
                                         <td>{item.product.batteryPct ? item.product.batteryPct : '-'}</td>
                                         {isAdmin ? (
                                             <td>
@@ -231,6 +254,8 @@ export default function SaleItemsSection({ items, setItems, disabled = false }: 
             {isModalOpen && !disabled && (
                 <ProductSelectionModal
                     existingItems={items}
+                    branchId={branchId}
+                    saleType={saleType}
                     onClose={() => setIsModalOpen(false)}
                     onAddItems={handleAddItems}
                 />
