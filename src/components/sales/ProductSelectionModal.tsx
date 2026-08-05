@@ -364,6 +364,7 @@ function newClientLineId(prefix = 'line') {
 export default function ProductSelectionModal({ existingItems, branchId, saleType = 'MINORISTA', preselectDefaultBag = false, onClose, onAddItems }: ProductSelectionModalProps) {
   const { data: session } = useSession()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole
+  const isAdmin = activeRole === 'ADMIN'
   const canOpenProductEdit = activeRole === 'ADMIN' || activeRole === 'STOCK' || activeRole === 'VENDEDOR'
   const [products, setProducts] = useState<ApiProduct[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -488,6 +489,12 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
       }
     })
   }, [products, availableStock])
+
+  const showPhoneSpecificColumns = useMemo(
+    () => productClusters.some((cluster) => cluster.product.type !== 'ACCESSORY'),
+    [productClusters],
+  )
+  const productTableColumnCount = 8 + (showPhoneSpecificColumns ? 2 : 0) + (isAdmin ? 1 : 0)
 
   const getSelectionKeyForProduct = useCallback((product: ApiProduct) => {
     return getSelectionKeyForProductFromSelection(selection, product)
@@ -1022,6 +1029,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                       <th>Estado</th>
                       <th>Stock disp.</th>
                       <th>% Bateria</th>
+                      {isAdmin ? <th>Costo</th> : null}
                       <th>Precio</th>
                       <th>Cantidad</th>
                       <th>Acciones</th>
@@ -1054,6 +1062,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                             <span className={`badge badge-ghost ${stock <= 0 ? 'badge-error' : ''}`}>{stock}</span>
                           </td>
                           <td>{representative.batteryPct != null ? `${representative.batteryPct}%` : 'N/A'}</td>
+                          {isAdmin ? <td>${draft.unitCost ?? representative.costPrice ?? '0'}</td> : null}
                           <td>${draft.unitPrice ?? representative.salePrice ?? '0'}</td>
                           <td>
                             <input
@@ -1095,12 +1104,18 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                 <thead>
                   <tr>
                     <th></th>
-                    <th>IMEI</th>
+                    {/* <th>IMEI</th> */}
+                    {showPhoneSpecificColumns ? (
+                      <th>IMEI</th>
+                    ) : null}
                     <th>Producto</th>
                     <th>Estado</th>
-                    <th>Stock Disp.</th>
                     <th>Ubicación</th>
-                    <th>% Batería</th>
+                    {showPhoneSpecificColumns ? (
+                      <th>% Batería</th>
+                    ) : null}
+                    <th>Stock Disp.</th>
+                    {isAdmin ? <th>Costo</th> : null}
                     <th>Precio</th>
                     <th>Cantidad</th>
                     <th>Acciones</th>
@@ -1109,7 +1124,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                 <tbody>
                   {productClusters.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-sm text-base-content/60">
+                      <td colSpan={productTableColumnCount} className="py-8 text-center text-sm text-base-content/60">
                         No se encontraron productos para esos filtros.
                       </td>
                     </tr>
@@ -1147,9 +1162,11 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                             disabled={currentStock <= 0 && !isSelected}
                           />
                         </td>
-                        <td>
-                          <ImeiDisplay imei={isCluster ? null : p.imei} className="text-base-content/40" fallback="N/A" />
-                        </td>
+                        {showPhoneSpecificColumns ? (
+                          <td>
+                            <ImeiDisplay imei={isCluster ? null : p.imei} className="text-base-content/40" fallback={isCluster ? `${cluster.products.length} items` : 'N/A'} />
+                          </td>
+                        ) : null}
                         <td>
                           <div className={isCluster ? 'dropdown dropdown-hover' : ''}>
                             <Link href={productEditHref(p.id)} className="font-bold link link-hover link-primary">
@@ -1176,6 +1193,10 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                             {p.state.replace(/_/g, ' ')}
                           </span>
                         </td>
+                        <td>{clusterLocationLabel(cluster)}</td>
+                        {showPhoneSpecificColumns ? (
+                          <td>{p.batteryPct != null ? `${p.batteryPct}%` : 'N/A'}</td>
+                        ) : null}
                         <td>
                           <div className="tooltip" data-tip={stockDetail}>
                             <span className={`badge badge-ghost ${isUnavailable ? 'badge-error' : ''}`}>
@@ -1183,8 +1204,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                             </span>
                           </div>
                         </td>
-                        <td>{clusterLocationLabel(cluster)}</td>
-                        <td>{p.batteryPct != null ? `${p.batteryPct}%` : 'N/A'}</td>
+                        {isAdmin ? <td>${p.costPrice ?? '0'}</td> : null}
                         <td>${p.salePrice ?? '0'}</td>
                         <td>
                           {usesClusterItemSelection && isSelected ? (
@@ -1231,7 +1251,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                       </tr>
                       {isSelected && p.type === 'PHONE' && (suggestions.length > 0 || suggestionsLoading) ? (
                         <tr>
-                          <td colSpan={10} className="bg-primary/5 px-4 py-3">
+                          <td colSpan={productTableColumnCount} className="bg-primary/5 px-4 py-3">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">Sugerencias compatibles</span>
                               {suggestionsLoading && suggestions.length === 0 ? (
@@ -1267,7 +1287,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                       ) : null}
                       {isCluster && isExpanded ? (
                         <tr>
-                          <td colSpan={10} className="bg-base-200/50 p-0">
+                          <td colSpan={productTableColumnCount} className="bg-base-200/50 p-0">
                             <div className="p-3">
                               <table className="table table-xs w-full">
                                 <thead>
@@ -1276,8 +1296,9 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                                     <th>Producto</th>
                                     {usesClusterItemSelection ? null : <th>IMEI</th>}
                                     <th>Ubicación</th>
-                                    <th>Stock</th>
+                                    <th>Stock Disp.</th>
                                     {usesClusterItemSelection ? <th>Cant.</th> : null}
+                                    {isAdmin ? <th>Costo</th> : null}
                                     <th>Precio</th>
                                     <th></th>
                                   </tr>
@@ -1312,8 +1333,8 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                                           {productAttributeLine(product)}
                                         </td>
                                         {usesClusterItemSelection ? null : <td><ImeiDisplay imei={product.imei} fallback="N/A" /></td>}
-                                        <td><span className="badge badge-ghost badge-xs">{productStock}</span></td>
                                         <td>{product.location || '-'}</td>
+                                        <td><span className="badge badge-ghost badge-xs">{productStock}</span></td>
                                         {usesClusterItemSelection ? (
                                           <td>
                                             {itemSelectedUnits > 0 ? (
@@ -1323,6 +1344,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
                                             )}
                                           </td>
                                         ) : null}
+                                        {isAdmin ? <td>${product.costPrice ?? '0'}</td> : null}
                                         <td>${product.salePrice ?? '0'}</td>
                                         <td className="text-right">
                                           {canOpenProductEdit ? (
