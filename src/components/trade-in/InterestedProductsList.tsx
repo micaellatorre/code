@@ -2,6 +2,7 @@
 
 import { calculateQuoteScenarios, formatTradeInDifference, formatUsd } from "@/lib/trade-in/calculateTradeIn"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
+import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayModel } from "@/lib/products/display"
 import type { InterestedProductDraft } from "./types"
 
 export default function InterestedProductsList({
@@ -39,10 +40,10 @@ export default function InterestedProductsList({
               <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
                 <input className="radio radio-primary radio-sm mt-1" type="radio" checked={selected} onChange={() => onSelect(product.id)} />
                 <span className="min-w-0">
-                  <span className="block font-semibold">{product.modelName} - {product.capacityGB ?? "-"} GB</span>
+                  <span className="block font-semibold">{getProductDisplayModel(product)} - {getProductDisplayCapacity(product) ?? "-"}</span>
                   <span className="flex flex-wrap items-baseline gap-x-1 text-xs text-base-content/60">
                     <span>{product.batteryPct ?? "-"}%</span>
-                    <span>- {product.color ?? "Sin color"}</span>
+                    <span>- {getProductDisplayColor(product) ?? "Sin color"}</span>
                     <span className="inline-flex items-baseline gap-1">
                       - #<ImeiDisplay imei={product.imei} fallback="Sin IMEI" />
                     </span>

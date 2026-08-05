@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
+import ProductCatalogSelectors from "@/components/products/ProductCatalogSelectors"
+import type { Role } from "@/lib/auth/roles"
 import { toArgDateInputValue } from "@/lib/timezone"
 
 type PurchaseKind = "PHONE" | "ACCESSORY"
@@ -20,9 +23,12 @@ type SupplierOption = {
 type PurchaseItemForm = {
   id: string
   type: PurchaseKind
+  catalogModelId: string
   modelName: string
   relatedModel: string
+  catalogColorId: string
   color: string
+  catalogCapacityId: string
   capacityGB: string
   physicalState: "NEW" | "USED"
   condition: ConditionValue
@@ -73,9 +79,12 @@ function newItem(type: PurchaseKind): PurchaseItemForm {
   return {
     id: makeId(),
     type,
+    catalogModelId: "",
     modelName: "",
     relatedModel: "",
+    catalogColorId: "",
     color: "",
+    catalogCapacityId: "",
     capacityGB: "",
     physicalState: "USED",
     condition: type === "PHONE" ? "ASIS" : "ASIS",
@@ -119,6 +128,8 @@ function paymentStatusLabel(status: SuccessPayload["summary"]["paymentStatus"]) 
 }
 
 export default function NewPurchaseForm() {
+  const { data: session } = useSession()
+  const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole ?? null
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [cashAccounts, setCashAccounts] = useState<CashAccountOption[]>([])
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
@@ -179,6 +190,10 @@ export default function NewPurchaseForm() {
   const total = useMemo(() => items.reduce((acc, item) => acc + Number(item.unitCost || 0) * item.quantity, 0), [items])
   const paidUsd = useMemo(() => payments.reduce((acc, payment) => acc + amountUsd(payment), 0), [payments])
   const totalUnits = useMemo(() => items.reduce((acc, item) => acc + item.quantity, 0), [items])
+  const hasValidCatalogItems = useMemo(
+    () => items.every((item) => item.catalogModelId && (item.type !== "PHONE" || item.catalogCapacityId)),
+    [items],
+  )
 
   function updateItem(itemId: string, patch: Partial<PurchaseItemForm>) {
     setItems((prev) => prev.map((item) => item.id === itemId ? { ...item, ...patch } : item))
@@ -192,7 +207,11 @@ export default function NewPurchaseForm() {
         return {
           ...item,
           type,
+          catalogModelId: "",
+          modelName: "",
           relatedModel: "",
+          catalogCapacityId: "",
+          capacityGB: "",
           physicalState: "USED",
           condition: "ASIS",
           imeis: Array.from({ length: item.quantity }, () => ""),
@@ -203,7 +222,10 @@ export default function NewPurchaseForm() {
       return {
         ...item,
         type,
+        catalogModelId: "",
+        modelName: "",
         relatedModel: "",
+        catalogCapacityId: "",
         capacityGB: "",
         physicalState: "USED",
         condition: "ASIS",
@@ -243,8 +265,11 @@ export default function NewPurchaseForm() {
       notes: form.notes || null,
       items: items.map((item) => item.type === "PHONE" ? {
         type: "PHONE" as const,
+        catalogModelId: item.catalogModelId,
         modelName: item.modelName,
+        catalogColorId: item.catalogColorId || null,
         color: item.color || null,
+        catalogCapacityId: item.catalogCapacityId,
         capacityGB: item.capacityGB ? Number(item.capacityGB) : null,
         physicalState: item.physicalState,
         condition: item.condition,
@@ -257,8 +282,10 @@ export default function NewPurchaseForm() {
         unitNotes: item.unitNotes,
       } : {
         type: "ACCESSORY" as const,
+        catalogModelId: item.catalogModelId,
         modelName: item.modelName,
         relatedModel: item.relatedModel || null,
+        catalogColorId: item.catalogColorId || null,
         color: item.color || null,
         quantity: item.quantity,
         unitCost: item.unitCost,
@@ -397,25 +424,25 @@ export default function NewPurchaseForm() {
                   </div>
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <label className="form-control">
-                    <span className="label-text">{item.type === "PHONE" ? "Modelo *" : "Articulo / modelo *"}</span>
-                    <input className="input input-bordered" value={item.modelName} onChange={(event) => updateItem(item.id, { modelName: event.target.value })} required />
-                  </label>
+                  <div className="md:col-span-3">
+                    <ProductCatalogSelectors
+                      type={item.type}
+                      activeRole={activeRole}
+                      modelId={item.catalogModelId}
+                      modelName={item.modelName}
+                      capacityId={item.catalogCapacityId}
+                      capacityGB={item.capacityGB}
+                      colorId={item.catalogColorId}
+                      color={item.color}
+                      onChange={(patch) => updateItem(item.id, patch)}
+                    />
+                  </div>
                   {item.type === "ACCESSORY" ? (
                     <label className="form-control">
                       <span className="label-text">Para modelo</span>
                       <input className="input input-bordered" value={item.relatedModel} onChange={(event) => updateItem(item.id, { relatedModel: event.target.value })} />
                     </label>
-                  ) : (
-                    <label className="form-control">
-                      <span className="label-text">Capacidad *</span>
-                      <input className="input input-bordered" type="number" value={item.capacityGB} onChange={(event) => updateItem(item.id, { capacityGB: event.target.value })} />
-                    </label>
-                  )}
-                  <label className="form-control">
-                    <span className="label-text">Color</span>
-                    <input className="input input-bordered" value={item.color} onChange={(event) => updateItem(item.id, { color: event.target.value })} />
-                  </label>
+                  ) : null}
                   {item.type === "PHONE" ? (
                     <>
                       <label className="form-control">
@@ -525,7 +552,7 @@ export default function NewPurchaseForm() {
         </section>
 
         <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={() => setConfirmOpen(true)} disabled={!form.branchId || !form.supplierId || saving}>
+          <button type="button" className="btn btn-primary" onClick={() => setConfirmOpen(true)} disabled={!form.branchId || !form.supplierId || !hasValidCatalogItems || saving}>
             Confirmar compra
           </button>
         </div>

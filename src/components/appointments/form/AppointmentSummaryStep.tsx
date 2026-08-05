@@ -2,6 +2,7 @@
 
 import type { AppointmentNoSaleReason, AppointmentOutcome, AppointmentStatus, Buyer } from "@prisma/client"
 import { formatMoney } from "@/components/appointments/appointmentUtils"
+import { getProductDisplayModel } from "@/lib/products/display"
 import type { AppointmentInterestDraft } from "@/components/appointments/AppointmentInterestSection"
 
 type AppointmentSummaryStepProps = {
@@ -144,7 +145,7 @@ export default function AppointmentSummaryStep({
           {items.length ? (
             items.map((item) => (
               <div key={item._id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <span>{item.product.modelName}</span>
+                <span>{getProductDisplayModel(item.product)}</span>
                 <span className="badge badge-outline">{item.kind ?? "NORMAL"}</span>
               </div>
             ))

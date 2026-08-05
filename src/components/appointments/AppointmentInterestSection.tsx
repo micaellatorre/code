@@ -4,12 +4,14 @@ import type { Product } from "@prisma/client"
 import Link from "next/link"
 import { useState } from "react"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
+import ProductColorSwatch from "@/components/products/ProductColorSwatch"
+import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayColorHex, getProductDisplayModel, type ProductCatalogDisplayProduct } from "@/lib/products/display"
 import ProductSelectionModal from "../sales/ProductSelectionModal"
 
 export type AppointmentInterestDraft = {
   _id: string
   productId: string
-  product: Product
+  product: Product & ProductCatalogDisplayProduct
   notes?: string
   priority?: number
   agreedPrice?: number
@@ -62,7 +64,7 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
     const note = firstItem.notes?.trim()
     const nextNote = [note, `Sugerencia compatible: ${tag}`].filter(Boolean).join(" | ")
     handleUpdateItem(firstItem._id, { notes: nextNote, kind: tag.includes("Promocion") ? "PROMO" : "GIFT" })
-    setSuggestionMessage(`${tag} agregado como sugerencia en ${firstItem.product.modelName}.`)
+    setSuggestionMessage(`${tag} agregado como sugerencia en ${getProductDisplayModel(firstItem.product)}.`)
   }
 
   return (
@@ -107,7 +109,10 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {items.map((item) => {
+                  const color = getProductDisplayColor(item.product)
+                  const capacity = item.product.type?.toUpperCase() === "PHONE" ? getProductDisplayCapacity(item.product) : null
+                  return (
                   <tr key={item._id}>
                     <td><ImeiDisplay imei={item.product.imei} fallback="N/A" /></td>
                     <td>
@@ -117,15 +122,20 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {item.product.modelName}
+                        {getProductDisplayModel(item.product)}
                       </Link>
                     </td>
                     <td>
                       <div className="flex flex-wrap gap-1">
-                        {item.product.capacityGB ? <span className="badge badge-outline badge-xs">{item.product.capacityGB}GB</span> : null}
+                        {capacity ? <span className="badge badge-outline badge-xs">{capacity}</span> : null}
                         {item.product.condition ? <span className="badge badge-outline badge-xs">{item.product.condition}</span> : null}
                         {item.product.batteryPct ? <span className="badge badge-outline badge-xs">{item.product.batteryPct}% bat.</span> : null}
-                        {item.product.color ? <span className="badge badge-outline badge-xs">{item.product.color}</span> : null}
+                        {color ? (
+                          <span className="badge badge-outline badge-xs gap-1">
+                            <ProductColorSwatch hexColor={getProductDisplayColorHex(item.product)} title={color} />
+                            {color}
+                          </span>
+                        ) : null}
                         {item.product.state ? <span className="badge badge-outline badge-xs">{item.product.state}</span> : null}
                       </div>
                     </td>
@@ -183,7 +193,8 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
                       </button>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

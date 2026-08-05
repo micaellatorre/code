@@ -6,6 +6,7 @@ import { createAuditLog } from "@/lib/domain/audit"
 import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
 import { resolveSessionTenantId } from "@/lib/tenant"
 import { buildProductCatalogUpdate, buildWholesalePriceUpdate } from "@/lib/config/productCatalogLinks"
+import { productCatalogDisplayInclude } from "@/lib/products/selects"
 
 type Ctx = {
   params: Promise<{ id: string }>
@@ -33,6 +34,21 @@ function serializeProduct(product: any, canSeeFinancials: boolean) {
   }
 }
 
+function productCatalogAuditValue(product: any) {
+  return {
+    catalogModelId: product.catalogModelId ?? null,
+    modelName: product.modelName ?? null,
+    catalogCapacityId: product.catalogCapacityId ?? null,
+    capacityGB: product.capacityGB ?? null,
+    catalogColorId: product.catalogColorId ?? null,
+    color: product.color ?? null,
+  }
+}
+
+function catalogAuditChanged(oldValue: ReturnType<typeof productCatalogAuditValue>, newValue: ReturnType<typeof productCatalogAuditValue>) {
+  return Object.keys(oldValue).some((key) => oldValue[key as keyof typeof oldValue] !== newValue[key as keyof typeof newValue])
+}
+
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const auth = await requireRoleApi(["ADMIN", "VENDEDOR", "STOCK", "SOCIO"])
 
@@ -44,7 +60,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
   const product = await prisma.product.findFirst({
     where: { id, ...(tenantId ? { tenantId } : {}) },
-    include: { branch: { select: { id: true, code: true, name: true } }, supplier: { select: { id: true, name: true } } },
+    include: {
+      branch: { select: { id: true, code: true, name: true } },
+      supplier: { select: { id: true, name: true } },
+      ...productCatalogDisplayInclude,
+    },
   })
   if (!product) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
   const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
@@ -65,7 +85,13 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   try {
     const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
     if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
-    const current = await prisma.product.findFirst({ where: { id, tenantId }, include: { branch: { select: { id: true, name: true } } } })
+    const current = await prisma.product.findFirst({
+      where: { id, tenantId },
+      include: {
+        branch: { select: { id: true, name: true } },
+        ...productCatalogDisplayInclude,
+      },
+    })
     if (!current) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
 
     if (body.senado === false) body.senadoAt = null
@@ -90,7 +116,15 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
       input: body,
     })
 
-    const product = await prisma.product.update({ where: { id }, data: { ...body, ...catalogUpdate, ...wholesaleUpdate }, include: { branch: { select: { id: true, name: true } }, supplier: { select: { id: true, name: true } } } })
+    const product = await prisma.product.update({
+      where: { id },
+      data: { ...body, ...catalogUpdate, ...wholesaleUpdate },
+      include: {
+        branch: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
+        ...productCatalogDisplayInclude,
+      },
+    })
     if (Object.prototype.hasOwnProperty.call(body, "branchId") && current.branchId !== product.branchId) {
       await createAuditLog({
         tenantId,
@@ -105,12 +139,29 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
         newValue: { branchId: product.branchId, branchName: product.branch?.name ?? null },
       })
     }
+    const oldCatalogValue = productCatalogAuditValue(current)
+    const newCatalogValue = productCatalogAuditValue(product)
+    if (catalogAuditChanged(oldCatalogValue, newCatalogValue)) {
+      await createAuditLog({
+        tenantId,
+        actorUserId: auth.session.user.id,
+        actorRole: auth.session.user.activeRole as UserRole,
+        action: "UPDATE",
+        module: "PRODUCT",
+        entityType: "Product",
+        entityId: product.id,
+        detail: "Actualizacion de catalogos del producto",
+        oldValue: oldCatalogValue,
+        newValue: newCatalogValue,
+      })
+    }
     const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
     return NextResponse.json(serializeProduct(product, canSeeFinancials))
   } catch (err: any) {
     console.error(err)
     const message = err instanceof Error ? err.message : "Error actualizando producto"
-    return NextResponse.json({ error: message }, { status: message.includes("Proveedor") ? 400 : 500 })
+    const lower = message.toLowerCase()
+    return NextResponse.json({ error: message }, { status: message.includes("Proveedor") || lower.includes("catalogo") || lower.includes("capacidad") ? 400 : 500 })
   }
 }
 
@@ -130,7 +181,13 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     const updateData: any = {}
     const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
     if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
-    const current = await prisma.product.findFirst({ where: { id, tenantId }, include: { branch: { select: { id: true, name: true } } } })
+    const current = await prisma.product.findFirst({
+      where: { id, tenantId },
+      include: {
+        branch: { select: { id: true, name: true } },
+        ...productCatalogDisplayInclude,
+      },
+    })
     if (!current) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
 
     if (Object.prototype.hasOwnProperty.call(body, "stock")) {
@@ -209,6 +266,19 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, "modelName") && !Object.prototype.hasOwnProperty.call(body, "catalogModelId")) {
+      return NextResponse.json({ error: "Actualiza el modelo seleccionando un item del catalogo." }, { status: 400 })
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "capacityGB") && !Object.prototype.hasOwnProperty.call(body, "catalogCapacityId")) {
+      return NextResponse.json({ error: "Actualiza la capacidad seleccionando un item del catalogo." }, { status: 400 })
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "color") && !Object.prototype.hasOwnProperty.call(body, "catalogColorId")) {
+      return NextResponse.json({ error: "Actualiza el color seleccionando un item del catalogo." }, { status: 400 })
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "type") && body.type !== current.type && !Object.prototype.hasOwnProperty.call(body, "catalogModelId")) {
+      return NextResponse.json({ error: "Al cambiar el tipo, selecciona un modelo del catalogo correspondiente." }, { status: 400 })
+    }
+
     if (Object.prototype.hasOwnProperty.call(body, "capacityGB")) {
       if (body.capacityGB === null || body.capacityGB === "") {
         updateData.capacityGB = null
@@ -233,10 +303,12 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
     }
 
-    const allowed = ["modelName", "brand", "condition", "color", "status", "state", "imei", "notes", "location", "origin", "catalogModelId", "catalogCapacityId", "catalogColorId"] as const
+    const allowed = ["type", "modelName", "brand", "condition", "color", "status", "state", "imei", "notes", "location", "origin", "catalogModelId", "catalogCapacityId", "catalogColorId"] as const
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
-        if (["brand", "imei", "color", "notes", "location", "origin"].includes(key) && body[key] === "") {
+        if (key === "type" && body[key] !== "PHONE" && body[key] !== "ACCESSORY") {
+          return NextResponse.json({ error: "Tipo de producto invalido" }, { status: 400 })
+        } else if (["brand", "imei", "color", "notes", "location", "origin"].includes(key) && body[key] === "") {
           updateData[key] = null
         } else {
           updateData[key] = body[key]
@@ -271,7 +343,15 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       return NextResponse.json({ error: "No hay campos para actualizar" }, { status: 400 })
     }
 
-    const product = await prisma.product.update({ where: { id }, data: updateData, include: { branch: { select: { id: true, code: true, name: true } }, supplier: { select: { id: true, name: true } } } })
+    const product = await prisma.product.update({
+      where: { id },
+      data: updateData,
+      include: {
+        branch: { select: { id: true, code: true, name: true } },
+        supplier: { select: { id: true, name: true } },
+        ...productCatalogDisplayInclude,
+      },
+    })
     if (Object.prototype.hasOwnProperty.call(updateData, "branchId") && current.branchId !== product.branchId) {
       await createAuditLog({
         tenantId,
@@ -286,12 +366,29 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         newValue: { branchId: product.branchId, branchName: product.branch?.name ?? null },
       })
     }
+    const oldCatalogValue = productCatalogAuditValue(current)
+    const newCatalogValue = productCatalogAuditValue(product)
+    if (catalogAuditChanged(oldCatalogValue, newCatalogValue)) {
+      await createAuditLog({
+        tenantId,
+        actorUserId: auth.session.user.id,
+        actorRole: auth.session.user.activeRole as UserRole,
+        action: "UPDATE",
+        module: "PRODUCT",
+        entityType: "Product",
+        entityId: product.id,
+        detail: "Actualizacion de catalogos del producto",
+        oldValue: oldCatalogValue,
+        newValue: newCatalogValue,
+      })
+    }
     const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
     return NextResponse.json(serializeProduct(product, canSeeFinancials))
   } catch (err: any) {
     console.error(err)
     const message = err instanceof Error ? err.message : "Error actualizando producto"
-    return NextResponse.json({ error: message }, { status: message.includes("Proveedor") ? 400 : 500 })
+    const lower = message.toLowerCase()
+    return NextResponse.json({ error: message }, { status: message.includes("Proveedor") || lower.includes("catalogo") || lower.includes("capacidad") ? 400 : 500 })
   }
 }
 

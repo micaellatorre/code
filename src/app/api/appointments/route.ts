@@ -2,6 +2,8 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { requireRoleApi } from "@/lib/auth/auth";
+import { resolveSessionTenantId } from "@/lib/tenant";
+import { productCatalogDisplayInclude } from "@/lib/products/selects";
 
 // GET: lista de todas las citas
 export async function GET() {
@@ -10,8 +12,19 @@ export async function GET() {
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status })
   }
+  const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+  if (!tenantId) {
+    return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
+  }
 
   const appointments = await prisma.appointment.findMany({
+    where: {
+      OR: [
+        { buyer: { is: { tenantId } } },
+        { user: { is: { tenantId } } },
+        { interests: { some: { product: { tenantId } } } },
+      ],
+    },
     include: {
       user: {
         select: {
@@ -21,7 +34,7 @@ export async function GET() {
         },
       },
       buyer: true,
-      interests: { include: { product: true } },
+      interests: { include: { product: { include: productCatalogDisplayInclude } } },
     },
     orderBy: { scheduledAt: "desc" },
   });
@@ -71,8 +84,9 @@ export async function POST(request: Request) {
     const txResult = await prisma.$transaction(
       async (tx) => {
         const userId = auth.session?.user?.id || null;
+        const tenantId = await resolveSessionTenantId(auth.session.user.tenantId);
 
-        if (!userId) {
+        if (!userId || !tenantId) {
           throw new Error("Usuario no autenticado");
         }
 
@@ -80,14 +94,23 @@ export async function POST(request: Request) {
         const productIds = interests?.map((interest) => interest.productId).filter(Boolean) ?? [];
         let derivedOutcome = outcome || "PENDIENTE";
 
-        if (!outcome && hasDeposit && productIds.length > 0) {
-          const products = await tx.product.findMany({
-            where: { id: { in: productIds } },
-            select: { state: true },
+        const buyer = await tx.buyer.findFirst({ where: { id: buyerId, tenantId }, select: { id: true } });
+        if (!buyer) throw new Error("Cliente no disponible para el tenant actual");
+
+        if (productIds.length > 0) {
+          const productsInTenant = await tx.product.findMany({
+            where: { id: { in: productIds }, tenantId },
+            select: { id: true, state: true },
           });
-          if (products.some((product) => product.state === "EN_STOCK")) derivedOutcome = "SENADO_EN_STOCK";
-          else if (products.some((product) => product.state === "EN_CAMINO")) derivedOutcome = "SENADO_EN_CAMINO";
-          else derivedOutcome = "SENADO";
+          if (productsInTenant.length !== new Set(productIds).size) {
+            throw new Error("Todos los productos de interes deben pertenecer al tenant actual");
+          }
+
+          if (!outcome && hasDeposit) {
+            if (productsInTenant.some((product) => product.state === "EN_STOCK")) derivedOutcome = "SENADO_EN_STOCK";
+            else if (productsInTenant.some((product) => product.state === "EN_CAMINO")) derivedOutcome = "SENADO_EN_CAMINO";
+            else derivedOutcome = "SENADO";
+          }
         }
 
         const appointment = await tx.appointment.create({
@@ -114,7 +137,7 @@ export async function POST(request: Request) {
 
         if (hasDeposit && productIds.length > 0) {
           await tx.product.updateMany({
-            where: { id: { in: productIds } },
+            where: { id: { in: productIds }, tenantId },
             data: { senado: true, senadoAt: new Date() },
           });
         }
@@ -130,7 +153,7 @@ export async function POST(request: Request) {
         buyer: true,
         interests: {
           include: {
-            product: true,
+            product: { include: productCatalogDisplayInclude },
           },
         },
       },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import { getProductDisplayModel, type ProductCatalogDisplayCapacity, type ProductCatalogDisplayColor, type ProductCatalogDisplayModel } from "@/lib/products/display"
 
 type Option = {
   id: string
@@ -10,6 +11,9 @@ type Option = {
   modelName?: string
   imei?: string | null
   surname?: string | null
+  catalogModel?: ProductCatalogDisplayModel | null
+  catalogCapacity?: ProductCatalogDisplayCapacity | null
+  catalogColor?: ProductCatalogDisplayColor | null
 }
 
 export default function ServiceOrderForm() {
@@ -48,7 +52,7 @@ export default function ServiceOrderForm() {
       const next = { ...prev, [field]: value }
       if (field === "productId") {
         const product = products.find((item) => item.id === value)
-        next.modelName = product?.modelName ?? next.modelName
+        next.modelName = product ? getProductDisplayModel(product) : next.modelName
         next.imeiSerial = product?.imei ?? next.imeiSerial
       }
       return next
@@ -134,7 +138,7 @@ export default function ServiceOrderForm() {
               <option value="">Sin producto</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.modelName}
+                  {getProductDisplayModel(product)}
                 </option>
               ))}
             </SelectField>

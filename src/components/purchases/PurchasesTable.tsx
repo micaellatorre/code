@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowPathIcon, ClockIcon } from "@heroicons/react/24/outline"
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE } from "@/lib/timezone"
+import { getProductDisplayModel, type ProductCatalogDisplayCapacity, type ProductCatalogDisplayColor, type ProductCatalogDisplayModel } from "@/lib/products/display"
 import PurchaseTimelineModal from "./PurchaseTimelineModal"
 
 export type PurchaseRow = {
@@ -21,7 +22,19 @@ export type PurchaseRow = {
   items: Array<{
     id: string
     units: number
-    product: { id: string; type: string; modelName: string; imei: string | null; state?: string | null }
+    product: {
+      id: string
+      type: string
+      modelName: string
+      imei: string | null
+      state?: string | null
+      catalogModelId?: string | null
+      catalogCapacityId?: string | null
+      catalogColorId?: string | null
+      catalogModel?: ProductCatalogDisplayModel | null
+      catalogCapacity?: ProductCatalogDisplayCapacity | null
+      catalogColor?: ProductCatalogDisplayColor | null
+    }
   }>
 }
 
@@ -203,7 +216,7 @@ export default function PurchasesTable({ purchases, canUpdatePaymentStatus = fal
                   <div className="max-w-sm">
                     <div className="font-medium">{purchase.totalUnits} unidades</div>
                     <div className="truncate text-xs text-base-content/60">
-                      {purchase.items.slice(0, 3).map((item) => `${item.product.modelName}${item.product.imei ? ` #${item.product.imei}` : ""}`).join(", ")}
+                      {purchase.items.slice(0, 3).map((item) => `${getProductDisplayModel(item.product)}${item.product.imei ? ` #${item.product.imei}` : ""}`).join(", ")}
                     </div>
                   </div>
                 </td>
@@ -293,7 +306,7 @@ export default function PurchasesTable({ purchases, canUpdatePaymentStatus = fal
                         className="font-medium text-primary hover:underline"
                         href={`/dashboard/products/${item.product.id}/edit`}
                       >
-                        {item.product.modelName}
+                        {getProductDisplayModel(item.product)}
                       </Link>
                       {item.product.imei ? <div className="truncate text-xs text-base-content/60">IMEI {item.product.imei}</div> : null}
                     </div>

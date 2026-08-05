@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react"
 import type { Buyer, Product, SaleItemKind } from "@prisma/client"
 import type { SaleItemDraft } from "@/components/sales/types"
 import { formatUsd } from "@/components/sales/salesUtils"
+import { getProductDisplayModel, type ProductCatalogDisplayProduct } from "@/lib/products/display"
 
 type AppointmentOption = {
   id: string
   scheduledAt: string
   buyer: Buyer | null
-  interests: { productId: string; product: Product; notes?: string | null; priority?: number | null }[]
+  interests: { productId: string; product: Product & ProductCatalogDisplayProduct; notes?: string | null; priority?: number | null }[]
 }
 
 function normalizeSearch(value: string) {
@@ -29,7 +30,7 @@ function getAppointmentSearchText(appointment: AppointmentOption) {
     [
       appointment.id,
       getBuyerLabel(appointment.buyer),
-      appointment.interests.map((interest) => interest.product.modelName).join(" "),
+      appointment.interests.map((interest) => getProductDisplayModel(interest.product)).join(" "),
     ].join(" "),
   )
 }
@@ -92,7 +93,7 @@ export default function SaleReservationStep({
   const autocompleteOptions = useMemo(() => {
     const options = appointments.flatMap((appointment) => [
       getBuyerLabel(appointment.buyer),
-      ...appointment.interests.map((interest) => interest.product.modelName),
+      ...appointment.interests.map((interest) => getProductDisplayModel(interest.product)),
     ])
     return Array.from(new Set(options.filter(Boolean))).sort((a, b) => a.localeCompare(b))
   }, [appointments])
@@ -160,7 +161,7 @@ export default function SaleReservationStep({
                     [{appointment.id.slice(-4).toUpperCase()}] {getBuyerLabel(appointment.buyer)}
                   </p>
                   <p className="text-sm text-base-content/60">
-                    {appointment.interests.map((interest) => interest.product.modelName).join(" · ")}
+                    {appointment.interests.map((interest) => getProductDisplayModel(interest.product)).join(" - ")}
                   </p>
                   <p className="text-xs text-base-content/50">Deposito / Seña: USD 0 · Total estimado: {formatUsd(total)}</p>
                 </div>

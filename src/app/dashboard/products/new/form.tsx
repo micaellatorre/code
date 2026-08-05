@@ -6,20 +6,20 @@ import { useSession } from "next-auth/react"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
+import ProductCatalogSelectors from "@/components/products/ProductCatalogSelectors"
 
 export const dynamic = "force-dynamic"
 
 type ProductType = "PHONE" | "ACCESSORY"
 type SupplierOption = { id: string; name: string }
-type CatalogOption = { id: string; name?: string; label?: string; capacityGB?: number; hexColor?: string; type?: ProductType; isActive: boolean }
 
 export default function NewProductForm() {
   const router = useRouter()
   const { data: session } = useSession()
   const isAdmin = session?.user?.activeRole === "ADMIN"
+  const activeRole = session?.user?.activeRole ?? null
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
-  const [catalogs, setCatalogs] = useState<{ models: CatalogOption[]; capacities: CatalogOption[]; colors: CatalogOption[] }>({ models: [], capacities: [], colors: [] })
   const [wholesaleEnabled, setWholesaleEnabled] = useState(false)
   const [currentBranch, setCurrentBranch] = useState<BranchOption | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -64,19 +64,10 @@ export default function NewProductForm() {
 
   useEffect(() => {
     if (!isAdmin) return
-    Promise.all([
-      fetch("/api/config/settings", { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)),
-      fetch("/api/config/catalogs", { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)),
-    ]).then(([settings, catalogPayload]) => {
+    fetch("/api/config/settings", { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)).then((settings) => {
       setWholesaleEnabled(Boolean(settings?.settings?.wholesalePricesEnabled))
-      setCatalogs({
-        models: Array.isArray(catalogPayload?.models) ? catalogPayload.models.filter((item: CatalogOption) => item.isActive) : [],
-        capacities: Array.isArray(catalogPayload?.capacities) ? catalogPayload.capacities.filter((item: CatalogOption) => item.isActive) : [],
-        colors: Array.isArray(catalogPayload?.colors) ? catalogPayload.colors.filter((item: CatalogOption) => item.isActive) : [],
-      })
     }).catch(() => {
       setWholesaleEnabled(false)
-      setCatalogs({ models: [], capacities: [], colors: [] })
     })
   }, [isAdmin])
 
@@ -90,6 +81,11 @@ export default function NewProductForm() {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
+    if (!form.catalogModelId) {
+      setError("Selecciona un modelo del catalogo.")
+      setIsSubmitting(false)
+      return
+    }
     const payload: any = {
       modelName: form.modelName,
       location: form.location || null,
@@ -98,7 +94,7 @@ export default function NewProductForm() {
       origin: form.origin || null,
       brand: form.brand || null,
       imei: form.imei || null,
-      capacityGB: form.capacityGB ? Number(form.capacityGB) : null,
+      capacityGB: form.type === "PHONE" && form.capacityGB ? Number(form.capacityGB) : null,
       condition: form.condition || null,
       color: form.color || null,
       batteryPct: form.batteryPct ? Number(form.batteryPct) : null,
@@ -106,9 +102,9 @@ export default function NewProductForm() {
       salePrice: parseFloat(form.salePrice) || 0,
       ...(isAdmin && wholesaleEnabled ? { wholesalePrice: form.wholesalePrice ? parseFloat(form.wholesalePrice) : null } : {}),
       shippingCost: form.shippingCost ? parseFloat(form.shippingCost) : null,
-      ...(form.catalogModelId ? { catalogModelId: form.catalogModelId } : {}),
-      ...(form.catalogCapacityId ? { catalogCapacityId: form.catalogCapacityId } : {}),
-      ...(form.catalogColorId ? { catalogColorId: form.catalogColorId } : {}),
+      catalogModelId: form.catalogModelId,
+      catalogCapacityId: form.type === "PHONE" && form.catalogCapacityId ? form.catalogCapacityId : null,
+      catalogColorId: form.catalogColorId || null,
       type: form.type,
       senado: form.senado,
       notes: form.notes || null,
@@ -132,7 +128,6 @@ export default function NewProductForm() {
 
   const productTypeLabel = form.type === "PHONE" ? "Telefono" : "Accesorio"
   const selectedSupplier = suppliers.find((supplier) => supplier.id === form.supplierId)
-  const modelOptions = catalogs.models.filter((model) => model.type === form.type)
   const selectedBranchName = isAdmin
     ? branches.find((branch) => branch.id === form.branchId)?.name
     : currentBranch?.name
@@ -168,7 +163,14 @@ export default function NewProductForm() {
                     type="button"
                     aria-pressed={form.type === type}
                     className={`btn btn-sm join-item ${form.type === type ? "btn-primary" : "btn-outline"}`}
-                    onClick={() => setForm((prev) => ({ ...prev, type }))}
+                    onClick={() => setForm((prev) => ({
+                      ...prev,
+                      type,
+                      catalogModelId: prev.type === type ? prev.catalogModelId : "",
+                      modelName: prev.type === type ? prev.modelName : "",
+                      catalogCapacityId: type === "PHONE" ? prev.catalogCapacityId : "",
+                      capacityGB: type === "PHONE" ? prev.capacityGB : "",
+                    }))}
                     disabled={isSubmitting}
                   >
                     {type === "PHONE" ? "Telefono" : "Accesorio"}
@@ -225,24 +227,19 @@ export default function NewProductForm() {
                 <p className="text-sm text-base-content/60">Datos que permiten reconocer el equipo o accesorio.</p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="form-control">
-                  <label className="label"><span className="label-text">Modelo *</span></label>
-                  {isAdmin && modelOptions.length > 0 ? (
-                    <select
-                      className="select select-bordered mb-2"
-                      value={form.catalogModelId}
-                      onChange={(event) => {
-                        const model = modelOptions.find((item) => item.id === event.target.value)
-                        setForm((prev) => ({ ...prev, catalogModelId: event.target.value, modelName: model?.name ?? prev.modelName }))
-                      }}
-                      disabled={isSubmitting}
-                    >
-                      <option value="">Modelo libre</option>
-                      {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-                    </select>
-                  ) : null}
-                  <input type="text" name="modelName" value={form.modelName} onChange={handleChange} required className="input  input-bordered" disabled={isSubmitting} />
-                  <span className="label-text-alt mt-1 text-base-content/50">Ej: iPhone 15 Pro, Funda 14 Pro Max.</span>
+                <div className="md:col-span-2">
+                  <ProductCatalogSelectors
+                    type={form.type}
+                    activeRole={activeRole}
+                    disabled={isSubmitting}
+                    modelId={form.catalogModelId || null}
+                    modelName={form.modelName}
+                    capacityId={form.catalogCapacityId || null}
+                    capacityGB={form.capacityGB}
+                    colorId={form.catalogColorId || null}
+                    color={form.color}
+                    onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+                  />
                 </div>
                 <div className="form-control">
                   <label className="label"><span className="label-text">Marca</span></label>
@@ -251,24 +248,6 @@ export default function NewProductForm() {
                 <div className="form-control">
                   <label className="label"><span className="label-text">IMEI / serie</span></label>
                   <input type="text" name="imei" value={form.imei} onChange={handleChange} className="input  input-bordered" disabled={isSubmitting} />
-                </div>
-                <div className="form-control">
-                  <label className="label"><span className="label-text">Color</span></label>
-                  {isAdmin && catalogs.colors.length > 0 ? (
-                    <select
-                      className="select select-bordered mb-2"
-                      value={form.catalogColorId}
-                      onChange={(event) => {
-                        const color = catalogs.colors.find((item) => item.id === event.target.value)
-                        setForm((prev) => ({ ...prev, catalogColorId: event.target.value, color: color?.name ?? prev.color }))
-                      }}
-                      disabled={isSubmitting}
-                    >
-                      <option value="">Color libre</option>
-                      {catalogs.colors.map((color) => <option key={color.id} value={color.id}>{color.name}</option>)}
-                    </select>
-                  ) : null}
-                  <input type="text" name="color" value={form.color} onChange={handleChange} className="input  input-bordered" disabled={isSubmitting} />
                 </div>
               </div>
             </div>
@@ -279,38 +258,6 @@ export default function NewProductForm() {
                 <p className="text-sm text-base-content/60">Condicion fisica y especificaciones relevantes.</p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="form-control">
-                  <label className="label"><span className="label-text">Capacidad</span></label>
-                  <select
-                    name="capacityGB"
-                    value={form.catalogCapacityId ? "" : form.capacityGB}
-                    onChange={handleChange}
-                    className="select select-bordered"
-                    disabled={isSubmitting || Boolean(form.catalogCapacityId)}
-                  >
-                    <option value="">Seleccionar</option>
-                    <option value="64">64 GB</option>
-                    <option value="128">128 GB</option>
-                    <option value="256">256 GB</option>
-                    <option value="512">512 GB</option>
-                    <option value="1024">1024 GB (1 TB)</option>
-                    <option value="2048">2048 GB (2 TB)</option>
-                  </select>
-                  {isAdmin && catalogs.capacities.length > 0 ? (
-                    <select
-                      className="select select-bordered mt-2"
-                      value={form.catalogCapacityId}
-                      onChange={(event) => {
-                        const capacity = catalogs.capacities.find((item) => item.id === event.target.value)
-                        setForm((prev) => ({ ...prev, catalogCapacityId: event.target.value, capacityGB: capacity?.capacityGB == null ? prev.capacityGB : String(capacity.capacityGB) }))
-                      }}
-                      disabled={isSubmitting}
-                    >
-                      <option value="">Capacidad libre</option>
-                      {catalogs.capacities.map((capacity) => <option key={capacity.id} value={capacity.id}>{capacity.label}</option>)}
-                    </select>
-                  ) : null}
-                </div>
                 <div className="form-control">
                   <label className="label"><span className="label-text">Condicion</span></label>
                   <select name="condition" value={form.condition} onChange={handleChange} className="select select-bordered" disabled={isSubmitting}>

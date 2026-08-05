@@ -5,6 +5,7 @@ import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline"
 import { useSession } from "next-auth/react"
 import type { SerializedSale, SalePaymentSummary } from "./types"
 import { getSaleBuyerName, toNumber } from "./salesUtils"
+import { getProductDisplayModel } from "@/lib/products/display"
 
 type SaleStatusValue = "CONFIRMADA" | "SENADA" | "CANCELADA"
 type CurrencyValue = "USD" | "ARS" | "USDT"
@@ -233,7 +234,7 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
               </label>
               <div className="rounded border border-base-300 bg-base-200/40 p-3 text-sm">
                 <div className="font-medium">{getSaleBuyerName(sale)}</div>
-                <div className="text-base-content/60">{sale.items.map((item) => item.product.modelName).join(" · ")}</div>
+                <div className="text-base-content/60">{sale.items.map((item) => getProductDisplayModel(item.product)).join(" - ")}</div>
               </div>
             </div>
           </section>

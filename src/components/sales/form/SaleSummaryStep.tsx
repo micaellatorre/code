@@ -2,6 +2,7 @@
 
 import type { SaleStatus } from "@prisma/client"
 import { formatUsd } from "@/components/sales/salesUtils"
+import { getProductDisplayModel } from "@/lib/products/display"
 import type { PaymentDraft, SaleItemDraft } from "@/components/sales/types"
 
 export default function SaleSummaryStep({
@@ -54,7 +55,7 @@ export default function SaleSummaryStep({
           <div key={item._id} className={`flex justify-between gap-3 border-b border-base-300 py-2 text-sm last:border-b-0 ${item.parentClientLineId ? "border-l-2 border-primary pl-3" : ""}`}>
             <span>
               {item.parentClientLineId ? <span className="mr-1 text-primary">↳</span> : null}
-              {item.product.modelName} x{item.units}
+              {getProductDisplayModel(item.product)} x{item.units}
               {item.parentClientLineId ? <span className="ml-2 text-xs text-primary">Accesorio sugerido</span> : null}
             </span>
             <span>{formatUsd(Number(item.unitPrice) * item.units)}</span>

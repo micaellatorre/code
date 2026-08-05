@@ -3,6 +3,8 @@
 import Link from "next/link"
 import { DevicePhoneMobileIcon, ShoppingBagIcon } from "@heroicons/react/24/outline"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
+import ProductColorSwatch from "@/components/products/ProductColorSwatch"
+import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayColorHex, getProductDisplayModel } from "@/lib/products/display"
 import type { AppointmentInterestSummary } from "./types"
 
 function ProductTypeIcon({ type }: { type: string }) {
@@ -15,9 +17,16 @@ function ProductTypeIcon({ type }: { type: string }) {
 
 function ItemSummary({ interest }: { interest: AppointmentInterestSummary }) {
   const product = interest.product
+  const color = getProductDisplayColor(product)
+  const capacity = product.type?.toUpperCase() === "PHONE" ? getProductDisplayCapacity(product) : null
   const details = [
-    product.capacityGB ? `${product.capacityGB}GB` : null,
-    product.color,
+    capacity,
+    color ? (
+      <span key="color" className="inline-flex items-center gap-1">
+        <ProductColorSwatch hexColor={getProductDisplayColorHex(product)} title={color} />
+        {color}
+      </span>
+    ) : null,
     product.batteryPct ? `${product.batteryPct}% bat.` : null,
   ].filter(Boolean)
   const detailNodes = [
@@ -36,7 +45,7 @@ function ItemSummary({ interest }: { interest: AppointmentInterestSummary }) {
     >
       <ProductTypeIcon type={String(product.type ?? "")} />
       <span className="min-w-0">
-        <span className="block truncate font-medium">{product.modelName}</span>
+        <span className="block truncate font-medium">{getProductDisplayModel(product)}</span>
         <span className="block text-xs text-base-content/60">
           {detailNodes.length
             ? detailNodes.map((detail, index) => (

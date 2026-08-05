@@ -18,6 +18,7 @@ export async function buildProductCatalogUpdate(
   productType?: ProductType | string | null,
 ) {
   const data: Record<string, unknown> = {}
+  const type = productType === "PHONE" || productType === "ACCESSORY" ? productType : null
 
   if (hasOwn(input, "catalogModelId")) {
     const catalogModelId = cleanOptionalId(input.catalogModelId)
@@ -28,7 +29,8 @@ export async function buildProductCatalogUpdate(
         where: {
           id: catalogModelId,
           tenantId,
-          ...(productType ? { type: productType as ProductType } : {}),
+          isActive: true,
+          ...(type ? { type } : {}),
         },
         select: { id: true, name: true, type: true },
       })
@@ -38,13 +40,19 @@ export async function buildProductCatalogUpdate(
     }
   }
 
-  if (hasOwn(input, "catalogCapacityId")) {
+  if (type === "ACCESSORY") {
+    const catalogCapacityId = hasOwn(input, "catalogCapacityId") ? cleanOptionalId(input.catalogCapacityId) : null
+    if (catalogCapacityId) throw new Error("La capacidad solo puede asociarse a productos PHONE.")
+    data.catalogCapacityId = null
+    data.capacityGB = null
+  } else if (hasOwn(input, "catalogCapacityId")) {
     const catalogCapacityId = cleanOptionalId(input.catalogCapacityId)
     if (!catalogCapacityId) {
       data.catalogCapacityId = null
+      data.capacityGB = null
     } else {
       const capacity = await prisma.productCatalogCapacity.findFirst({
-        where: { id: catalogCapacityId, tenantId },
+        where: { id: catalogCapacityId, tenantId, isActive: true },
         select: { id: true, capacityGB: true },
       })
       if (!capacity) throw new Error("Capacidad de catalogo no disponible.")
@@ -57,9 +65,10 @@ export async function buildProductCatalogUpdate(
     const catalogColorId = cleanOptionalId(input.catalogColorId)
     if (!catalogColorId) {
       data.catalogColorId = null
+      data.color = null
     } else {
       const color = await prisma.productCatalogColor.findFirst({
-        where: { id: catalogColorId, tenantId },
+        where: { id: catalogColorId, tenantId, isActive: true },
         select: { id: true, name: true },
       })
       if (!color) throw new Error("Color de catalogo no disponible.")

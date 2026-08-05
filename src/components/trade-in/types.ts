@@ -1,3 +1,5 @@
+import type { ProductCatalogDisplayCapacity, ProductCatalogDisplayColor, ProductCatalogDisplayModel } from "@/lib/products/display"
+
 export type TradeInDeductionCategory = "PANTALLA_MODULO" | "TAPA" | "CAMARA" | "FUNCIONAMIENTO" | "OTRO"
 export type TradeInDeductionScope = "GLOBAL" | "MODEL" | "MODEL_CAPACITY"
 
@@ -68,6 +70,12 @@ export type EligibleProductDto = {
   salePrice: string
   location: string | null
   condition: string | null
+  catalogModelId?: string | null
+  catalogCapacityId?: string | null
+  catalogColorId?: string | null
+  catalogModel?: ProductCatalogDisplayModel | null
+  catalogCapacity?: ProductCatalogDisplayCapacity | null
+  catalogColor?: ProductCatalogDisplayColor | null
 }
 
 export type InterestedProductDraft = EligibleProductDto & {

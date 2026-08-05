@@ -509,6 +509,311 @@ export async function createCatalogItem(params: {
   })
 }
 
+function cleanCatalogLimit(value: unknown) {
+  const limit = Number(value ?? 20)
+  if (!Number.isInteger(limit) || limit < 1) return 20
+  return Math.min(limit, 50)
+}
+
+function deriveCapacityLabel(capacityGB: number, label?: unknown) {
+  const explicitLabel = typeof label === "string" ? label.trim() : ""
+  if (explicitLabel) return explicitLabel
+  if (capacityGB >= 1024 && capacityGB % 1024 === 0) return `${capacityGB / 1024} TB`
+  return `${capacityGB} GB`
+}
+
+const modelQuickSelect = {
+  id: true,
+  type: true,
+  name: true,
+  normalizedName: true,
+  source: true,
+  isActive: true,
+} as const
+
+const capacityQuickSelect = {
+  id: true,
+  capacityGB: true,
+  label: true,
+  source: true,
+  isActive: true,
+} as const
+
+const colorQuickSelect = {
+  id: true,
+  name: true,
+  hexColor: true,
+  source: true,
+  isActive: true,
+} as const
+
+export async function searchCatalogModels(params: {
+  tenantId: string
+  type: ProductType
+  q?: string | null
+  activeOnly?: boolean
+  limit?: number
+}) {
+  const q = params.q?.trim()
+  return prisma.productCatalogModel.findMany({
+    where: {
+      tenantId: params.tenantId,
+      type: params.type,
+      ...(params.activeOnly === false ? {} : { isActive: true }),
+      ...(q ? { normalizedName: { contains: normalizeCatalogValue(q) } } : {}),
+    },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    take: cleanCatalogLimit(params.limit),
+    select: modelQuickSelect,
+  })
+}
+
+export async function searchCatalogCapacities(params: {
+  tenantId: string
+  q?: string | null
+  activeOnly?: boolean
+  limit?: number
+}) {
+  const q = params.q?.trim()
+  const parsedCapacity = q ? Number(q.replace(/[^\d]/g, "")) : NaN
+  const numericCapacity = Number.isInteger(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : undefined
+  return prisma.productCatalogCapacity.findMany({
+    where: {
+      tenantId: params.tenantId,
+      ...(params.activeOnly === false ? {} : { isActive: true }),
+      ...(q
+        ? {
+            OR: [
+              { label: { contains: q, mode: "insensitive" } },
+              ...(numericCapacity ? [{ capacityGB: numericCapacity }] : []),
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ sortOrder: "asc" }, { capacityGB: "asc" }],
+    take: cleanCatalogLimit(params.limit),
+    select: capacityQuickSelect,
+  })
+}
+
+export async function searchCatalogColors(params: {
+  tenantId: string
+  q?: string | null
+  activeOnly?: boolean
+  limit?: number
+}) {
+  const q = params.q?.trim()
+  const normalizedQuery = q ? normalizeCatalogValue(q) : null
+  return prisma.productCatalogColor.findMany({
+    where: {
+      tenantId: params.tenantId,
+      ...(params.activeOnly === false ? {} : { isActive: true }),
+      ...(normalizedQuery
+        ? {
+            OR: [
+              { normalizedName: { contains: normalizedQuery } },
+              { aliases: { some: { normalizedAlias: { contains: normalizedQuery } } } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    take: cleanCatalogLimit(params.limit),
+    select: colorQuickSelect,
+  })
+}
+
+export async function quickCreateCatalogModel(params: {
+  tenantId: string
+  actorUserId: string
+  actorRole: UserRole
+  type: ProductType
+  name: string
+}) {
+  const name = params.name.trim()
+  if (!name) throw new Error("El modelo es obligatorio.")
+  const normalizedName = normalizeCatalogValue(name)
+
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.productCatalogModel.findUnique({
+      where: {
+        tenantId_type_normalizedName: {
+          tenantId: params.tenantId,
+          type: params.type,
+          normalizedName,
+        },
+      },
+      select: modelQuickSelect,
+    })
+
+    if (current?.isActive) return current
+
+    const item = current
+      ? await tx.productCatalogModel.update({
+          where: { id: current.id },
+          data: { name, isActive: true },
+          select: modelQuickSelect,
+        })
+      : await tx.productCatalogModel.create({
+          data: {
+            tenantId: params.tenantId,
+            type: params.type,
+            name,
+            normalizedName,
+            source: "CUSTOM",
+            sortOrder:
+              ((await tx.productCatalogModel.aggregate({
+                where: { tenantId: params.tenantId, type: params.type },
+                _max: { sortOrder: true },
+              }))._max.sortOrder ?? 0) + 1,
+          },
+          select: modelQuickSelect,
+        })
+
+    await createAuditLog({
+      tenantId: params.tenantId,
+      actorUserId: params.actorUserId,
+      actorRole: params.actorRole,
+      action: "CREATE",
+      module: "CATALOG",
+      entityType: "ProductCatalogModel",
+      entityId: item.id,
+      detail: `Creacion rapida de modelo: ${item.name}`,
+      newValue: item as Prisma.InputJsonValue,
+    }, tx)
+
+    return item
+  })
+}
+
+export async function quickCreateCatalogCapacity(params: {
+  tenantId: string
+  actorUserId: string
+  actorRole: UserRole
+  capacityGB: number
+  label?: string | null
+}) {
+  if (!Number.isInteger(params.capacityGB) || params.capacityGB <= 0 || params.capacityGB > 8192) {
+    throw new Error("Capacidad invalida.")
+  }
+  const label = deriveCapacityLabel(params.capacityGB, params.label)
+
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.productCatalogCapacity.findUnique({
+      where: { tenantId_capacityGB: { tenantId: params.tenantId, capacityGB: params.capacityGB } },
+      select: capacityQuickSelect,
+    })
+
+    if (current?.isActive) return current
+
+    const item = current
+      ? await tx.productCatalogCapacity.update({
+          where: { id: current.id },
+          data: { label, isActive: true },
+          select: capacityQuickSelect,
+        })
+      : await tx.productCatalogCapacity.create({
+          data: {
+            tenantId: params.tenantId,
+            capacityGB: params.capacityGB,
+            label,
+            source: "CUSTOM",
+            sortOrder: params.capacityGB,
+          },
+          select: capacityQuickSelect,
+        })
+
+    await createAuditLog({
+      tenantId: params.tenantId,
+      actorUserId: params.actorUserId,
+      actorRole: params.actorRole,
+      action: "CREATE",
+      module: "CATALOG",
+      entityType: "ProductCatalogCapacity",
+      entityId: item.id,
+      detail: `Creacion rapida de capacidad: ${item.label}`,
+      newValue: item as Prisma.InputJsonValue,
+    }, tx)
+
+    return item
+  })
+}
+
+export async function quickCreateCatalogColor(params: {
+  tenantId: string
+  actorUserId: string
+  actorRole: UserRole
+  name: string
+  hexColor: string
+}) {
+  const name = params.name.trim()
+  const hexColor = params.hexColor.trim().toUpperCase()
+  if (!name) throw new Error("El color es obligatorio.")
+  assertHexColor(hexColor)
+  const normalizedName = normalizeCatalogValue(name)
+
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.productCatalogColor.findUnique({
+      where: { tenantId_normalizedName: { tenantId: params.tenantId, normalizedName } },
+      select: colorQuickSelect,
+    })
+
+    if (current?.isActive) return current
+
+    const item = current
+      ? await tx.productCatalogColor.update({
+          where: { id: current.id },
+          data: { name, hexColor, isActive: true },
+          select: colorQuickSelect,
+        })
+      : await tx.productCatalogColor.create({
+          data: {
+            tenantId: params.tenantId,
+            name,
+            normalizedName,
+            hexColor,
+            source: "CUSTOM",
+            sortOrder:
+              ((await tx.productCatalogColor.aggregate({
+                where: { tenantId: params.tenantId },
+                _max: { sortOrder: true },
+              }))._max.sortOrder ?? 0) + 1,
+          },
+          select: colorQuickSelect,
+        })
+
+    const alias = await tx.productCatalogColorAlias.findUnique({
+      where: { tenantId_normalizedAlias: { tenantId: params.tenantId, normalizedAlias: normalizedName } },
+      select: { id: true, colorId: true },
+    })
+    if (alias && alias.colorId !== item.id) throw new Error("El alias del color ya existe para otro color.")
+    if (!alias) {
+      await tx.productCatalogColorAlias.create({
+        data: {
+          tenantId: params.tenantId,
+          colorId: item.id,
+          alias: name,
+          normalizedAlias: normalizedName,
+        },
+      })
+    }
+
+    await createAuditLog({
+      tenantId: params.tenantId,
+      actorUserId: params.actorUserId,
+      actorRole: params.actorRole,
+      action: "CREATE",
+      module: "CATALOG",
+      entityType: "ProductCatalogColor",
+      entityId: item.id,
+      detail: `Creacion rapida de color: ${item.name}`,
+      newValue: item as Prisma.InputJsonValue,
+    }, tx)
+
+    return item
+  })
+}
+
 export async function updateCatalogItem(params: {
   tenantId: string
   actorUserId: string

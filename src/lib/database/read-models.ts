@@ -1,5 +1,7 @@
 import { Prisma, type Currency, type PaymentMethod, type UserRole } from "@prisma/client"
 import prisma from "@/lib/prisma"
+import { getProductDisplayModel, getProductDisplayParts, type ProductCatalogDisplayProduct } from "@/lib/products/display"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
 
 export type DatabaseTabKey =
   | "cash"
@@ -265,10 +267,10 @@ function productCode(index: number) {
   return `A${String(index + 1).padStart(3, "0")}`
 }
 
-function saleItemSummary(items: Array<{ units: number; product: { modelName: string; capacityGB: number | null; color: string | null; imei: string | null } }>) {
+function saleItemSummary(items: Array<{ units: number; product: ProductCatalogDisplayProduct & { type?: string | null; modelName: string; capacityGB: number | null; color: string | null; imei: string | null } }>) {
   const first = items[0]
   if (!first) return { summary: "Sin items", meta: null }
-  const parts = [first.product.modelName, first.product.capacityGB ? `${first.product.capacityGB}GB` : null, first.product.color].filter(Boolean)
+  const parts = getProductDisplayParts(first.product)
   const suffix = items.length > 1 ? ` +${items.length - 1} items` : ""
   return {
     summary: `${parts.join(" ")}${suffix}`,
@@ -324,7 +326,7 @@ export async function getDatabaseReadModel(params: {
         payments: { orderBy: { paidAt: "asc" } },
         items: {
           include: {
-            product: { select: { id: true, modelName: true, capacityGB: true, color: true, imei: true } },
+            product: { select: { id: true, type: true, modelName: true, capacityGB: true, color: true, imei: true, ...productCatalogDisplaySelect } },
           },
         },
       },
@@ -337,7 +339,7 @@ export async function getDatabaseReadModel(params: {
         payments: { orderBy: { paidAt: "asc" } },
         items: {
           include: {
-            product: { select: { modelName: true, imei: true } },
+            product: { select: { modelName: true, imei: true, ...productCatalogDisplaySelect } },
           },
         },
       },
@@ -348,13 +350,13 @@ export async function getDatabaseReadModel(params: {
       include: {
         buyer: { select: { name: true, surname: true, businessName: true } },
         payments: true,
-        items: { include: { product: { select: { modelName: true, imei: true } } } },
+        items: { include: { product: { select: { modelName: true, imei: true, ...productCatalogDisplaySelect } } } },
       },
     }),
     prisma.product.findMany({
       where: { tenantId: params.tenantId, senado: true, senadoAt: whereDate },
       orderBy: { senadoAt: "desc" },
-      select: { id: true, senadoAt: true, modelName: true, imei: true, salePrice: true, notes: true },
+      select: { id: true, senadoAt: true, modelName: true, imei: true, salePrice: true, notes: true, ...productCatalogDisplaySelect },
     }),
     prisma.serviceOrder.findMany({
       where: { tenantId: params.tenantId, receivedAt: whereDate },
@@ -455,7 +457,7 @@ export async function getDatabaseReadModel(params: {
       supplier: purchase.supplier.name,
       supplierProvince: purchase.supplier.provinceRef?.name ?? null,
       supplierCity: purchase.supplier.city,
-      model: firstItem?.product.modelName ?? "Compra sin items",
+      model: firstItem?.product ? getProductDisplayModel(firstItem.product) : "Compra sin items",
       imeiSerial: firstItem?.product.imei ?? null,
       code: productCode(index),
       total: toNumber(purchase.totalCost),
@@ -479,7 +481,7 @@ export async function getDatabaseReadModel(params: {
         source: "RESERVATION" as const,
         reservedAt: reservation.reservedAt.toISOString(),
         customer: buyerName(reservation.buyer),
-        item: firstItem?.product?.modelName ?? firstItem?.itemName ?? "Reserva sin item",
+        item: firstItem?.product ? getProductDisplayModel(firstItem.product) : firstItem?.itemName ?? "Reserva sin item",
         pickupAt: reservation.pickupAt?.toISOString() ?? null,
         agreedPrice: nullableNumber(reservation.agreedTotal),
         depositUsd,
@@ -507,7 +509,7 @@ export async function getDatabaseReadModel(params: {
       source: "LEGACY" as const,
       reservedAt: (product.senadoAt ?? new Date()).toISOString(),
       customer: "Reserva legacy",
-      item: product.modelName,
+      item: getProductDisplayModel(product),
       pickupAt: null,
       agreedPrice: toNumber(product.salePrice),
       depositUsd: null,

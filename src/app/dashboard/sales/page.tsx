@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import type { Metadata } from "next"
 import { requireRolePage } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
 
 export const metadata: Metadata = {
   title: "Ventas",
@@ -51,6 +52,7 @@ export default async function SalesPage() {
               stockAvailable: true,
               costPrice: canSeeFinancials,
               shippingCost: canSeeFinancials,
+              ...productCatalogDisplaySelect,
             },
           },
         },
@@ -136,6 +138,12 @@ export default async function SalesPage() {
         stock: item.product.stock,
         stockAvailable: item.product.stockAvailable,
         salePrice: toStr(item.product.salePrice),
+        catalogModelId: item.product.catalogModelId,
+        catalogCapacityId: item.product.catalogCapacityId,
+        catalogColorId: item.product.catalogColorId,
+        catalogModel: item.product.catalogModel,
+        catalogCapacity: item.product.catalogCapacity,
+        catalogColor: item.product.catalogColor,
       },
     })),
   }))

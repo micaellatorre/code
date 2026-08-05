@@ -9,6 +9,7 @@ import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
 import { isMonetaryPaymentMethod, postSalePaymentToCash, reverseSourceCashMovement } from "@/lib/domain/cash"
 import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money"
 import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue"
+import { productCatalogDisplayInclude } from "@/lib/products/selects"
 
 export const runtime = "nodejs"
 
@@ -204,7 +205,7 @@ function saleInclude() {
     buyer: true,
     user: { select: { id: true, name: true, email: true } },
     branch: { select: { id: true, code: true, name: true } },
-    items: { include: { product: true } },
+    items: { include: { product: { include: productCatalogDisplayInclude } } },
     payments: { orderBy: { paidAt: "asc" as const } },
   }
 }

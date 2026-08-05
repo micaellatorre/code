@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
+import { resolveSessionTenantId } from "@/lib/tenant"
+import { productCatalogDisplayInclude } from "@/lib/products/selects"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -15,9 +17,13 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 
   try {
     const { id } = await params
+    const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+    if (!tenantId) {
+      return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
+    }
 
-    const productToCopy = await prisma.product.findUnique({
-      where: { id },
+    const productToCopy = await prisma.product.findFirst({
+      where: { id, tenantId },
     })
 
     if (!productToCopy) {
@@ -27,6 +33,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     // Find the highest copy number for this model name
     const productsWithSameName = await prisma.product.findMany({
       where: {
+        tenantId,
         modelName: {
           startsWith: `${productToCopy.modelName} Copia #`,
         },
@@ -53,11 +60,14 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     } = productToCopy
 
     const defaultStock = productToCopy.type === "PHONE" ? 1 : 0
+    const duplicateModelName = productToCopy.catalogModelId
+      ? productToCopy.modelName
+      : `${productToCopy.modelName} Copia #${nextCopyNumber}`
 
     const newProduct = await prisma.product.create({
       data: {
         ...dataToCopy,
-        modelName: `${productToCopy.modelName} Copia #${nextCopyNumber}`,
+        modelName: duplicateModelName,
         imei: productToCopy.type === "PHONE" ? null : productToCopy.imei,
         senado: false,
         senadoAt: null,
@@ -68,6 +78,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       include: {
         branch: { select: { id: true, code: true, name: true } },
         supplier: { select: { id: true, name: true } },
+        ...productCatalogDisplayInclude,
       },
     })
 

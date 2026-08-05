@@ -8,6 +8,7 @@ import { fromArgDateInputValue } from "@/lib/timezone"
 import type { Role } from "@/lib/auth/roles"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
+import { getProductDisplayCapacityGB, getProductDisplayColor, getProductDisplayModel } from "@/lib/products/display"
 import type { BranchOption } from "@/components/branches/BranchAutocomplete"
 import type { InventorySegment, ProductsApiResponse, SerializedProduct } from "./types"
 import { compareIphoneModels, getIphoneSeries, getSeriesSortValue, isSealedPhone, normalizeModelKey } from "./utils"
@@ -215,13 +216,13 @@ export function useProductsInventory() {
     [productsLocal],
   )
   const colors = useMemo(
-    () => Array.from(new Set(productsLocal.map((p) => p.color).filter(Boolean) as string[])),
+    () => Array.from(new Set(productsLocal.map((p) => getProductDisplayColor(p)).filter(Boolean) as string[])),
     [productsLocal],
   )
   const capacities = useMemo(
     () =>
       Array.from(
-        new Set(productsLocal.map((p) => p.capacityGB).filter((n): n is number => n != null) as number[]),
+        new Set(productsLocal.map((p) => getProductDisplayCapacityGB(p)).filter((n): n is number => n != null) as number[]),
       ).sort((a, b) => a - b),
     [productsLocal],
   )
@@ -234,8 +235,8 @@ export function useProductsInventory() {
     return productsLocal.filter((p) => {
       const matchesBrand = brandFilter ? p.brand === brandFilter : true
       const matchesCondition = conditionFilter ? p.condition === conditionFilter : true
-      const matchesColor = colorFilter ? p.color === colorFilter : true
-      const matchesCapacity = capacityFilter ? p.capacityGB === Number(capacityFilter) : true
+      const matchesColor = colorFilter ? getProductDisplayColor(p) === colorFilter : true
+      const matchesCapacity = capacityFilter ? getProductDisplayCapacityGB(p) === Number(capacityFilter) : true
       const matchesOrigin = originFilter
         ? (p.origin ?? "").toLowerCase().includes(originFilter.trim().toLowerCase())
         : true
@@ -275,7 +276,7 @@ export function useProductsInventory() {
     const makeGroups = (items: SerializedProduct[]) => {
       const map = new Map<string, SerializedProduct[]>()
       for (const product of items) {
-        const series = getIphoneSeries(product.modelName)
+        const series = getIphoneSeries(getProductDisplayModel(product))
         map.set(series, [...(map.get(series) ?? []), product])
       }
       return Array.from(map.entries())
@@ -295,13 +296,14 @@ export function useProductsInventory() {
     >()
 
     for (const p of filteredProducts) {
-      const key = normalizeModelKey(p.modelName)
+      const displayModel = getProductDisplayModel(p)
+      const key = normalizeModelKey(displayModel)
       if (!key) continue
       const existing = map.get(key)
       if (!existing) {
         map.set(key, {
           key,
-          label: p.modelName,
+          label: displayModel,
           items: [p],
           newest: p.createdAt ? new Date(p.createdAt).getTime() : 0,
           stockSum: p.stock ?? 0,
@@ -373,6 +375,7 @@ export function useProductsInventory() {
   }
 
   function canEditField(fieldName: string) {
+    if (["modelName", "capacityGB", "color"].includes(fieldName)) return false
     if (fieldName === "branchId") return isAdmin
     if (fieldName === "costPrice") return canSeeCosts && canEditProducts
     if (fieldName === "salePrice") return canSeeSalePrice && canEditProducts
@@ -669,7 +672,7 @@ export function useProductsInventory() {
       title: "Cambiar estado del producto",
       description: "Esta accion cambiara la disponibilidad operativa del producto seleccionado.",
       details: [
-        { label: "Producto", value: product.modelName },
+        { label: "Producto", value: getProductDisplayModel(product) },
         { label: "IMEI", value: createElement(ImeiDisplay, { imei: product.imei, fallback: "Sin IMEI" }) },
         { label: "Estado actual", value: product.state },
         { label: "Nuevo estado", value: newState },
@@ -740,7 +743,7 @@ export function useProductsInventory() {
       description: "Esta accion eliminara el producto del inventario. No podra recuperarse desde esta pantalla.",
       details: product
         ? [
-            { label: "Producto", value: product.modelName },
+            { label: "Producto", value: getProductDisplayModel(product) },
             { label: "IMEI", value: createElement(ImeiDisplay, { imei: product.imei, fallback: "Sin IMEI" }) },
             { label: "Estado", value: product.state },
             { label: "Sucursal", value: product.location ?? "Sin sucursal" },
@@ -805,7 +808,7 @@ export function useProductsInventory() {
       description: "Esta accion creara una copia del producto seleccionado para acelerar la carga de inventario.",
       details: product
         ? [
-            { label: "Producto base", value: product.modelName },
+            { label: "Producto base", value: getProductDisplayModel(product) },
             { label: "IMEI", value: createElement(ImeiDisplay, { imei: product.imei, fallback: "Sin IMEI" }) },
             { label: "Estado", value: product.state },
             { label: "Costo", value: product.costPrice ?? "0", sensitive: true },

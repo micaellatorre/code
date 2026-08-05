@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { formatAppointmentDate, formatMoney, getAppointmentDepositTotal, getAppointmentReservedValue } from "./appointmentUtils"
+import { getProductDisplayModel } from "@/lib/products/display"
 import type { SerializedAppointment } from "./types"
 
 type ExportAppointmentsModalProps = {
@@ -42,7 +43,7 @@ export default function ExportAppointmentsModal({ open, onClose, appointments }:
       Fecha: formatAppointmentDate(appointment.scheduledAt),
       Cliente: appointment.buyer?.name ?? "Sin cliente",
       Contacto: [appointment.buyer?.phone, appointment.buyer?.instagram].filter(Boolean).join(" / "),
-      Items: appointment.interests.map((interest) => interest.product.modelName).join(" | "),
+      Items: appointment.interests.map((interest) => getProductDisplayModel(interest.product)).join(" | "),
       "Precio pactado": formatMoney(total),
       Seña: formatMoney(deposit),
       Saldo: formatMoney(total - deposit),

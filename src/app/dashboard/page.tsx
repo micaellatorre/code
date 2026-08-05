@@ -14,6 +14,8 @@ import type {
 } from "@/components/dashboard/DashboardTypes"
 import { requireRolePage } from "@/lib/auth/auth"
 import prisma from "@/lib/prisma"
+import { getProductDisplayModel, type ProductCatalogDisplayProduct } from "@/lib/products/display"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
 import { AR_TIME_ZONE, fromArgDateInputValue, toArgDateInputValue } from "@/lib/timezone"
 import { addDays, differenceInCalendarDays, eachDayOfInterval, subDays, subYears } from "date-fns"
 import { formatInTimeZone } from "date-fns-tz"
@@ -49,7 +51,7 @@ type SaleItemForInsight = {
     id: string
     modelName: string
     type: DashboardProductType
-  }
+  } & ProductCatalogDisplayProduct
 }
 
 function numberParam(value: string | string[] | undefined) {
@@ -157,7 +159,7 @@ function buildDailySalesSeries(
       dayProducts.get(productKey) ??
       ({
         id: item.product.id,
-        name: item.product.modelName,
+        name: getProductDisplayModel(item.product),
         type: item.product.type,
         units: 0,
         revenue: 0,
@@ -217,7 +219,7 @@ function buildTopProductInsights(saleItems: SaleItemForInsight[]): DashboardProd
       topProductsMap.get(item.product.id) ??
       ({
         id: item.product.id,
-        name: item.product.modelName,
+        name: getProductDisplayModel(item.product),
         type: item.product.type,
         unitsSold: 0,
         revenue: 0,
@@ -298,7 +300,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         lineTotal: true,
         lineProfit: true,
         sale: { select: { date: true } },
-        product: { select: { id: true, modelName: true, type: true } },
+        product: { select: { id: true, modelName: true, type: true, ...productCatalogDisplaySelect } },
       },
     }),
     prisma.product.findMany({
@@ -308,6 +310,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         id: true,
         modelName: true,
         type: true,
+        ...productCatalogDisplaySelect,
         stockAvailable: true,
         stock: true,
         stockInitial: true,
@@ -343,7 +346,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const topProducts = buildTopProductInsights(saleItems)
   const inventoryProducts: DashboardInventoryInsightItem[] = inventoryProductsBase.map((product) => ({
     id: product.id,
-    name: product.modelName,
+    name: getProductDisplayModel(product),
     type: product.type,
     stockAvailable: product.stockAvailable,
     stockTotal: product.stock,

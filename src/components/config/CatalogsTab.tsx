@@ -366,7 +366,14 @@ function CompatibilityModal({
   const [selected, setSelected] = useState<Set<string>>(current)
   const [query, setQuery] = useState("")
   const [saving, setSaving] = useState(false)
-  const filtered = accessories.filter((accessory) => accessory.name.toLowerCase().includes(query.trim().toLowerCase()))
+  const normalizedQuery = query.trim().toLowerCase()
+  const selectedAccessories = accessories
+    .filter((accessory) => selected.has(accessory.id))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const availableAccessories = accessories
+    .filter((accessory) => !selected.has(accessory.id))
+    .filter((accessory) => accessory.name.toLowerCase().includes(normalizedQuery))
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -393,6 +400,16 @@ function CompatibilityModal({
     await onSaved()
   }
 
+  function renderCompatibilityRow(accessory: CatalogModel, checked: boolean) {
+    return (
+      <label key={accessory.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${checked ? "border-primary bg-primary/10" : "border-base-300"}`}>
+        <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={checked} onChange={() => toggle(accessory.id)} />
+        <span className="flex-1">{accessory.name}</span>
+        <span className="badge badge-ghost badge-sm">Stock cat.: {accessory._count?.products ?? 0}</span>
+      </label>
+    )
+  }
+
   return (
     <dialog className="modal modal-open">
       <div className="modal-box max-w-2xl rounded-lg">
@@ -400,17 +417,29 @@ function CompatibilityModal({
         <div className="mt-4">
           <input className="input input-bordered w-full" placeholder="Buscar accesorio" value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
-        <div className="mt-4 max-h-96 space-y-2 overflow-y-auto">
-          {filtered.map((accessory) => {
-            const checked = selected.has(accessory.id)
-            return (
-              <label key={accessory.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${checked ? "border-primary bg-primary/10" : "border-base-300"}`}>
-                <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={checked} onChange={() => toggle(accessory.id)} />
-                <span className="flex-1">{accessory.name}</span>
-                <span className="badge badge-ghost badge-sm">Stock cat.: {accessory._count?.products ?? 0}</span>
-              </label>
-            )
-          })}
+        <div className="mt-4 max-h-96 space-y-4 overflow-y-auto">
+          {selectedAccessories.length > 0 ? (
+            <section className="sticky top-0 z-10 rounded-lg border border-primary/20 bg-base-100 p-2 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <span className="text-xs font-semibold uppercase text-primary">Compatibles seleccionados</span>
+                <span className="badge badge-primary badge-outline badge-sm">{selectedAccessories.length}</span>
+              </div>
+              <div className="space-y-2">
+                {selectedAccessories.map((accessory) => renderCompatibilityRow(accessory, true))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="space-y-2">
+            <div className="px-1 text-xs font-semibold uppercase text-base-content/50">Disponibles</div>
+            {availableAccessories.length > 0 ? (
+              availableAccessories.map((accessory) => renderCompatibilityRow(accessory, false))
+            ) : (
+              <div className="rounded-lg border border-dashed border-base-300 p-4 text-sm text-base-content/60">
+                No hay accesorios disponibles para esa busqueda.
+              </div>
+            )}
+          </section>
         </div>
         <div className="modal-action">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireRoleApi } from "@/lib/auth/auth"
+import { resolveSessionTenantId } from "@/lib/tenant"
 import { getCompatibleAccessorySuggestions } from "@/lib/config/compatibilityService"
 
 export async function GET(request: NextRequest) {
   const auth = await requireRoleApi(["ADMIN", "VENDEDOR"])
   if (!auth.ok) return Response.json({ error: "Unauthorized" }, { status: auth.status })
 
-  const tenantId = auth.session.user.tenantId
+  const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
   if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
 
   try {

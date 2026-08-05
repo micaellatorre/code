@@ -7,6 +7,7 @@ import type {
   ProductType,
 } from "@prisma/client"
 import type { Role } from "@/lib/auth/roles"
+import type { ProductCatalogDisplayCapacity, ProductCatalogDisplayColor, ProductCatalogDisplayModel } from "@/lib/products/display"
 
 export type AppointmentUserSummary = {
   id: string
@@ -37,6 +38,12 @@ export type AppointmentProductSummary = {
   location: string | null
   stock: number | null
   stockAvailable: number | null
+  catalogModelId?: string | null
+  catalogCapacityId?: string | null
+  catalogColorId?: string | null
+  catalogModel?: ProductCatalogDisplayModel | null
+  catalogCapacity?: ProductCatalogDisplayCapacity | null
+  catalogColor?: ProductCatalogDisplayColor | null
 }
 
 export type AppointmentInterestSummary = {

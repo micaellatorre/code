@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { formatSaleDate, formatUsd, getSaleOrigin } from "./salesUtils"
+import { getProductDisplayModel } from "@/lib/products/display"
 import type { SerializedSale } from "./types"
 
 const columnOptions = ["Fecha", "Cliente", "Items", "Importe", "Margen", "Origen", "Vendedor", "Estado"]
@@ -30,7 +31,7 @@ export default function ExportSalesModal({
 
   function getCell(sale: SerializedSale, column: string) {
     const buyer = sale.buyer ? `${sale.buyer.name} ${sale.buyer.surname ?? ""}`.trim() : sale.customerName || "Consumidor Final"
-    const items = sale.items.map((item) => `${item.product.modelName} x${item.units}`).join(" | ")
+    const items = sale.items.map((item) => `${getProductDisplayModel(item.product)} x${item.units}`).join(" | ")
     const values: Record<string, string> = {
       Fecha: formatSaleDate(sale.date),
       Cliente: buyer,

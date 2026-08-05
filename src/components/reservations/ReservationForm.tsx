@@ -2,10 +2,19 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { getProductDisplayModel, type ProductCatalogDisplayCapacity, type ProductCatalogDisplayColor, type ProductCatalogDisplayModel } from "@/lib/products/display"
 import { toArgDateTimeInputValue } from "@/lib/timezone"
 
 type Buyer = { id: string; name: string; surname?: string | null; businessName?: string | null }
-type Product = { id: string; modelName: string; imei?: string | null; salePrice?: string | null }
+type Product = {
+  id: string
+  modelName: string
+  imei?: string | null
+  salePrice?: string | null
+  catalogModel?: ProductCatalogDisplayModel | null
+  catalogCapacity?: ProductCatalogDisplayCapacity | null
+  catalogColor?: ProductCatalogDisplayColor | null
+}
 type Gift = { label: string }
 type CashAccount = { id: string; name: string; currency: string; scope: string; branch?: { name: string } | null }
 
@@ -52,7 +61,7 @@ export default function ReservationForm() {
       const next = { ...prev, [field]: value }
       if (field === "productId") {
         const product = products.find((item) => item.id === value)
-        next.itemName = product?.modelName ?? next.itemName
+        next.itemName = product ? getProductDisplayModel(product) : next.itemName
         next.imeiSerial = product?.imei ?? next.imeiSerial
         next.unitPrice = product?.salePrice ?? next.unitPrice
         next.agreedTotal = product?.salePrice ?? next.agreedTotal
@@ -133,7 +142,7 @@ export default function ReservationForm() {
             <span className="label-text">Producto</span>
             <select className="select select-bordered" value={form.productId} onChange={(event) => setField("productId", event.target.value)}>
               <option value="">Snapshot manual</option>
-              {products.map((product) => <option key={product.id} value={product.id}>{product.modelName} {product.imei ? `- ${product.imei}` : ""}</option>)}
+              {products.map((product) => <option key={product.id} value={product.id}>{getProductDisplayModel(product)} {product.imei ? `- ${product.imei}` : ""}</option>)}
             </select>
           </label>
           <label className="form-control">

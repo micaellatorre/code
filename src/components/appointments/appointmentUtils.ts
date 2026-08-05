@@ -2,6 +2,7 @@ import { formatInTimeZone } from "date-fns-tz"
 import type { AppointmentOutcome, AppointmentStatus } from "@prisma/client"
 import { AR_TIME_ZONE } from "@/lib/timezone"
 import type { TradeInDeviceDraft } from "@/components/trade-in/types"
+import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayLabel, getProductDisplayModel } from "@/lib/products/display"
 import type { AppointmentInterestSummary, SerializedAppointment } from "./types"
 
 export const OUTCOME_OPTIONS: AppointmentOutcome[] = [
@@ -71,11 +72,12 @@ export function getInterestsSearchText(interests: AppointmentInterestSummary[]) 
   return interests
     .map((interest) =>
       [
-        interest.product?.modelName,
+        getProductDisplayLabel(interest.product),
+        getProductDisplayModel(interest.product),
         interest.product?.type,
         interest.product?.imei,
-        interest.product?.capacityGB,
-        interest.product?.color,
+        getProductDisplayCapacity(interest.product),
+        getProductDisplayColor(interest.product),
         interest.product?.state,
         interest.notes,
       ]

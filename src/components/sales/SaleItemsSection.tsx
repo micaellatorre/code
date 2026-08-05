@@ -4,11 +4,12 @@
 import type { SaleItemDraft } from '@/components/sales/types';
 import type { SaleItemKind } from '@prisma/client';
 import { useState } from 'react';
-import { CheckIcon } from '@heroicons/react/24/solid';
+import { CheckCircleIcon, TrashIcon } from '@heroicons/react/24/solid';
 import { useSession } from 'next-auth/react';
 import type { Role } from '@/lib/auth/roles';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import ImeiDisplay from '@/components/common/ImeiDisplay';
+import { getProductDisplayModel } from '@/lib/products/display';
 import ProductSelectionModal from './ProductSelectionModal';
 
 interface SaleItemsSectionProps {
@@ -37,23 +38,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false, br
 
     const handleAddItems = (newItems: SaleItemDraft[]) => {
         if (disabled) return;
-
-        const updatedItems = [...items];
-        newItems.forEach(newItem => {
-            const existingIndex = updatedItems.findIndex(i => i.productId === newItem.productId && (i.parentClientLineId ?? null) === (newItem.parentClientLineId ?? null));
-            if (existingIndex > -1) {
-                // If item exists, just update units
-                const existingItem = updatedItems[existingIndex];
-                const newUnits = existingItem.units + newItem.units;
-                const stock = existingItem.product.stockAvailable ?? existingItem.product.stock;
-                updatedItems[existingIndex] = { ...existingItem, units: Math.min(newUnits, stock) };
-            } else {
-                // Otherwise, add the new item
-                updatedItems.push(newItem);
-            }
-        });
-
-        setItems(updatedItems);
+        setItems(newItems);
         setIsModalOpen(false);
     };
 
@@ -105,7 +90,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false, br
             title: 'Guardar costo del item',
             description: 'Esta accion actualizara el costo usado para calcular el resultado de la venta.',
             details: [
-                { label: 'Producto', value: item.product.modelName },
+                { label: 'Producto', value: getProductDisplayModel(item.product) },
                 { label: 'IMEI', value: <ImeiDisplay imei={item.product.imei} fallback="Sin IMEI" /> },
                 { label: 'Costo actual', value: `$${item.unitCost || '0'}`, sensitive: true },
                 { label: 'Nuevo costo', value: `$${normalizedCost}`, sensitive: true },
@@ -151,10 +136,10 @@ export default function SaleItemsSection({ items, setItems, disabled = false, br
                                     <th>IMEI</th>
                                     <th>Producto</th>
                                     <th>% Bateria</th>
-                                    {isAdmin ? <th>Costo</th> : null}
                                     <th>Estado</th>
+                                    {isAdmin ? <th>Costo u.</th> : null}
+                                    <th>Precio u.</th>
                                     <th>Cantidad</th>
-                                    <th>Precio Unit.</th>
                                     <th>Total</th>
                                     <th></th>
                                 </tr>
@@ -166,82 +151,91 @@ export default function SaleItemsSection({ items, setItems, disabled = false, br
                                     const isSuggestedAccessory = Boolean(item.parentClientLineId);
 
                                     return (
-                                    <tr key={item._id} className={isSuggestedAccessory ? 'bg-primary/5' : ''}>
-                                        <td><ImeiDisplay imei={item.product.imei} /></td>
-                                        <td>
-                                            <div className={isSuggestedAccessory ? 'border-l-2 border-primary pl-3' : ''}>
-                                                {isSuggestedAccessory ? <div className="text-xs text-primary">↳ Accesorio sugerido</div> : null}
-                                                <span>{item.product.modelName}</span>
-                                            </div>
-                                        </td>
-                                        <td>{item.product.batteryPct ? item.product.batteryPct : '-'}</td>
-                                        {isAdmin ? (
+                                        <tr key={item._id} className={isSuggestedAccessory ? 'bg-primary/5' : ''}>
+                                            <td><ImeiDisplay imei={item.product.imei} /></td>
                                             <td>
-                                                <div className="flex items-center gap-1">
-                                                    <div className="relative">
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min={0}
-                                                            value={getCostDraftValue(item)}
-                                                            onChange={(e) => handleCostDraftChange(item._id, e.target.value)}
-                                                            className="input input-bordered input-sm w-24 pl-6 text-right"
-                                                            disabled={disabled}
-                                                        />
-                                                        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs opacity-50">$</span>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-primary btn-xs px-2"
-                                                        onClick={() => void handleSaveCost(item)}
-                                                        disabled={disabled || getCostDraftValue(item).trim() === String(item.unitCost ?? '0')}
-                                                        title="Guardar costo"
-                                                    >
-                                                        <CheckIcon className="size-3.5" />
-                                                    </button>
+                                                <div className={isSuggestedAccessory ? 'border-l-2 border-primary pl-3' : ''}>
+                                                    {isSuggestedAccessory ? <div className="text-xs text-primary">↳ Accesorio sugerido</div> : null}
+                                                    <span>{getProductDisplayModel(item.product)}</span>
                                                 </div>
                                             </td>
-                                        ) : null}
-                                        <td className="text-center">
-                                            <span className={`text-nowrap badge badge-sm ${getStateBadgeClass(String(item.product.state))}`}>
-                                                {String(item.product.state).replace(/_/g, ' ')}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                value={item.units}
-                                                onChange={(e) => handleUpdateItem(item._id, { units: parseInt(e.target.value) || 1 })}
-                                                className="input input-bordered input-sm w-20"
-                                                min={1}
-                                                max={Math.max(1, availableForItem)}
-                                                disabled={disabled}
-                                            />
-                                        </td>
-                                        <td>
-                                            <div className="relative items-center baseline">
-                                                <input
-                                                    type="text"
-                                                    value={item.unitPrice}
-                                                    onChange={(e) => handleUpdateItem(item._id, { unitPrice: e.target.value })}
-                                                    className="input input-bordered input-sm w-24 pl-6 text-right"
-                                                    disabled={disabled}
-                                                />
-                                                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs opacity-50">$</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="flex flex-row justify-between items-center gap-2 h-full">
-                                                <span className="text-xs opacity-50">$</span>
-                                                <span className="text-right">
-                                                    {(parseFloat(item.unitPrice) * item.units).toFixed(2)}
+                                            <td>{item.product.batteryPct ? item.product.batteryPct : '-'}</td>
+                                            {/* Estado */}
+                                            <td className="text-center">
+                                                <span className={`text-nowrap badge badge-sm ${getStateBadgeClass(String(item.product.state))}`}>
+                                                    {String(item.product.state).replace(/_/g, ' ')}
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <button onClick={() => handleRemoveItem(item._id)} className="btn btn-outline  btn-error btn-xs" disabled={disabled}>Eliminar</button>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            {/* Costo u. (admin) */}
+                                            {isAdmin ? (
+                                                <td>
+                                                    <div className="flex items-center gap-1">
+                                                        <div className="relative">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min={0}
+                                                                value={getCostDraftValue(item)}
+                                                                onChange={(e) => handleCostDraftChange(item._id, e.target.value)}
+                                                                className="input hover:input-bordered input-sm w-24 pl-6 text-left"
+                                                                disabled={disabled}
+                                                            />
+                                                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs opacity-50">$</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-circle btn-outline  btn-success btn-xs"
+                                                            onClick={() => void handleSaveCost(item)}
+                                                            disabled={disabled || getCostDraftValue(item).trim() === String(item.unitCost ?? '0')}
+                                                            title="Guardar costo"
+                                                        >
+                                                            <CheckCircleIcon className="size-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            ) : null}
+                                            {/* Precio u. */}
+                                            <td>
+                                                <div className="relative items-center baseline">
+                                                    <input
+                                                        type="text"
+                                                        value={item.unitPrice}
+                                                        onChange={(e) => handleUpdateItem(item._id, { unitPrice: e.target.value })}
+                                                        className="input hover:input-bordered input-sm w-24 pl-6 text-left"
+                                                        disabled={disabled}
+                                                    />
+                                                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs opacity-50">$</span>
+                                                </div>
+                                            </td>
+                                            {/* Cantidad */}
+                                            <td>
+                                                <div className="flex flex-row justify-between items-center w-full">
+                                                    <input
+                                                        type="number"
+                                                        value={item.units}
+                                                        onChange={(e) => handleUpdateItem(item._id, { units: parseInt(e.target.value) || 1 })}
+                                                        className="input hover:input-bordered input-sm text-center w-16"
+                                                        min={1}
+                                                        max={Math.max(1, availableForItem)}
+                                                        disabled={disabled}
+                                                    />
+                                                </div>
+                                            </td>
+                                            {/* Total */}
+                                            <td>
+                                                <div className="flex flex-row justify-between items-center gap-2 h-full">
+                                                    <span className="text-xs opacity-50">$</span>
+                                                    <span className="text-right">
+                                                        {(parseFloat(item.unitPrice) * item.units).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <button onClick={() => handleRemoveItem(item._id)} className="btn btn-circle btn-outline  btn-error btn-xs" disabled={disabled} title="Eliminar ítem">
+                                                    <TrashIcon className="size-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
                                     );
                                 })}
                             </tbody>
@@ -256,6 +250,7 @@ export default function SaleItemsSection({ items, setItems, disabled = false, br
                     existingItems={items}
                     branchId={branchId}
                     saleType={saleType}
+                    preselectDefaultBag
                     onClose={() => setIsModalOpen(false)}
                     onAddItems={handleAddItems}
                 />

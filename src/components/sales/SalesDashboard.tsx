@@ -10,6 +10,7 @@ import SalesHeader from "./SalesHeader"
 import SalesKpis from "./SalesKpis"
 import SalesTable from "./SalesTable"
 import { useSalesList } from "./useSalesList"
+import { getProductDisplayModel } from "@/lib/products/display"
 import type { SerializedSale } from "./types"
 
 function TransportModal({ sale, onClose }: { sale: SerializedSale | null; onClose: () => void }) {
@@ -23,7 +24,7 @@ function TransportModal({ sale, onClose }: { sale: SerializedSale | null; onClos
         <div className="mt-4 grid gap-3">
           <div className="rounded-lg border border-base-300 p-3">
             <p className="font-medium">{buyer}</p>
-            <p className="text-sm text-base-content/60">{sale.items.map((item) => item.product.modelName).join(" - ")}</p>
+            <p className="text-sm text-base-content/60">{sale.items.map((item) => getProductDisplayModel(item.product)).join(" - ")}</p>
           </div>
           <input className="input input-bordered" placeholder="Transporte / cadete / retiro en local" />
           <input className="input input-bordered" placeholder="Direccion o punto de entrega" />

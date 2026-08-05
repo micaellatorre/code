@@ -8,6 +8,7 @@ import { resolveOperationBranch } from "@/lib/domain/user-branches";
 import { isMonetaryPaymentMethod, postSalePaymentToCash } from "@/lib/domain/cash";
 import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money";
 import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue";
+import { productCatalogDisplayInclude } from "@/lib/products/selects";
 
 type SaleOperationType = "CONFIRM_SALE" | "RESERVE";
 
@@ -26,7 +27,7 @@ export async function GET() {
   const sales = await prisma.sale.findMany({
     where: { tenantId },
     include: {
-      items: { include: { product: true } },
+      items: { include: { product: { include: productCatalogDisplayInclude } } },
       payments: true,
       buyer: true,
       user: { select: { id: true, name: true, email: true } },
@@ -552,7 +553,7 @@ export async function POST(request: Request) {
         user: { select: { id: true, name: true, email: true } },
         branch: { select: { id: true, code: true, name: true } },
         payments: true,
-        items: { include: { product: true } },
+        items: { include: { product: { include: productCatalogDisplayInclude } } },
       },
     });
 

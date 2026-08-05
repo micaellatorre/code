@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { requireRoleApi } from '@/lib/auth/auth'
+import { resolveSessionTenantId } from '@/lib/tenant'
+import { productCatalogDisplaySelect } from '@/lib/products/selects'
 
 // GET /api/sales/search?q=term
 export async function GET(req: Request) {
@@ -10,6 +12,11 @@ export async function GET(req: Request) {
   if (!auth.ok) {
     return Response.json({ error: "Unauthorized" }, { status: auth.status })
   }
+  const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+  if (!tenantId) {
+    return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
+  }
+  const canSeeFinancials = auth.session.user.activeRole === "ADMIN" || auth.session.user.activeRole === "SOCIO"
 
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q')?.trim()
@@ -23,6 +30,9 @@ export async function GET(req: Request) {
       { buyer: { is: { surname: { contains: q, mode: 'insensitive' } } } },
       { user: { is: { name: { contains: q, mode: 'insensitive' } } } },
       { user: { is: { email: { contains: q, mode: 'insensitive' } } } },
+      { items: { some: { product: { modelName: { contains: q, mode: 'insensitive' } } } } },
+      { items: { some: { product: { catalogModel: { is: { name: { contains: q, mode: 'insensitive' } } } } } } },
+      { items: { some: { product: { catalogColor: { is: { name: { contains: q, mode: 'insensitive' } } } } } } },
       { id: { contains: q } }
     )
     // Try parse date-like queries (ISO or simple YYYY-MM-DD)
@@ -32,7 +42,10 @@ export async function GET(req: Request) {
     }
   }
 
-  const where: Prisma.SaleWhereInput = q && orClauses.length > 0 ? { OR: orClauses } : {}
+  const where: Prisma.SaleWhereInput = {
+    tenantId,
+    ...(q && orClauses.length > 0 ? { OR: orClauses } : {}),
+  }
 
   const results = await prisma.sale.findMany({
     where,
@@ -46,13 +59,16 @@ export async function GET(req: Request) {
         include: {
           product: {
             select: {
+              id: true,
               modelName: true,
               type: true,
               capacityGB: true,
+              color: true,
               imei: true,
-              costPrice: true,
+              costPrice: canSeeFinancials,
               salePrice: true,
-              shippingCost: true,
+              shippingCost: canSeeFinancials,
+              ...productCatalogDisplaySelect,
             },
           },
         },
@@ -102,13 +118,21 @@ export async function GET(req: Request) {
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
       product: {
+        id: item.product.id,
         modelName: item.product.modelName,
         type: typeof item.product.type === 'string' ? item.product.type.toUpperCase() : item.product.type,
         capacityGB: item.product.capacityGB,
+        color: item.product.color,
         imei: item.product.imei,
-        costPrice: item.product.costPrice != null ? String(item.product.costPrice) : null,
+        costPrice: canSeeFinancials && item.product.costPrice != null ? String(item.product.costPrice) : null,
         salePrice: item.product.salePrice != null ? String(item.product.salePrice) : null,
-        shippingCost: item.product.shippingCost ? String(item.product.shippingCost) : null,
+        shippingCost: canSeeFinancials && item.product.shippingCost ? String(item.product.shippingCost) : null,
+        catalogModelId: item.product.catalogModelId,
+        catalogCapacityId: item.product.catalogCapacityId,
+        catalogColorId: item.product.catalogColorId,
+        catalogModel: item.product.catalogModel,
+        catalogCapacity: item.product.catalogCapacity,
+        catalogColor: item.product.catalogColor,
       },
     })),
   }))

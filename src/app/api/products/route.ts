@@ -6,6 +6,7 @@ import type { Prisma } from "@prisma/client"
 import { resolveOperationBranch } from "@/lib/domain/user-branches"
 import { buildProductCatalogUpdate, buildWholesalePriceUpdate } from "@/lib/config/productCatalogLinks"
 import { ensureTenantSettings } from "@/lib/config/settings"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
@@ -86,9 +87,7 @@ const PRODUCT_SELECT = {
   salePrice: true,
   wholesalePrice: true,
   shippingCost: true,
-  catalogModelId: true,
-  catalogCapacityId: true,
-  catalogColorId: true,
+  ...productCatalogDisplaySelect,
   stockInitial: true,
   stock: true,
   stockAvailable: true,
@@ -184,6 +183,8 @@ export async function GET(request: Request) {
     if (q) {
       where.OR = [
         { modelName: { contains: q, mode: "insensitive" } },
+        { catalogModel: { is: { name: { contains: q, mode: "insensitive" } } } },
+        { catalogColor: { is: { name: { contains: q, mode: "insensitive" } } } },
         { brand: { contains: q, mode: "insensitive" } },
         { imei: { contains: q, mode: "insensitive" } },
       ]
@@ -252,6 +253,9 @@ export async function GET(request: Request) {
       catalogModelId: p.catalogModelId ?? null,
       catalogCapacityId: p.catalogCapacityId ?? null,
       catalogColorId: p.catalogColorId ?? null,
+      catalogModel: p.catalogModel ?? null,
+      catalogCapacity: p.catalogCapacity ?? null,
+      catalogColor: p.catalogColor ?? null,
 
       stockInitial: p.stockInitial ?? 0,
       stock: p.stock ?? 0,
@@ -298,6 +302,9 @@ export async function POST(request: Request) {
     if (!tenantId) {
       return NextResponse.json({ error: "DEFAULT_TENANT_ID not set" }, { status: 500 })
     }
+    if (!body.catalogModelId) {
+      return NextResponse.json({ error: "Selecciona un modelo del catalogo." }, { status: 400 })
+    }
 
     if (body.senado === false) body.senadoAt = null
     if (body.senado === true && !body.senadoAt) body.senadoAt = new Date()
@@ -321,6 +328,7 @@ export async function POST(request: Request) {
       include: {
         branch: { select: { id: true, code: true, name: true } },
         supplier: { select: { id: true, name: true } },
+        ...productCatalogDisplaySelect,
       },
     })
 
@@ -340,6 +348,11 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error(err)
     const message = err instanceof Error ? err.message : "Error creando producto"
-    return NextResponse.json({ error: message }, { status: message.includes("permisos") || message.includes("Selecciona") || message.includes("Sucursal") ? 403 : 500 })
+    const status = message.includes("permisos") || message.includes("Selecciona") || message.includes("Sucursal")
+      ? 403
+      : message.toLowerCase().includes("catalogo") || message.toLowerCase().includes("capacidad")
+        ? 400
+        : 500
+    return NextResponse.json({ error: message }, { status })
   }
 }

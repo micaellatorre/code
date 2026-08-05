@@ -7,7 +7,9 @@ import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE, toArgDateInputValue } from "@/lib/timezone"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
 import BranchAutocomplete from "@/components/branches/BranchAutocomplete"
+import ProductColorSwatch from "@/components/products/ProductColorSwatch"
 import { getStockRotation } from "@/lib/config/stockRotation"
+import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayColorHex, getProductDisplayModel } from "@/lib/products/display"
 import type { SerializedProduct } from "./types"
 import type { ProductsInventory } from "./useProductsInventory"
 import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } from "./utils"
@@ -161,7 +163,23 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
     )
   }
 
+  function ProductColorLabel({ product }: { product: SerializedProduct }) {
+    const color = getProductDisplayColor(product)
+    if (!color) return <span className="text-nowrap">-</span>
+    return (
+      <span className="inline-flex items-center gap-1 text-nowrap">
+        <ProductColorSwatch hexColor={getProductDisplayColorHex(product)} title={color} />
+        {color}
+      </span>
+    )
+  }
+
+  function ProductCapacityLabel({ product }: { product: SerializedProduct }) {
+    return <span className="text-nowrap">{getProductDisplayCapacity(product) ?? "-"}</span>
+  }
+
   function ProductRow({ p }: { p: SerializedProduct }) {
+    const displayModel = getProductDisplayModel(p)
     return (
       <tr key={p.id}>
         <td className="text-xs text-base-content/60">
@@ -313,13 +331,13 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               </div>
             </div>
           ) : (
-            <span  {...editableCellProps(p.id, "modelName", p.modelName)}>
+            <span  {...editableCellProps(p.id, "modelName", displayModel)}>
               {p.notes ? (
                 <div className="tooltip tooltip-bottom" data-tip={p.notes ?? ""}>
-                  <span className="underline decoration-dotted cursor-help text-nowrap">{p.modelName}</span>
+                  <span className="underline decoration-dotted cursor-help text-nowrap">{displayModel}</span>
                 </div>
               ) : (
-                p.modelName
+                displayModel
               )}
             </span>
           )}
@@ -392,8 +410,8 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               </div>
             </div>
           ) : (
-            <span {...editableCellProps(p.id, "color", p.color)}>
-              <span className="text-nowrap">{p.color ?? "-"}</span>
+            <span {...editableCellProps(p.id, "color", getProductDisplayColor(p))}>
+              <ProductColorLabel product={p} />
             </span>
           )}
         </td>
@@ -432,14 +450,8 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               </div>
             </div>
           ) : (
-            <span {...editableCellProps(p.id, "capacityGB", p.capacityGB)}>
-              {(p.capacityGB != null) ? (
-                <>
-                  {p.capacityGB}<span className="text-xs text-base-content/50"> GB</span>
-                </>
-              ) : (
-                '-'
-              )}
+            <span {...editableCellProps(p.id, "capacityGB", getProductDisplayCapacity(p))}>
+              <ProductCapacityLabel product={p} />
             </span>
           )}
         </td>
@@ -780,6 +792,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
   }
 
   function PhoneOperationalRow({ product }: { product: SerializedProduct }) {
+    const displayModel = getProductDisplayModel(product)
     return (
       <tr>
         {/* <td>
@@ -788,7 +801,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             className="checkbox checkbox-xs"
             checked={selectedProductIds.has(product.id)}
             onChange={() => toggleProductSelection(product.id)}
-            aria-label={`Seleccionar ${product.modelName}`}
+            aria-label={`Seleccionar ${displayModel}`}
           />
         </td> */}
         <td className="font-mono text-xs">{getProductCode(product)}</td>
@@ -798,7 +811,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
         <td>
           <OperationalEditableCell product={product} fieldName="modelName">
             <span className={product.notes ? "underline decoration-dotted cursor-help text-nowrap" : ""} title={product.notes ?? ""}>
-              {product.modelName}
+              {displayModel}
             </span>
           </OperationalEditableCell>
         </td>
@@ -828,12 +841,12 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
         ) : null}
         <td>
           <OperationalEditableCell product={product} fieldName="capacityGB">
-            <span className='text-nowrap'>{product.capacityGB ?? "-"} GB</span>
+            <ProductCapacityLabel product={product} />
           </OperationalEditableCell>
         </td>
         <td>
           <OperationalEditableCell product={product} fieldName="color">
-            <span className='text-nowrap'>{product.color ?? "-"}</span>
+            <ProductColorLabel product={product} />
           </OperationalEditableCell>
         </td>
         <td>

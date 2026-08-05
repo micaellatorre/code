@@ -13,6 +13,8 @@ import { decimal, normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money
 import { fromArgDateInputValue } from "@/lib/timezone"
 import { assertSupplierCoversBranch } from "@/lib/domain/suppliers"
 import { isMonetaryPaymentMethod, postPurchasePaymentToCash } from "@/lib/domain/cash"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
+import { buildProductCatalogUpdate } from "@/lib/config/productCatalogLinks"
 
 const currencySchema = z.nativeEnum(Currency)
 
@@ -36,7 +38,9 @@ export const purchasePaymentStatusUpdateSchema = z.object({
 type PurchasePaymentStatusValue = z.infer<typeof purchasePaymentStatusSchema>
 
 const purchaseBaseItemSchema = z.object({
-  modelName: z.string().trim().min(1, "El modelo/articulo es obligatorio").max(180),
+  catalogModelId: z.string().trim().min(1, "El modelo de catalogo es obligatorio"),
+  modelName: z.string().trim().max(180).optional().default(""),
+  catalogColorId: z.string().trim().optional().nullable(),
   color: z.string().trim().max(80).optional().nullable(),
   quantity: z.coerce.number().int().positive(),
   unitCost: z.union([z.string(), z.number()]),
@@ -46,6 +50,7 @@ const purchaseBaseItemSchema = z.object({
 
 const phoneItemSchema = purchaseBaseItemSchema.extend({
   type: z.literal(ProductType.PHONE),
+  catalogCapacityId: z.string().trim().min(1, "La capacidad de catalogo es obligatoria"),
   capacityGB: z.coerce.number().int().positive().optional().nullable(),
   condition: z.nativeEnum(Condition).optional().nullable(),
   physicalState: z.enum(["NEW", "USED"]).optional().default("USED"),
@@ -56,6 +61,7 @@ const phoneItemSchema = purchaseBaseItemSchema.extend({
 
 const accessoryItemSchema = purchaseBaseItemSchema.extend({
   type: z.literal(ProductType.ACCESSORY),
+  catalogCapacityId: z.string().trim().optional().nullable(),
   relatedModel: z.string().trim().max(120).optional().nullable(),
 })
 
@@ -139,6 +145,7 @@ const purchaseSerializationSelect = Prisma.validator<Prisma.PurchaseSelect>()({
           color: true,
           capacityGB: true,
           state: true,
+          ...productCatalogDisplaySelect,
         },
       },
     },
@@ -185,6 +192,12 @@ export function serializePurchase(row: PurchaseForSerialization) {
         color: item.product.color,
         capacityGB: item.product.capacityGB,
         state: item.product.state,
+        catalogModelId: item.product.catalogModelId,
+        catalogCapacityId: item.product.catalogCapacityId,
+        catalogColorId: item.product.catalogColorId,
+        catalogModel: item.product.catalogModel,
+        catalogCapacity: item.product.catalogCapacity,
+        catalogColor: item.product.catalogColor,
       },
     })),
     payments: row.payments.map((payment) => ({
@@ -213,6 +226,8 @@ export async function listPurchases(params: {
       OR: [
         { supplier: { name: { contains: q, mode: "insensitive" } } },
         { items: { some: { product: { modelName: { contains: q, mode: "insensitive" } } } } },
+        { items: { some: { product: { catalogModel: { is: { name: { contains: q, mode: "insensitive" } } } } } } },
+        { items: { some: { product: { catalogColor: { is: { name: { contains: q, mode: "insensitive" } } } } } } },
         { items: { some: { product: { imei: { contains: q, mode: "insensitive" } } } } },
       ],
     } : {}),
@@ -315,6 +330,18 @@ export async function createPurchaseWithPayments(params: {
     for (const item of input.items) {
       const unitCost = decimal(item.unitCost)
       const salePrice = decimal(item.salePrice ?? 0)
+      const catalogData = await buildProductCatalogUpdate(
+        params.tenantId,
+        {
+          catalogModelId: item.catalogModelId,
+          catalogCapacityId: item.type === ProductType.PHONE ? item.catalogCapacityId : null,
+          catalogColorId: item.catalogColorId ?? null,
+        },
+        item.type,
+      )
+      const catalogModelName = String(catalogData.modelName ?? "").trim()
+      if (!catalogModelName) throw new Error("Modelo de catalogo no disponible")
+
       if (item.type === ProductType.PHONE) {
         for (let index = 0; index < item.quantity; index += 1) {
           const imei = normalizeImei(item.imeis[index])
@@ -323,10 +350,9 @@ export async function createPurchaseWithPayments(params: {
               tenantId: params.tenantId,
               type: ProductType.PHONE,
               brand: "Apple",
-              modelName: item.modelName.trim(),
-              capacityGB: item.capacityGB ?? null,
+              ...(catalogData as any),
+              modelName: catalogModelName,
               condition: item.condition ?? (item.physicalState === "NEW" ? Condition.SEALED : Condition.ASIS),
-              color: item.color?.trim() || null,
               batteryPct: item.physicalState === "USED" ? item.batteryPct ?? null : null,
               imei,
               purchaseDate,
@@ -355,8 +381,8 @@ export async function createPurchaseWithPayments(params: {
           data: {
             tenantId: params.tenantId,
             type: ProductType.ACCESSORY,
-            modelName: item.modelName.trim(),
-            color: item.color?.trim() || null,
+            ...(catalogData as any),
+            modelName: catalogModelName,
             purchaseDate,
             costPrice: unitCost,
             salePrice,

@@ -3,6 +3,7 @@ import { requireRoleApi } from "@/lib/auth/auth"
 import { NextResponse } from "next/server"
 import type { Prisma } from "@prisma/client"
 import { getTenantId, TRADE_IN_ALLOWED_STATES } from "../_utils"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
 
 const PRODUCT_SELECT = {
   id: true,
@@ -16,6 +17,7 @@ const PRODUCT_SELECT = {
   salePrice: true,
   location: true,
   condition: true,
+  ...productCatalogDisplaySelect,
 } as const
 
 export async function GET(request: Request) {
@@ -41,6 +43,8 @@ export async function GET(request: Request) {
   if (q) {
     where.OR = [
       { modelName: { contains: q, mode: "insensitive" } },
+      { catalogModel: { is: { name: { contains: q, mode: "insensitive" } } } },
+      { catalogColor: { is: { name: { contains: q, mode: "insensitive" } } } },
       { imei: { contains: q, mode: "insensitive" } },
       { color: { contains: q, mode: "insensitive" } },
     ]

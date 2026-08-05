@@ -1,6 +1,7 @@
 // code/src/components/products/utils.ts
 
 import type { SerializedProduct } from "./types"
+import { getProductDisplayCapacityGB, getProductDisplayModel } from "@/lib/products/display"
 
 export function formatDecimal(value: unknown) {
   if (value == null) return "-"
@@ -72,7 +73,7 @@ export function isSealedPhone(product: SerializedProduct) {
 }
 
 export function getCapacityNumber(product: SerializedProduct) {
-  const value = Number(product.capacityGB)
+  const value = Number(getProductDisplayCapacityGB(product))
   return Number.isFinite(value) ? value : 0
 }
 
@@ -92,7 +93,7 @@ export function compareIphoneModels(a: SerializedProduct, b: SerializedProduct) 
     return 2
   }
   return (
-    getTier(b.modelName) - getTier(a.modelName) ||
+    getTier(getProductDisplayModel(b)) - getTier(getProductDisplayModel(a)) ||
     getCapacityNumber(b) - getCapacityNumber(a) ||
     new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()
   )

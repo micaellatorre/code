@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { formatAppointmentDate, formatMoney, getAppointmentDepositTotal, getAppointmentReservedValue } from "./appointmentUtils"
+import { getProductDisplayModel } from "@/lib/products/display"
 import type { SerializedAppointment } from "./types"
 
 type AppointmentCashoutModalProps = {
@@ -40,7 +41,7 @@ export default function AppointmentCashoutModal({ appointment, onClose }: Appoin
                   href={`/dashboard/products/${interest.productId}/edit`}
                   className="flex items-center justify-between gap-3 py-2 hover:text-primary"
                 >
-                  <span>{interest.product.modelName}</span>
+                  <span>{getProductDisplayModel(interest.product)}</span>
                   <span>{formatMoney(interest.product.salePrice)}</span>
                 </Link>
               ))}

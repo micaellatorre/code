@@ -1,5 +1,6 @@
 import type { Buyer, BuyerType, Currency, PaymentMethod, Product, SaleItemKind, SaleStatus } from "@prisma/client"
 import type { Role } from "@/lib/auth/roles"
+import type { ProductCatalogDisplayCapacity, ProductCatalogDisplayColor, ProductCatalogDisplayModel, ProductCatalogDisplayProduct } from "@/lib/products/display"
 import type { TradeInDeviceDraft } from "@/components/trade-in/types"
 
 export type SaleUserSummary = {
@@ -32,6 +33,12 @@ export type SaleProductSummary = {
   stock?: number | null
   stockAvailable?: number | null
   salePrice?: string | null
+  catalogModelId?: string | null
+  catalogCapacityId?: string | null
+  catalogColorId?: string | null
+  catalogModel?: ProductCatalogDisplayModel | null
+  catalogCapacity?: ProductCatalogDisplayCapacity | null
+  catalogColor?: ProductCatalogDisplayColor | null
 }
 
 export type SaleItemSummary = {
@@ -131,7 +138,7 @@ export type SaleItemDraft = {
   clientLineId: string
   parentClientLineId?: string | null
   productId: string
-  product: Product
+  product: Product & ProductCatalogDisplayProduct
   units: number
   unitPrice: string
   unitCost: string

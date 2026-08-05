@@ -2,9 +2,22 @@
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { NextRequest, NextResponse } from "next/server"
+import { resolveSessionTenantId } from "@/lib/tenant"
+import { productCatalogDisplayInclude } from "@/lib/products/selects"
 
 type Ctx = {
   params: Promise<{ id: string }>
+}
+
+function appointmentTenantWhere(id: string, tenantId: string) {
+  return {
+    id,
+    OR: [
+      { buyer: { is: { tenantId } } },
+      { user: { is: { tenantId } } },
+      { interests: { some: { product: { tenantId } } } },
+    ],
+  }
 }
 
 export async function GET(_request: NextRequest, { params }: Ctx) {
@@ -20,14 +33,16 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
     if (!id) {
       return NextResponse.json({ error: "Appointment ID is required" }, { status: 400 })
     }
+    const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+    if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
+    const appointment = await prisma.appointment.findFirst({
+      where: appointmentTenantWhere(id, tenantId),
       include: {
         buyer: true,
         interests: {
           include: {
-            product: true,
+            product: { include: productCatalogDisplayInclude },
           },
           orderBy: {
             priority: 'asc' as const,
@@ -61,19 +76,16 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (!id) {
       return NextResponse.json({ error: "Appointment ID is required" }, { status: 400 })
     }
+    const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+    if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
 
     // Check if this is a user assignment request
     if (body.userId) {
       // User assignment logic (original functionality)
-      const adminTenantId = auth.session.user.tenantId
-      if (!adminTenantId) {
-        return NextResponse.json({ error: "Tenant no disponible para el usuario autenticado" }, { status: 403 })
-      }
-
       const userId = body.userId.trim()
 
-      const appointment = await prisma.appointment.findUnique({
-        where: { id },
+      const appointment = await prisma.appointment.findFirst({
+        where: appointmentTenantWhere(id, tenantId),
         select: { id: true },
       })
 
@@ -90,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         return NextResponse.json({ error: "Usuario destino no encontrado" }, { status: 404 })
       }
 
-      if (targetUser.tenantId !== adminTenantId) {
+      if (targetUser.tenantId !== tenantId) {
         return NextResponse.json({ error: "No puedes asignar usuarios fuera de tu tenant" }, { status: 403 })
       }
 
@@ -130,8 +142,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
 
       // Check if appointment exists
-      const existingAppointment = await prisma.appointment.findUnique({
-        where: { id },
+      const existingAppointment = await prisma.appointment.findFirst({
+        where: appointmentTenantWhere(id, tenantId),
         select: { id: true },
       })
 
@@ -140,7 +152,23 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
 
       const updatedAppointment = await prisma.$transaction(async (tx) => {
-        const updated = await tx.appointment.update({
+        if (buyerId) {
+          const buyer = await tx.buyer.findFirst({ where: { id: buyerId, tenantId }, select: { id: true } })
+          if (!buyer) throw new Error("Cliente no disponible para el tenant actual")
+        }
+
+        const productIds = Array.isArray(interests) ? interests.map((interest: any) => interest.productId).filter(Boolean) : []
+        if (productIds.length > 0) {
+          const productsInTenant = await tx.product.findMany({
+            where: { id: { in: productIds }, tenantId },
+            select: { id: true },
+          })
+          if (productsInTenant.length !== new Set(productIds).size) {
+            throw new Error("Todos los productos de interes deben pertenecer al tenant actual")
+          }
+        }
+
+        await tx.appointment.update({
           where: { id },
           data: {
             scheduledAt: new Date(scheduledAt),
@@ -171,19 +199,28 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
           }
         }
 
-        const productIds = Array.isArray(interests) ? interests.map((interest: any) => interest.productId).filter(Boolean) : []
         const hasDeposit = Array.isArray(deposits) && deposits.some((deposit: any) => Number(deposit.amount || 0) > 0)
 
         if (productIds.length > 0 && (hasDeposit || status === "CANCELADA")) {
           await tx.product.updateMany({
-            where: { id: { in: productIds } },
+            where: { id: { in: productIds }, tenantId },
             data: hasDeposit
               ? { senado: true, senadoAt: new Date() }
               : { senado: false, senadoAt: null },
           })
         }
 
-        return updated
+        return tx.appointment.findFirst({
+          where: { id },
+          include: {
+            buyer: true,
+            user: { select: { id: true, name: true, email: true } },
+            interests: {
+              include: { product: { include: productCatalogDisplayInclude } },
+              orderBy: { priority: "asc" as const },
+            },
+          },
+        })
       })
 
       return NextResponse.json(updatedAppointment, { status: 200 })
@@ -206,6 +243,16 @@ export async function DELETE(_request: NextRequest, { params }: Ctx) {
 
     if (!id) {
       return NextResponse.json({ error: "Appointment ID is required" }, { status: 400 })
+    }
+    const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
+    if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
+
+    const appointment = await prisma.appointment.findFirst({
+      where: appointmentTenantWhere(id, tenantId),
+      select: { id: true },
+    })
+    if (!appointment) {
+      return NextResponse.json({ error: "Appointment not found" }, { status: 404 })
     }
 
     await prisma.appointment.delete({

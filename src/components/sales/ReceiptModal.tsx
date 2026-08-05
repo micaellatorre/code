@@ -2,6 +2,7 @@
 
 import type { ReceiptPreview, SaleItemSummary, SerializedSale } from "./types"
 import { formatSaleDate, formatUsd, getSaleBuyerName, getSaleOrigin, toNumber } from "./salesUtils"
+import { getProductDisplayModel } from "@/lib/products/display"
 
 type ReceiptModalProps = {
   preview: ReceiptPreview | null
@@ -136,7 +137,7 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"], 
         <tr class="${depth > 0 ? "item-child" : ""}">
           <td class="description">
             ${depth > 0 ? '<span class="child-label">Accesorio sugerido</span>' : ""}
-            ${escapeHtml(item.product.modelName)}
+            ${escapeHtml(getProductDisplayModel(item.product))}
           </td>
           <td class="number quantity">
             ${escapeHtml(quantity)}
@@ -620,7 +621,7 @@ export default function ReceiptModal({ preview, onClose }: ReceiptModalProps) {
                     <td>
                       <div className={depth > 0 ? "pl-5 text-base-content/70" : ""}>
                         {depth > 0 ? <div className="text-[10px] font-medium uppercase text-base-content/50">Accesorio sugerido</div> : null}
-                        {item.product.modelName}
+                        {getProductDisplayModel(item.product)}
                       </div>
                     </td>
                     <td className="text-center">{getItemQuantity(item)}</td>

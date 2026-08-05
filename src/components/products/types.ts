@@ -1,5 +1,7 @@
 // code/src/components/products/types.ts
 
+import type { ProductCatalogDisplayCapacity, ProductCatalogDisplayColor, ProductCatalogDisplayModel } from "@/lib/products/display"
+
 type SerializedProduct = {
   id: string
   tenantId: string
@@ -7,7 +9,7 @@ type SerializedProduct = {
   brand: string | null
   imei: string | null
   modelName: string
-  capacityGB: number | string | null | any
+  capacityGB: number | string | null
   condition: string | null
   color: string | null
   batteryPct: number | null
@@ -19,6 +21,9 @@ type SerializedProduct = {
   catalogModelId?: string | null
   catalogCapacityId?: string | null
   catalogColorId?: string | null
+  catalogModel?: ProductCatalogDisplayModel | null
+  catalogCapacity?: ProductCatalogDisplayCapacity | null
+  catalogColor?: ProductCatalogDisplayColor | null
   state: string
   senado: boolean
   senadoAt: string | null

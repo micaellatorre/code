@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma"
 import type { Metadata } from "next"
 import FilterableAppointmentsTable from "@/components/appointments/FilterableAppointmentsTable"
 import { requireRolePage } from "@/lib/auth/auth"
+import { resolveSessionTenantId } from "@/lib/tenant"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
 
 export const metadata: Metadata = {
   title: "Citas",
@@ -13,9 +15,18 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function AppointmentsPage() {
-  await requireRolePage(["ADMIN", "VENDEDOR"])
+  const session = await requireRolePage(["ADMIN", "VENDEDOR"])
+  const tenantId = await resolveSessionTenantId(session.user.tenantId)
+  if (!tenantId) throw new Error("Tenant no disponible")
 
   const appointments = await prisma.appointment.findMany({
+    where: {
+      OR: [
+        { buyer: { is: { tenantId } } },
+        { user: { is: { tenantId } } },
+        { interests: { some: { product: { tenantId } } } },
+      ],
+    },
     orderBy: { scheduledAt: "desc" },
     include: {
       buyer: { select: { name: true, surname: true, phone: true, instagram: true, email: true, id: true } },
@@ -37,6 +48,7 @@ export default async function AppointmentsPage() {
               location: true,
               stock: true,
               stockAvailable: true,
+              ...productCatalogDisplaySelect,
             },
           },
         },
@@ -89,6 +101,12 @@ export default async function AppointmentsPage() {
         location: interest.product.location,
         stock: interest.product.stock,
         stockAvailable: interest.product.stockAvailable,
+        catalogModelId: interest.product.catalogModelId,
+        catalogCapacityId: interest.product.catalogCapacityId,
+        catalogColorId: interest.product.catalogColorId,
+        catalogModel: interest.product.catalogModel,
+        catalogCapacity: interest.product.catalogCapacity,
+        catalogColor: interest.product.catalogColor,
       },
     })),
     resultNotes: appointment.resultNotes,

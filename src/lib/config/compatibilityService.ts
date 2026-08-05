@@ -3,6 +3,12 @@ import prisma from "@/lib/prisma"
 import { createAuditLog } from "@/lib/domain/audit"
 import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue"
 import { ensureTenantSettings } from "@/lib/config/settings"
+import { productCatalogDisplaySelect } from "@/lib/products/selects"
+import type {
+  ProductCatalogDisplayCapacity,
+  ProductCatalogDisplayColor,
+  ProductCatalogDisplayModel,
+} from "@/lib/products/display"
 
 const SELLABLE_STATES = ["EN_STOCK", "DISPONIBLE"] as const
 
@@ -20,6 +26,11 @@ export type CompatibleAccessorySuggestion = {
     imei: string | null
     modelName: string
     catalogModelId: string | null
+    catalogCapacityId: string | null
+    catalogColorId: string | null
+    catalogModel?: ProductCatalogDisplayModel | null
+    catalogCapacity?: ProductCatalogDisplayCapacity | null
+    catalogColor?: ProductCatalogDisplayColor | null
     capacityGB: number | null
     condition: string | null
     color: string | null
@@ -369,7 +380,7 @@ export async function getCompatibleAccessorySuggestions(params: {
       color: true,
       batteryPct: true,
       purchaseDate: true,
-      catalogModelId: true,
+      ...productCatalogDisplaySelect,
       costPrice: true,
       salePrice: true,
       wholesalePrice: true,
@@ -410,6 +421,11 @@ export async function getCompatibleAccessorySuggestions(params: {
       imei: product.imei,
       modelName: product.modelName,
       catalogModelId: product.catalogModelId,
+      catalogCapacityId: product.catalogCapacityId,
+      catalogColorId: product.catalogColorId,
+      catalogModel: product.catalogModel,
+      catalogCapacity: product.catalogCapacity,
+      catalogColor: product.catalogColor,
       capacityGB: product.capacityGB,
       condition: product.condition,
       color: product.color,
