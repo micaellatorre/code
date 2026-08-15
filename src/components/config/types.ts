@@ -11,6 +11,11 @@ export type SettingsDto = {
   closerCommissionsEnabled: boolean
   financialFeeEnabled: boolean
   financialFeeRatePct: string
+  bnaInstallmentsEnabled: boolean
+  bnaMarkupRatePct: string
+  bnaDefaultInstallments: number
+  bnaCustomerRebatePct: string
+  bnaCustomerRebateCapArs: string
   usedDeviceWarrantyDays: number
   warrantyPolicyText: string
 }
