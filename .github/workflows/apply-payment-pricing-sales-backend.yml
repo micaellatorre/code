@@ -1,0 +1,188 @@
+name: Apply payment pricing sales backend patch
+
+on:
+  push:
+    branches:
+      - feature/payment-pricing-cotizador
+    paths:
+      - .github/workflows/apply-payment-pricing-sales-backend.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-sales:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/payment-pricing-cotizador
+          fetch-depth: 0
+      - name: Patch sales API and form totals
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path_name, old, new):
+              path = Path(path_name)
+              text = path.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f"Expected fragment not found in {path_name}:\n{old}")
+              path.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "src/app/api/sales/route.ts",
+              'import { Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client";\n',
+              'import { Currency, PaymentMethod, Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client";\n',
+          )
+          replace_once(
+              "src/app/api/sales/route.ts",
+              'import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money";\n',
+              'import { getBlueSellRateSnapshot, getPaymentPricingSettings, priceNativePayment } from "@/lib/domain/payment-pricing";\n',
+          )
+          replace_once(
+              "src/app/api/sales/route.ts",
+              '  paidAt?: string;\n}\n',
+              '  paidAt?: string;\n  installments?: number | null;\n}\n',
+          )
+          replace_once(
+              "src/app/api/sales/route.ts",
+              '  let newSaleId: string | null = null;\n\n  try {\n    const txResult = await prisma.$transaction(\n      async (tx) => {\n        const tenantId = await resolveSessionTenantId(auth.session.user.tenantId);\n        if (!tenantId) throw apiError("DEFAULT_TENANT_ID no configurado", 500);\n\n        const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });',
+              '  let newSaleId: string | null = null;\n\n  try {\n    const resolvedTenantId = await resolveSessionTenantId(auth.session.user.tenantId);\n    if (!resolvedTenantId) throw apiError("DEFAULT_TENANT_ID no configurado", 500);\n    const paymentPricingSettings = await getPaymentPricingSettings(resolvedTenantId);\n    const needsArsRate = payments.some((payment) => String(payment.currency) === "ARS");\n    const exchangeRateSnapshot = needsArsRate ? await getBlueSellRateSnapshot() : null;\n\n    const txResult = await prisma.$transaction(\n      async (tx) => {\n        const tenant = await tx.tenant.findFirst({ where: { id: resolvedTenantId } });',
+          )
+          replace_once(
+              "src/app/api/sales/route.ts",
+              '''        const total = subtotal.add(extraCosts);
+        const profit = total.sub(costTotal);
+        const totalPaid = payments.reduce(
+          (acc, p) => acc.add(decimal(p.amount)),
+          new Prisma.Decimal(0),
+        );
+
+        if (operationType === "CONFIRM_SALE" && !totalPaid.equals(total)) {
+          throw apiError(
+            `El total de pagos (${totalPaid.toFixed(2)}) no coincide con el total de la venta (${total.toFixed(2)}).`,
+            400,
+          );
+        }
+
+        if (operationType === "RESERVE") {
+          if (totalPaid.lessThanOrEqualTo(0)) {
+            throw apiError("La seña debe tener al menos un pago mayor a 0.", 400);
+          }
+
+          if (totalPaid.greaterThan(total)) {
+            throw apiError("La seña no puede superar el total de la venta.", 400);
+          }
+        }
+
+        const saleStatus: SaleStatus = operationType === "RESERVE" ? "SENADA" : "CONFIRMADA";
+        const balanceDue = total.sub(totalPaid);
+        const paymentsData = payments.map((p) => ({
+          method: p.method as any,
+          currency: p.currency as any,
+          amount: decimal(p.amount),
+          exchangeRate: optionalDecimal(p.exchangeRate),
+          amountUsd: normalizeAmountUsd(decimal(p.amount), String(p.currency), optionalDecimal(p.exchangeRate)),
+          cashAccountId: isMonetaryPaymentMethod(p.method) ? p.cashAccountId || null : null,
+          note: p.note,
+          paidAt: p.paidAt ? new Date(p.paidAt) : new Date(),
+        }));''',
+              '''        const total = subtotal.add(extraCosts);
+        const profit = total.sub(costTotal);
+        const pricedPayments = payments.map((payment) => {
+          const method = payment.method as PaymentMethod;
+          const currency = payment.currency as Currency;
+          return priceNativePayment({
+            method,
+            currency,
+            amount: decimal(payment.amount),
+            exchangeRate: currency === "ARS" ? exchangeRateSnapshot?.rate ?? null : null,
+            settings: paymentPricingSettings,
+            installments: payment.installments,
+          });
+        });
+        const totalPaid = pricedPayments.reduce(
+          (acc, payment) => acc.add(payment.coveredUsd),
+          new Prisma.Decimal(0),
+        );
+        const paymentDelta = totalPaid.sub(total).abs();
+
+        if (operationType === "CONFIRM_SALE" && paymentDelta.greaterThan(new Prisma.Decimal("0.01"))) {
+          throw apiError(
+            `La cobertura USD de los pagos (${totalPaid.toFixed(2)}) no coincide con el total base de la venta (${total.toFixed(2)}).`,
+            400,
+          );
+        }
+
+        if (operationType === "RESERVE") {
+          if (totalPaid.lessThanOrEqualTo(0)) {
+            throw apiError("La seña debe tener al menos un pago mayor a 0.", 400);
+          }
+
+          if (totalPaid.sub(total).greaterThan(new Prisma.Decimal("0.01"))) {
+            throw apiError("La seña no puede superar el total de la venta.", 400);
+          }
+        }
+
+        const saleStatus: SaleStatus = operationType === "RESERVE" ? "SENADA" : "CONFIRMADA";
+        const balanceDue = Prisma.Decimal.max(total.sub(totalPaid), 0).toDecimalPlaces(2);
+        const paymentsData = pricedPayments.map((pricing, index) => {
+          const payment = payments[index];
+          return {
+            method: pricing.method,
+            currency: pricing.currency,
+            amount: pricing.amount,
+            exchangeRate: pricing.exchangeRate,
+            amountUsd: pricing.amountUsd,
+            coveredBaseUsd: pricing.coveredUsd,
+            surchargePct: pricing.surchargePct,
+            surchargeAmount: pricing.surchargeAmount,
+            installments: pricing.installments,
+            installmentAmount: pricing.installmentAmount,
+            pricingSnapshot: {
+              exchangeRateSource: pricing.exchangeRate ? exchangeRateSnapshot?.source ?? null : null,
+              exchangeRate: pricing.exchangeRate?.toFixed(4) ?? null,
+              exchangeRateAt: pricing.exchangeRate ? exchangeRateSnapshot?.fetchedAt.toISOString() ?? null : null,
+              surchargePct: pricing.surchargePct.toFixed(2),
+              installments: pricing.installments,
+            },
+            cashAccountId: isMonetaryPaymentMethod(payment.method) ? payment.cashAccountId || null : null,
+            note: payment.note,
+            paidAt: payment.paidAt ? new Date(payment.paidAt) : new Date(),
+          };
+        });''',
+          )
+          replace_once(
+              "src/app/api/sales/route.ts",
+              '            notes: notes || null,\n            status: saleStatus,\n            amountPaid: totalPaid,',
+              '            notes: notes || null,\n            exchangeRate: exchangeRateSnapshot?.rate ?? null,\n            exchangeRateSource: exchangeRateSnapshot?.source ?? null,\n            exchangeRateAt: exchangeRateSnapshot?.fetchedAt ?? null,\n            status: saleStatus,\n            amountPaid: totalPaid.toDecimalPlaces(2),',
+          )
+
+          replace_once(
+              "src/components/sales/form/useSaleForm.ts",
+              '    const totalPaid = payments.reduce((acc, payment) => acc + toNumber(payment.amount), 0)\n',
+              '    const totalPaid = payments.reduce((acc, payment) => acc + toNumber(payment.coveredBaseUsd ?? payment.amountUsd ?? ((payment.currency === "USD" || payment.currency === "USDT") ? payment.amount : "0")), 0)\n',
+          )
+          replace_once(
+              "src/components/sales/form/useSaleForm.ts",
+              '          amount: totals.tradeInCredit.toFixed(2),\n          note: "Credito Plan Canje",',
+              '          amount: totals.tradeInCredit.toFixed(2),\n          amountUsd: totals.tradeInCredit.toFixed(2),\n          coveredBaseUsd: totals.tradeInCredit.toFixed(6),\n          note: "Credito Plan Canje",',
+          )
+          replace_once(
+              "src/components/sales/form/useSaleForm.ts",
+              '        exchangeRate: payment.exchangeRate,\n        cashAccountId: payment.cashAccountId,',
+              '        exchangeRate: payment.exchangeRate,\n        installments: payment.installments,\n        cashAccountId: payment.cashAccountId,',
+          )
+
+      - name: Commit patch
+        run: |
+          git rm .github/workflows/apply-payment-pricing-sales-backend.yml
+          git diff --check
+          git config user.name "tech-stock-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/app/api/sales/route.ts src/components/sales/form/useSaleForm.ts
+          git commit -m "feat: settle mixed payments by USD coverage"
+          git push origin HEAD:feature/payment-pricing-cotizador
