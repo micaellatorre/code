@@ -18,6 +18,8 @@ export type PaymentPricingSettings = {
   bnaInstallmentsEnabled: boolean
   bnaMarkupRatePct: Prisma.Decimal
   bnaDefaultInstallments: number
+  bnaCustomerRebatePct: Prisma.Decimal
+  bnaCustomerRebateCapArs: Prisma.Decimal
 }
 
 export type PaymentPricingResult = {
@@ -31,6 +33,8 @@ export type PaymentPricingResult = {
   surchargeAmount: Prisma.Decimal
   installments: number | null
   installmentAmount: Prisma.Decimal | null
+  customerRebatePct: Prisma.Decimal | null
+  customerRebateAmount: Prisma.Decimal | null
 }
 
 function money(value: Prisma.Decimal) {
@@ -95,6 +99,8 @@ export async function getPaymentPricingSettings(
     bnaInstallmentsEnabled: settings.bnaInstallmentsEnabled,
     bnaMarkupRatePct: settings.bnaMarkupRatePct,
     bnaDefaultInstallments: settings.bnaDefaultInstallments,
+    bnaCustomerRebatePct: settings.bnaCustomerRebatePct,
+    bnaCustomerRebateCapArs: settings.bnaCustomerRebateCapArs,
   }
 }
 
@@ -121,6 +127,19 @@ function surchargePctFor(method: PaymentMethod, settings: PaymentPricingSettings
     return settings.bnaMarkupRatePct
   }
   return new Prisma.Decimal(0)
+}
+
+function customerRebateFor(method: PaymentMethod, amount: Prisma.Decimal, settings: PaymentPricingSettings) {
+  if (method !== "BNA_CUOTAS" || settings.bnaCustomerRebatePct.lessThanOrEqualTo(0)) {
+    return { pct: null, amount: null }
+  }
+
+  const calculated = amount.mul(settings.bnaCustomerRebatePct).div(100)
+  const capped = Prisma.Decimal.min(calculated, settings.bnaCustomerRebateCapArs)
+  return {
+    pct: settings.bnaCustomerRebatePct,
+    amount: money(capped),
+  }
 }
 
 export function priceNativePayment(params: {
@@ -163,6 +182,8 @@ export function priceNativePayment(params: {
     installmentAmount = money(params.amount.div(installments))
   }
 
+  const customerRebate = customerRebateFor(params.method, params.amount, params.settings)
+
   return {
     method: params.method,
     currency: params.currency,
@@ -174,6 +195,8 @@ export function priceNativePayment(params: {
     surchargeAmount: money(surchargeAmount),
     installments,
     installmentAmount,
+    customerRebatePct: customerRebate.pct,
+    customerRebateAmount: customerRebate.amount,
   }
 }
 
@@ -228,5 +251,7 @@ export function serializePricingResult(result: PaymentPricingResult) {
     surchargeAmount: result.surchargeAmount.toFixed(2),
     installments: result.installments,
     installmentAmount: result.installmentAmount?.toFixed(2) ?? null,
+    customerRebatePct: result.customerRebatePct?.toFixed(2) ?? null,
+    customerRebateAmount: result.customerRebateAmount?.toFixed(2) ?? null,
   }
 }
