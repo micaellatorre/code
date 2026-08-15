@@ -1,0 +1,124 @@
+name: Apply payment pricing UI patch
+
+on:
+  push:
+    branches:
+      - feature/payment-pricing-cotizador
+    paths:
+      - .github/workflows/apply-payment-pricing-ui-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/payment-pricing-cotizador
+          fetch-depth: 0
+      - name: Patch settings and navigation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path_name, old, new):
+              path = Path(path_name)
+              text = path.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f"Expected fragment not found in {path_name}:\n{old}")
+              path.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "src/components/config/SettingsTab.tsx",
+              '        financialFeeEnabled: form.financialFeeEnabled,\n        financialFeeRatePct: Number(form.financialFeeRatePct),\n        usedDeviceWarrantyDays: form.usedDeviceWarrantyDays,',
+              '        financialFeeEnabled: form.financialFeeEnabled,\n        financialFeeRatePct: Number(form.financialFeeRatePct),\n        bnaInstallmentsEnabled: form.bnaInstallmentsEnabled,\n        bnaMarkupRatePct: Number(form.bnaMarkupRatePct),\n        bnaDefaultInstallments: form.bnaDefaultInstallments,\n        bnaCustomerRebatePct: Number(form.bnaCustomerRebatePct),\n        bnaCustomerRebateCapArs: Number(form.bnaCustomerRebateCapArs),\n        usedDeviceWarrantyDays: form.usedDeviceWarrantyDays,',
+          )
+
+          replace_once(
+              "src/components/config/SettingsTab.tsx",
+              '''            <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+              <label className="flex items-center justify-between gap-3 rounded-lg border border-base-300 p-3">
+                <span>Comision financiera</span>
+                <input type="checkbox" className="toggle toggle-primary" checked={form.financialFeeEnabled} onChange={(event) => setField("financialFeeEnabled", event.target.checked)} />
+              </label>
+              <label className="form-control">
+                <span className="label-text">%</span>
+                <input type="number" min={0} max={100} step="0.01" className="input input-bordered" value={form.financialFeeRatePct} onChange={(event) => setField("financialFeeRatePct", event.target.value)} />
+              </label>
+            </div>''',
+              '''            <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+              <label className="flex items-center justify-between gap-3 rounded-lg border border-base-300 p-3">
+                <span>Recargo transferencia ARS</span>
+                <input type="checkbox" className="toggle toggle-primary" checked={form.financialFeeEnabled} onChange={(event) => setField("financialFeeEnabled", event.target.checked)} />
+              </label>
+              <label className="form-control">
+                <span className="label-text">%</span>
+                <input type="number" min={0} max={100} step="0.01" className="input input-bordered" value={form.financialFeeRatePct} onChange={(event) => setField("financialFeeRatePct", event.target.value)} />
+              </label>
+            </div>
+            <div className="rounded-lg border border-base-300 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-medium">Cuotas BNA</span>
+                  <p className="text-xs text-base-content/50">Recargo comercial sobre Blue venta. De 1 a 12 cuotas.</p>
+                </div>
+                <input type="checkbox" className="toggle toggle-primary" checked={form.bnaInstallmentsEnabled} onChange={(event) => setField("bnaInstallmentsEnabled", event.target.checked)} />
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="form-control">
+                  <span className="label-text">Recargo GP %</span>
+                  <input type="number" min={0} max={100} step="0.01" className="input input-bordered" value={form.bnaMarkupRatePct} onChange={(event) => setField("bnaMarkupRatePct", event.target.value)} />
+                </label>
+                <label className="form-control">
+                  <span className="label-text">Cuotas por defecto</span>
+                  <input type="number" min={1} max={12} step="1" className="input input-bordered" value={form.bnaDefaultInstallments} onChange={(event) => setField("bnaDefaultInstallments", Number(event.target.value))} />
+                </label>
+                <label className="form-control">
+                  <span className="label-text">Reintegro cliente %</span>
+                  <input type="number" min={0} max={100} step="0.01" className="input input-bordered" value={form.bnaCustomerRebatePct} onChange={(event) => setField("bnaCustomerRebatePct", event.target.value)} />
+                </label>
+                <label className="form-control">
+                  <span className="label-text">Tope reintegro ARS</span>
+                  <input type="number" min={0} step="1" className="input input-bordered" value={form.bnaCustomerRebateCapArs} onChange={(event) => setField("bnaCustomerRebateCapArs", event.target.value)} />
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-base-content/50">El reintegro es informativo: pertenece al cliente y no reduce el cobro ni Caja.</p>
+            </div>''',
+          )
+
+          replace_once(
+              "src/lib/navigation/dashboard-navigation.ts",
+              '  CalendarIcon,\n  CircleStackIcon,',
+              '  CalendarIcon,\n  CalculatorIcon,\n  CircleStackIcon,',
+          )
+
+          replace_once(
+              "src/lib/navigation/dashboard-navigation.ts",
+              '''      {
+        key: "appointments",
+        label: "Citas",''',
+              '''      {
+        key: "quote",
+        label: "Cotizador",
+        href: "/dashboard/sales/quote",
+        icon: CalculatorIcon,
+        allowedRoles: ["ADMIN", "VENDEDOR"],
+      },
+      {
+        key: "appointments",
+        label: "Citas",''',
+          )
+
+      - name: Commit patch
+        run: |
+          git rm .github/workflows/apply-payment-pricing-ui-patch.yml
+          git diff --check
+          git config user.name "tech-stock-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/components/config/SettingsTab.tsx src/lib/navigation/dashboard-navigation.ts
+          git commit -m "feat: expose payment pricing settings and quote navigation"
+          git push origin HEAD:feature/payment-pricing-cotizador
