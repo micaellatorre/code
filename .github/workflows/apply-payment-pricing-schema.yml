@@ -1,0 +1,66 @@
+name: Apply payment pricing schema patch
+
+on:
+  push:
+    branches:
+      - feature/payment-pricing-cotizador
+    paths:
+      - .github/workflows/apply-payment-pricing-schema.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/payment-pricing-cotizador
+          fetch-depth: 0
+
+      - name: Patch Prisma schema
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("prisma/schema.prisma")
+          text = path.read_text()
+
+          replacements = [
+              (
+                  '  financialFeeEnabled Boolean @default(false)\n  financialFeeRatePct Decimal @default(0) @db.Decimal(5, 2)\n',
+                  '  financialFeeEnabled Boolean @default(false)\n  financialFeeRatePct Decimal @default(0) @db.Decimal(5, 2)\n\n  bnaInstallmentsEnabled Boolean @default(false)\n  bnaMarkupRatePct Decimal @default(40) @db.Decimal(5, 2)\n  bnaDefaultInstallments Int @default(12)\n  bnaCustomerRebatePct Decimal @default(10) @db.Decimal(5, 2)\n  bnaCustomerRebateCapArs Decimal @default(30000) @db.Decimal(12, 2)\n',
+              ),
+              (
+                  '  origin       String? // "Local", "Conocido", "Instagram", etc.\n  notes        String?\n',
+                  '  origin       String? // "Local", "Conocido", "Instagram", etc.\n  notes        String?\n\n  exchangeRate       Decimal? @db.Decimal(12, 4)\n  exchangeRateSource String?\n  exchangeRateAt     DateTime?\n',
+              ),
+              (
+                  '  exchangeRate               Decimal?            @db.Decimal(12, 4)\n  amountUsd                  Decimal?            @db.Decimal(12, 2)\n',
+                  '  exchangeRate               Decimal?            @db.Decimal(12, 4)\n  amountUsd                  Decimal?            @db.Decimal(12, 2)\n  coveredBaseUsd             Decimal?            @db.Decimal(14, 6)\n  surchargePct               Decimal?            @db.Decimal(5, 2)\n  surchargeAmount            Decimal?            @db.Decimal(12, 2)\n  installments               Int?\n  installmentAmount          Decimal?            @db.Decimal(12, 2)\n  pricingSnapshot            Json?\n',
+              ),
+              (
+                  '  TARJETA\n  USDT\n',
+                  '  TARJETA\n  BNA_CUOTAS\n  USDT\n',
+              ),
+          ]
+
+          for old, new in replacements:
+              if new in text:
+                  continue
+              if old not in text:
+                  raise SystemExit(f"Expected schema fragment not found:\n{old}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+
+      - name: Remove one-shot workflow and commit
+        run: |
+          git rm .github/workflows/apply-payment-pricing-schema.yml
+          git diff --check
+          git config user.name "tech-stock-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add prisma/schema.prisma
+          git commit -m "feat: extend Prisma schema for payment pricing"
+          git push origin HEAD:feature/payment-pricing-cotizador
