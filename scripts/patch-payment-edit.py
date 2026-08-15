@@ -196,15 +196,7 @@ replace(
     '''      saleData.amountPaid = amountPaid
       saleData.balanceDue = balanceDue''',
     '''      saleData.amountPaid = amountPaid.toDecimalPlaces(2)
-      saleData.balanceDue = balanceDue
-      if (Array.isArray(body.payments)) {
-        const firstArsPayment = paymentsData.find((payment) => payment.currency === "ARS" && payment.exchangeRate)
-        if (firstArsPayment?.exchangeRate) {
-          saleData.exchangeRate = firstArsPayment.exchangeRate
-          saleData.exchangeRateSource = "DOLAR_BLUE_VENTA"
-          saleData.exchangeRateAt = currentRateSnapshot?.fetchedAt ?? sale.exchangeRateAt ?? new Date()
-        }
-      }''',
+      saleData.balanceDue = balanceDue''',
 )
 replace(
     '''          amountUsd: p.amountUsd != null ? String(p.amountUsd) : null,
