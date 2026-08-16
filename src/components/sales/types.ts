@@ -167,6 +167,8 @@ export type PaymentDraft = {
   surchargeAmount?: string
   installments?: number
   installmentAmount?: string
+  customerRebatePct?: string
+  customerRebateAmount?: string
   cashAccountId?: string
   _id: string
 }

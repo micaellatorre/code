@@ -7,7 +7,7 @@ import { requireRoleApi } from "@/lib/auth/auth"
 import { createAuditLog } from "@/lib/domain/audit"
 import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
 import { isMonetaryPaymentMethod, postSalePaymentToCash, reverseSourceCashMovement } from "@/lib/domain/cash"
-import { getBlueSellRateSnapshot, getPaymentPricingSettings, priceNativePayment } from "@/lib/domain/payment-pricing"
+import { buildPaymentPricingSnapshot, getBlueSellRateSnapshot, getPaymentPricingSettings, priceNativePayment } from "@/lib/domain/payment-pricing"
 import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue"
 import { productCatalogDisplayInclude } from "@/lib/products/selects"
 
@@ -92,6 +92,10 @@ function decimalEquals(left: unknown, right: unknown) {
   if (left == null && right == null) return true
   if (left == null || right == null) return false
   return decimal(left).equals(decimal(right))
+}
+
+function jsonInput(value: Prisma.JsonValue | Prisma.InputJsonValue | null | undefined) {
+  return value == null ? Prisma.JsonNull : value as Prisma.InputJsonValue
 }
 
 function dateEquals(left: Date | null | undefined, right: Date | null | undefined) {
@@ -247,7 +251,10 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.findFirst({ where: { id, tenantId }, include: { items: { include: { product: true } } } })
+      const sale = await tx.sale.findFirst({
+        where: { id, tenantId },
+        include: { items: { include: { product: true } }, payments: true },
+      })
       if (!sale) throw new Error("Venta no encontrada")
       if (sale.status === "CANCELADA") return
 
@@ -270,6 +277,18 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
         for (const item of sale.items) {
           await tx.product.update({ where: { id: item.productId }, data: { senado: false, senadoAt: null } })
         }
+      }
+
+      for (const payment of sale.payments) {
+        await reverseSourceCashMovement({
+          tx,
+          tenantId: sale.tenantId,
+          actorUserId: auth.session.user.id,
+          actorRole: auth.session.user.activeRole as UserRole,
+          sourceType: "SALE_PAYMENT",
+          sourceId: payment.id,
+          reason: `Venta ${sale.id} cancelada`,
+        })
       }
 
       await tx.sale.update({ where: { id }, data: { status: "CANCELADA" } })
@@ -327,11 +346,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   try {
     const incomingPaymentsForPricing = Array.isArray(body.payments) ? body.payments as PaymentInput[] : null
     const paymentPricingSettings = incomingPaymentsForPricing ? await getPaymentPricingSettings(tenantId) : null
-    const needsCurrentArsRate = incomingPaymentsForPricing?.some((payment) => {
-      if (String(payment.currency) !== "ARS") return false
-      const hasPersistedRate = payment.exchangeRate != null && decimal(payment.exchangeRate).greaterThan(0)
-      return !hasPersistedRate
-    }) ?? false
+    const needsCurrentArsRate = incomingPaymentsForPricing?.some((payment) => String(payment.currency) === "ARS") ?? false
     const currentRateSnapshot = needsCurrentArsRate ? await getBlueSellRateSnapshot() : null
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -365,6 +380,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       const targetStatus = requestedStatus ?? sale.status
 
       const saleData: Prisma.SaleUpdateInput = {}
+      let nextBranchId = sale.branchId
 
       if (Object.prototype.hasOwnProperty.call(body, "date")) {
         if (body.date == null || String(body.date).trim() === "") {
@@ -434,10 +450,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         const branchId = body.branchId == null || String(body.branchId).trim() === "" ? null : String(body.branchId)
         if (!branchId) {
           saleData.branch = { disconnect: true }
+          nextBranchId = null
         } else {
           const branch = await tx.branch.findFirst({ where: { id: branchId, tenantId: sale.tenantId, isActive: true }, select: { id: true } })
           if (!branch) throw new Error("Sucursal no disponible")
           saleData.branch = { connect: { id: branch.id } }
+          nextBranchId = branch.id
         }
       }
 
@@ -869,16 +887,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
               surchargeAmount: existing.surchargeAmount,
               installments: existing.installments,
               installmentAmount: existing.installmentAmount,
-              pricingSnapshot: existing.pricingSnapshot,
+              pricingSnapshot: jsonInput(existing.pricingSnapshot),
               cashAccountId: isMonetaryPaymentMethod(method) ? payment.cashAccountId || null : null,
               note: payment.note == null || String(payment.note).trim() === "" ? null : String(payment.note),
               paidAt: payment.paidAt ? new Date(payment.paidAt) : existing.paidAt,
             }
           }
 
-          const rate = currency === "ARS"
-            ? (submittedRate?.greaterThan(0) ? submittedRate : currentRateSnapshot?.rate ?? null)
-            : null
+          const rate = currency === "ARS" ? currentRateSnapshot?.rate ?? null : null
           const pricing = priceNativePayment({
             method,
             currency,
@@ -896,19 +912,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             amount: pricing.amount,
             exchangeRate: pricing.exchangeRate,
             amountUsd: pricing.amountUsd,
-            coveredBaseUsd: pricing.coveredUsd,
+            coveredBaseUsd: pricing.coveredBaseUsd,
             surchargePct: pricing.surchargePct,
             surchargeAmount: pricing.surchargeAmount,
             installments: pricing.installments,
             installmentAmount: pricing.installmentAmount,
-            pricingSnapshot: {
-              exchangeRateSource: pricing.exchangeRate ? "DOLAR_BLUE_VENTA" : null,
-              exchangeRate: pricing.exchangeRate?.toFixed(4) ?? null,
-              surchargePct: pricing.surchargePct.toFixed(2),
-              installments: pricing.installments,
-              customerRebatePct: pricing.customerRebatePct?.toFixed(2) ?? null,
-              customerRebateAmount: pricing.customerRebateAmount?.toFixed(2) ?? null,
-            },
+            pricingSnapshot: buildPaymentPricingSnapshot(pricing, currentRateSnapshot),
             cashAccountId: isMonetaryPaymentMethod(method) ? payment.cashAccountId || null : null,
             note: payment.note == null || String(payment.note).trim() === "" ? null : String(payment.note),
             paidAt: payment.paidAt ? new Date(payment.paidAt) : new Date(),
@@ -955,16 +964,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             existing.cashAccountId !== persisted.cashAccountId ||
             !dateEquals(existing.paidAt, persisted.paidAt)
 
-          if (!changedFinancially || isMonetaryPaymentMethod(persisted.method)) {
+          if (targetStatus !== "CANCELADA" && isMonetaryPaymentMethod(persisted.method)) {
             await postSalePaymentToCash({
               tx,
               tenantId: sale.tenantId,
               actorUserId: auth.session.user.id,
               actorRole: auth.session.user.activeRole as UserRole,
-              sale: { id: sale.id, branchId: sale.branchId },
+              sale: { id: sale.id, branchId: nextBranchId },
               payment: persisted,
             })
-          } else if (existing) {
+          } else if (existing && (targetStatus === "CANCELADA" || changedFinancially)) {
             await reverseSourceCashMovement({
               tx,
               tenantId: sale.tenantId,
@@ -972,7 +981,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
               actorRole: auth.session.user.activeRole as UserRole,
               sourceType: "SALE_PAYMENT",
               sourceId: existing.id,
-              reason: `Pago de venta ${existing.id} convertido a metodo no monetario`,
+              reason: targetStatus === "CANCELADA"
+                ? `Venta ${sale.id} cancelada`
+                : `Pago de venta ${existing.id} convertido a metodo no monetario`,
             })
           }
         }
@@ -989,6 +1000,20 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             reason: `Pago de venta ${existing.id} eliminado`,
           })
           await tx.payment.delete({ where: { id: existing.id } })
+        }
+      }
+
+      if (targetStatus === "CANCELADA" && sale.status !== "CANCELADA") {
+        for (const payment of sale.payments) {
+          await reverseSourceCashMovement({
+            tx,
+            tenantId: sale.tenantId,
+            actorUserId: auth.session.user.id,
+            actorRole: auth.session.user.activeRole as UserRole,
+            sourceType: "SALE_PAYMENT",
+            sourceId: payment.id,
+            reason: `Venta ${sale.id} cancelada`,
+          })
         }
       }
 
@@ -1019,6 +1044,24 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         data: saleData,
         include: saleInclude(),
       })
+
+      const shouldSyncExistingPaymentMovements =
+        targetStatus !== "CANCELADA" &&
+        !Array.isArray(body.payments) &&
+        (sale.branchId !== updatedSale.branchId || sale.status === "CANCELADA")
+
+      if (shouldSyncExistingPaymentMovements) {
+        for (const payment of updatedSale.payments) {
+          await postSalePaymentToCash({
+            tx,
+            tenantId: sale.tenantId,
+            actorUserId: auth.session.user.id,
+            actorRole: auth.session.user.activeRole as UserRole,
+            sale: { id: updatedSale.id, branchId: updatedSale.branchId },
+            payment,
+          })
+        }
+      }
 
       if (Object.prototype.hasOwnProperty.call(body, "branchId") && sale.branchId !== updatedSale.branchId) {
         await createAuditLog({

@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReceiptPreview, SaleItemSummary, SerializedSale } from "./types"
+import type { ReceiptPreview, SaleItemSummary, SalePaymentSummary, SerializedSale } from "./types"
 import { formatSaleDate, formatUsd, getSaleBuyerName, getSaleOrigin, toNumber } from "./salesUtils"
 import { getProductDisplayModel } from "@/lib/products/display"
 
@@ -78,6 +78,58 @@ function getSaleTime(date: string | null) {
   return formatSaleDate(date, "HH:mm")
 }
 
+function formatNativeAmount(value: string | number | null | undefined, currency: string | null | undefined) {
+  const amount = toSafeNumber(value)
+  if (currency === "ARS") return `$ ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(amount)}`
+  if (currency === "USDT") return `USDT ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(amount)}`
+  return `USD ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(amount)}`
+}
+
+function formatArs(value: string | number | null | undefined) {
+  return `$ ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(toSafeNumber(value))}`
+}
+
+function formatUsdDetailed(value: string | number | null | undefined) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(toSafeNumber(value))
+}
+
+function paymentMethodLabel(method: string | null | undefined) {
+  const labels: Record<string, string> = {
+    EFECTIVO_PESOS: "Efectivo ARS",
+    EFECTIVO_USD: "Efectivo USD",
+    TRANSFERENCIA_ARS: "Transferencia ARS",
+    TRANSFERENCIA_USD: "Transferencia USD",
+    BNA_CUOTAS: "BNA",
+    USDT: "USDT",
+    TARJETA: "Tarjeta",
+    PLAN_CANJE: "Plan Canje",
+  }
+  return labels[String(method ?? "")] ?? String(method ?? "Pago")
+}
+
+function snapshotValue(payment: SalePaymentSummary, key: string) {
+  const snapshot = payment.pricingSnapshot
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return null
+  const value = (snapshot as Record<string, unknown>)[key]
+  return value == null ? null : String(value)
+}
+
+function paymentDetails(payment: SalePaymentSummary) {
+  const rebateAmount = snapshotValue(payment, "customerRebateAmount")
+  return [
+    payment.exchangeRate ? `TC $ ${toSafeNumber(payment.exchangeRate).toLocaleString("es-AR", { maximumFractionDigits: 4 })}` : null,
+    payment.installments && payment.installmentAmount
+      ? `BNA · ${payment.installments} cuotas de ${formatArs(payment.installmentAmount)}`
+      : null,
+    rebateAmount ? `Reintegro informativo cliente: ${formatArs(rebateAmount)}` : null,
+  ].filter(Boolean).join(" · ")
+}
+
 type ReceiptBranding = NonNullable<ReceiptPreview["branding"]>
 
 function getBrandName(branding?: ReceiptBranding) {
@@ -151,6 +203,18 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"], 
         </tr>
       `
     })
+    .join("")
+  const paymentRows = currentSale.payments
+    .map((payment) => `
+      <tr>
+        <td>
+          ${escapeHtml(paymentMethodLabel(payment.method))}
+          ${paymentDetails(payment) ? `<div class="payment-detail">${escapeHtml(paymentDetails(payment))}</div>` : ""}
+        </td>
+        <td class="number">${escapeHtml(formatNativeAmount(payment.amount, payment.currency))}</td>
+        <td class="number">${escapeHtml(formatUsdDetailed(payment.coveredBaseUsd ?? payment.amountUsd ?? payment.amount))}</td>
+      </tr>
+    `)
     .join("")
 
   const html = `
@@ -394,6 +458,30 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"], 
             white-space: nowrap;
           }
 
+          .payments {
+            margin-top: 7mm;
+            padding-top: 4mm;
+            border-top: 1px dashed #d1d5db;
+          }
+
+          .payments-title {
+            margin-bottom: 2mm;
+            color: #8b9199;
+            font-size: 10px;
+            text-transform: uppercase;
+          }
+
+          .payments table td {
+            padding: 1.7mm 2mm;
+            border-top: 1px solid #edf0f3;
+          }
+
+          .payment-detail {
+            margin-top: 0.7mm;
+            color: #6b7280;
+            font-size: 8px;
+          }
+
           .footer {
             margin-top: auto;
             padding-top: 16mm;
@@ -507,9 +595,18 @@ function printReceipt(sale: SerializedSale, receipt: ReceiptPreview["receipt"], 
             <div class="totals">
               <div class="total-label">Total</div>
               <div class="total-value">
-                ${escapeHtml(formatUsd(currentSale.total))}
+                ${escapeHtml(formatUsdDetailed(currentSale.total))}
               </div>
             </div>
+
+            ${paymentRows ? `
+              <div class="payments">
+                <div class="payments-title">Medios de pago</div>
+                <table aria-label="Medios de pago">
+                  <tbody>${paymentRows}</tbody>
+                </table>
+              </div>
+            ` : ""}
           </section>
 
           <footer class="footer">
@@ -634,8 +731,30 @@ export default function ReceiptModal({ preview, onClose }: ReceiptModalProps) {
 
             <div className="mt-5 grid grid-cols-[minmax(0,1fr)_160px] items-center gap-4 border-t border-dashed border-base-300 pt-4">
               <div className="text-right text-xs uppercase text-base-content/50">Total</div>
-              <div className="text-right text-lg font-bold">{formatUsd(sale.total)}</div>
+              <div className="text-right text-lg font-bold">{formatUsdDetailed(sale.total)}</div>
             </div>
+
+            {sale.payments.length ? (
+              <div className="mt-5 border-t border-dashed border-base-300 pt-4">
+                <div className="mb-2 text-xs uppercase text-base-content/50">Medios de pago</div>
+                <div className="overflow-x-auto">
+                  <table className="table table-xs w-full">
+                    <tbody>
+                      {sale.payments.map((payment) => (
+                        <tr key={payment.id ?? `${payment.method}-${payment.amount}`}>
+                          <td>
+                            <div className="font-medium">{paymentMethodLabel(payment.method)}</div>
+                            {paymentDetails(payment) ? <div className="text-[11px] text-base-content/60">{paymentDetails(payment)}</div> : null}
+                          </td>
+                          <td className="text-right">{formatNativeAmount(payment.amount, payment.currency)}</td>
+                          <td className="text-right">{formatUsdDetailed(payment.coveredBaseUsd ?? payment.amountUsd ?? payment.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <footer className="pt-8 text-center text-xs text-base-content/50">

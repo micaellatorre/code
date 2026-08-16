@@ -23,6 +23,8 @@ type PricingLine = {
   surchargeAmount: string
   installments: number | null
   installmentAmount: string | null
+  customerRebatePct: string | null
+  customerRebateAmount: string | null
 }
 
 type QuotePayload = {
@@ -34,6 +36,8 @@ type QuotePayload = {
     bnaInstallmentsEnabled: boolean
     bnaMarkupRatePct: string
     bnaDefaultInstallments: number
+    bnaCustomerRebatePct: string
+    bnaCustomerRebateCapArs: string
   }
   quickQuotes: PricingLine[]
   payments: PricingLine[]
@@ -58,6 +62,10 @@ function formatNative(line: PricingLine) {
 
 function labelFor(method: QuoteMethod) {
   return methodOptions.find((option) => option.value === method)?.label ?? method
+}
+
+function formatArs(value: string | number | null | undefined) {
+  return `$ ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(Number(value ?? 0))}`
 }
 
 function paymentId() {
@@ -173,11 +181,14 @@ export default function SalesQuoteCalculator() {
             <article key={line.method} className="rounded-xl border border-base-300 bg-base-100 p-4">
               <p className="text-sm font-medium text-base-content/70">{labelFor(line.method)}</p>
               <p className="mt-2 text-xl font-bold">{formatNative(line)}</p>
-              {Number(line.surchargePct) > 0 ? (
-                <p className="mt-1 text-xs text-base-content/50">Recargo aplicado: {line.surchargePct}%</p>
+              {line.method === "TRANSFERENCIA_ARS" && Number(line.surchargePct) > 0 ? (
+                <p className="mt-1 text-xs text-base-content/50">Incluye recargo por transferencia.</p>
               ) : null}
               {line.installments && line.installmentAmount ? (
-                <p className="mt-2 text-sm font-semibold">{line.installments} x $ {Number(line.installmentAmount).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</p>
+                <p className="mt-2 text-sm font-semibold">BNA · {line.installments} cuotas de {formatArs(line.installmentAmount)}</p>
+              ) : null}
+              {line.customerRebateAmount ? (
+                <p className="mt-1 text-xs text-base-content/60">Reintegro estimado cliente: {formatArs(line.customerRebateAmount)}</p>
               ) : null}
             </article>
           ))}
@@ -242,7 +253,8 @@ export default function SalesQuoteCalculator() {
                   <div className="lg:col-span-5 flex flex-wrap gap-x-5 gap-y-1 rounded-md bg-base-200/60 px-3 py-2 text-sm">
                     <span>Cobra: <strong>{formatNative(result)}</strong></span>
                     <span>Cubre: <strong>USD {Number(result.coveredUsd).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</strong></span>
-                    {result.installments && result.installmentAmount ? <span>Cuota: <strong>$ {Number(result.installmentAmount).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</strong></span> : null}
+                    {result.installments && result.installmentAmount ? <span>BNA: <strong>{result.installments} cuotas de {formatArs(result.installmentAmount)}</strong></span> : null}
+                    {result.customerRebateAmount ? <span>Reintegro cliente: <strong>{formatArs(result.customerRebateAmount)}</strong></span> : null}
                   </div>
                 ) : null}
               </div>

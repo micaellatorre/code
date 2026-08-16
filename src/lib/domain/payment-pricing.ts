@@ -6,9 +6,13 @@ import { normalizeAmountUsd } from "@/lib/domain/money"
 
 type Tx = Prisma.TransactionClient
 
+export type ExchangeRateSource =
+  | "DOLARHOY_BLUE_VENTA"
+  | "LEGACY_DOLAR_PROVIDER_BLUE_VENTA"
+
 export type ExchangeRateSnapshot = {
   rate: Prisma.Decimal
-  source: "DOLAR_BLUE_VENTA"
+  source: ExchangeRateSource
   fetchedAt: Date
 }
 
@@ -26,7 +30,7 @@ export type PaymentPricingResult = {
   method: PaymentMethod
   currency: Currency
   amount: Prisma.Decimal
-  coveredUsd: Prisma.Decimal
+  coveredBaseUsd: Prisma.Decimal
   amountUsd: Prisma.Decimal | null
   exchangeRate: Prisma.Decimal | null
   surchargePct: Prisma.Decimal
@@ -63,7 +67,7 @@ function assertInstallments(value: number | null | undefined, fallback: number) 
   return installments
 }
 
-function expectedCurrency(method: PaymentMethod): Currency | null {
+export function expectedCurrency(method: PaymentMethod): Currency | null {
   switch (method) {
     case "EFECTIVO_PESOS":
     case "TRANSFERENCIA_ARS":
@@ -104,7 +108,51 @@ export async function getPaymentPricingSettings(
   }
 }
 
+function parseLocalizedNumber(value: string) {
+  const normalized = value
+    .replace(/\s+/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+async function getDolarHoyBlueSellRateSnapshot(): Promise<ExchangeRateSnapshot> {
+  const fetchedAt = new Date()
+  const response = await fetch("https://dolarhoy.com/cotizacion-dolar-blue", {
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "User-Agent": "TECH-STOCK payment-pricing/1.0",
+    },
+    next: { revalidate: 60 },
+  })
+
+  if (!response.ok) {
+    throw new Error(`DolarHoy respondio ${response.status}`)
+  }
+
+  const html = await response.text()
+  const compact = html.replace(/\s+/g, " ")
+  const match = compact.match(/<div class="topic">Venta<\/div>\s*<div class="value">\$\s*([0-9.,]+)<\/div>/i)
+  const sale = match ? parseLocalizedNumber(match[1]) : null
+  if (sale == null || sale <= 0) {
+    throw new Error("No se pudo leer DolarHoy Blue Venta.")
+  }
+
+  return {
+    rate: new Prisma.Decimal(String(sale)),
+    source: "DOLARHOY_BLUE_VENTA",
+    fetchedAt,
+  }
+}
+
 export async function getBlueSellRateSnapshot(): Promise<ExchangeRateSnapshot> {
+  try {
+    return await getDolarHoyBlueSellRateSnapshot()
+  } catch (error) {
+    console.warn("[payment-pricing] DolarHoy no disponible, usando proveedor legado:", error)
+  }
+
   const response = await fetchDolarUpstream({ revalidateSeconds: 60, useStaleOnError: true })
   const blue = response.panel.find((item) => item.titulo.toLocaleLowerCase("es-AR").includes("blue"))
   const sale = blue?.venta
@@ -113,7 +161,7 @@ export async function getBlueSellRateSnapshot(): Promise<ExchangeRateSnapshot> {
   }
   return {
     rate: new Prisma.Decimal(String(sale)),
-    source: "DOLAR_BLUE_VENTA",
+    source: "LEGACY_DOLAR_PROVIDER_BLUE_VENTA",
     fetchedAt: new Date(),
   }
 }
@@ -151,7 +199,8 @@ export function priceNativePayment(params: {
   installments?: number | null
 }): PaymentPricingResult {
   validatePaymentCurrency(params.method, params.currency)
-  assertPositive(params.amount, "El importe")
+  const amount = money(params.amount)
+  assertPositive(amount, "El importe")
 
   const surchargePct = surchargePctFor(params.method, params.settings)
   const isArs = params.currency === "ARS"
@@ -168,28 +217,29 @@ export function priceNativePayment(params: {
 
   if (params.method === "TRANSFERENCIA_ARS" || params.method === "BNA_CUOTAS") {
     const multiplier = rateMultiplier(surchargePct)
-    coveredUsd = params.amount.div((exchangeRate as Prisma.Decimal).mul(multiplier))
+    coveredUsd = amount.div((exchangeRate as Prisma.Decimal).mul(multiplier))
     const baseArs = coveredUsd.mul(exchangeRate as Prisma.Decimal)
-    surchargeAmount = params.amount.sub(baseArs)
+    surchargeAmount = amount.sub(baseArs)
   } else if (isArs) {
-    coveredUsd = params.amount.div(exchangeRate as Prisma.Decimal)
+    coveredUsd = amount.div(exchangeRate as Prisma.Decimal)
   } else {
-    coveredUsd = params.amount
+    coveredUsd = amount
   }
 
   if (params.method === "BNA_CUOTAS") {
     installments = assertInstallments(params.installments, params.settings.bnaDefaultInstallments)
-    installmentAmount = money(params.amount.div(installments))
+    installmentAmount = money(amount.div(installments))
   }
 
-  const customerRebate = customerRebateFor(params.method, params.amount, params.settings)
+  const customerRebate = customerRebateFor(params.method, amount, params.settings)
+  const amountUsd = normalizeAmountUsd(amount, params.currency, exchangeRate)
 
   return {
     method: params.method,
     currency: params.currency,
-    amount: money(params.amount),
-    coveredUsd: usd(coveredUsd),
-    amountUsd: normalizeAmountUsd(params.amount, params.currency, exchangeRate),
+    amount,
+    coveredBaseUsd: usd(coveredUsd),
+    amountUsd: amountUsd ? money(amountUsd) : null,
     exchangeRate,
     surchargePct,
     surchargeAmount: money(surchargeAmount),
@@ -239,12 +289,37 @@ export function quoteFromCoveredUsd(params: {
   })
 }
 
+export function buildPaymentPricingSnapshot(
+  result: PaymentPricingResult,
+  exchangeRateSnapshot?: ExchangeRateSnapshot | null,
+): Prisma.InputJsonObject {
+  return {
+    version: 1,
+    method: result.method,
+    currency: result.currency,
+    amount: result.amount.toFixed(2),
+    coveredBaseUsd: result.coveredBaseUsd.toFixed(6),
+    amountUsd: result.amountUsd?.toFixed(2) ?? null,
+    exchangeRateSource: result.exchangeRate ? exchangeRateSnapshot?.source ?? null : null,
+    exchangeRate: result.exchangeRate?.toFixed(4) ?? null,
+    exchangeRateFetchedAt: result.exchangeRate ? exchangeRateSnapshot?.fetchedAt.toISOString() ?? null : null,
+    surchargePct: result.surchargePct.toFixed(2),
+    surchargeAmount: result.surchargeAmount.toFixed(2),
+    installments: result.installments,
+    installmentAmount: result.installmentAmount?.toFixed(2) ?? null,
+    customerRebatePct: result.customerRebatePct?.toFixed(2) ?? null,
+    customerRebateAmount: result.customerRebateAmount?.toFixed(2) ?? null,
+  }
+}
+
 export function serializePricingResult(result: PaymentPricingResult) {
+  const coveredBaseUsd = result.coveredBaseUsd.toFixed(6)
   return {
     method: result.method,
     currency: result.currency,
     amount: result.amount.toFixed(2),
-    coveredUsd: result.coveredUsd.toFixed(6),
+    coveredBaseUsd,
+    coveredUsd: coveredBaseUsd,
     amountUsd: result.amountUsd?.toFixed(2) ?? null,
     exchangeRate: result.exchangeRate?.toFixed(4) ?? null,
     surchargePct: result.surchargePct.toFixed(2),

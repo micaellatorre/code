@@ -6,6 +6,7 @@ import { resolveSessionTenantId } from "@/lib/tenant"
 import {
   getBlueSellRateSnapshot,
   getPaymentPricingSettings,
+  expectedCurrency,
   priceNativePayment,
   quoteFromCoveredUsd,
   serializePricingResult,
@@ -40,9 +41,9 @@ function decimal(value: string | number) {
 }
 
 function currencyForMethod(method: PaymentMethod) {
-  if (method === "EFECTIVO_PESOS" || method === "TRANSFERENCIA_ARS" || method === "BNA_CUOTAS") return "ARS" as const
-  if (method === "USDT") return "USDT" as const
-  return "USD" as const
+  const currency = expectedCurrency(method)
+  if (!currency) throw new Error("Medio de pago no soportado.")
+  return currency
 }
 
 export async function POST(request: Request) {
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
             installments: input.installments,
           })
 
-      coveredUsd = coveredUsd.add(result.coveredUsd)
+      coveredUsd = coveredUsd.add(result.coveredBaseUsd)
       payments.push(serializePricingResult(result))
     }
 
@@ -122,6 +123,8 @@ export async function POST(request: Request) {
         bnaInstallmentsEnabled: settings.bnaInstallmentsEnabled,
         bnaMarkupRatePct: settings.bnaMarkupRatePct.toFixed(2),
         bnaDefaultInstallments: settings.bnaDefaultInstallments,
+        bnaCustomerRebatePct: settings.bnaCustomerRebatePct.toFixed(2),
+        bnaCustomerRebateCapArs: settings.bnaCustomerRebateCapArs.toFixed(2),
       },
       quickQuotes,
       payments,

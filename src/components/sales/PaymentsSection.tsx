@@ -49,6 +49,8 @@ type QuoteLine = {
   surchargeAmount: string
   installments: number | null
   installmentAmount: string | null
+  customerRebatePct: string | null
+  customerRebateAmount: string | null
 }
 
 type QuoteResponse = {
@@ -75,6 +77,10 @@ function preferredAccountCode(method: PaymentMethod) {
 function toNumber(value?: string | null) {
   const parsed = Number(value ?? 0)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatArs(value?: string | null) {
+  return `$ ${toNumber(value).toLocaleString("es-AR", { maximumFractionDigits: 2 })}`
 }
 
 export default function PaymentsSection({ payments, setPayments, total, disabled = false }: PaymentsSectionProps) {
@@ -160,6 +166,8 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
         surchargeAmount: line.surchargeAmount,
         installments: line.installments ?? undefined,
         installmentAmount: line.installmentAmount ?? undefined,
+        customerRebatePct: line.customerRebatePct ?? undefined,
+        customerRebateAmount: line.customerRebateAmount ?? undefined,
       })
     } catch (error) {
       setPricingError(error instanceof Error ? error.message : "No se pudo calcular el pago")
@@ -200,6 +208,8 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
         surchargeAmount: line.surchargeAmount,
         installments: line.installments ?? undefined,
         installmentAmount: line.installmentAmount ?? undefined,
+        customerRebatePct: line.customerRebatePct ?? undefined,
+        customerRebateAmount: line.customerRebateAmount ?? undefined,
       })
     } catch (error) {
       setPricingError(error instanceof Error ? error.message : "No se pudo completar el restante")
@@ -245,6 +255,8 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
       surchargeAmount: undefined,
       installments: method === "BNA_CUOTAS" ? (payment.installments ?? bnaDefaultInstallments) : undefined,
       installmentAmount: undefined,
+      customerRebatePct: undefined,
+      customerRebateAmount: undefined,
     })
   }
 
@@ -342,8 +354,9 @@ export default function PaymentsSection({ payments, setPayments, total, disabled
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/70">
                 <span>Cubre <strong>USD {toNumber(payment.coveredBaseUsd).toFixed(2)}</strong></span>
                 {payment.exchangeRate ? <span>Blue venta <strong>$ {toNumber(payment.exchangeRate).toLocaleString("es-AR")}</strong></span> : null}
-                {toNumber(payment.surchargePct) > 0 ? <span>Recargo <strong>{payment.surchargePct}%</strong></span> : null}
-                {payment.installments && payment.installmentAmount ? <span><strong>{payment.installments} x $ {toNumber(payment.installmentAmount).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</strong></span> : null}
+                {payment.method === "TRANSFERENCIA_ARS" && toNumber(payment.surchargePct) > 0 ? <span>Incluye recargo transferencia</span> : null}
+                {payment.installments && payment.installmentAmount ? <span><strong>BNA · {payment.installments} cuotas de {formatArs(payment.installmentAmount)}</strong></span> : null}
+                {payment.customerRebateAmount ? <span>Reintegro cliente <strong>{formatArs(payment.customerRebateAmount)}</strong></span> : null}
               </div>
             </div>
           )

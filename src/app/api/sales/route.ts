@@ -6,7 +6,7 @@ import { Currency, PaymentMethod, Prisma, ProductState, SaleItemKind, SaleStatus
 import { resolveSessionTenantId } from "@/lib/tenant"
 import { resolveOperationBranch } from "@/lib/domain/user-branches"
 import { isMonetaryPaymentMethod, postSalePaymentToCash } from "@/lib/domain/cash"
-import { getBlueSellRateSnapshot, getPaymentPricingSettings, priceNativePayment } from "@/lib/domain/payment-pricing"
+import { buildPaymentPricingSnapshot, getBlueSellRateSnapshot, getPaymentPricingSettings, priceNativePayment } from "@/lib/domain/payment-pricing"
 import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue"
 import { productCatalogDisplayInclude } from "@/lib/products/selects"
 
@@ -349,7 +349,7 @@ export async function POST(request: Request) {
         })
 
         const totalPaid = pricedPayments.reduce(
-          (acc, payment) => acc.add(payment.coveredUsd),
+          (acc, payment) => acc.add(payment.coveredBaseUsd),
           new Prisma.Decimal(0),
         )
         const paymentDelta = totalPaid.sub(total).abs()
@@ -381,18 +381,12 @@ export async function POST(request: Request) {
             amount: pricing.amount,
             exchangeRate: pricing.exchangeRate,
             amountUsd: pricing.amountUsd,
-            coveredBaseUsd: pricing.coveredUsd,
+            coveredBaseUsd: pricing.coveredBaseUsd,
             surchargePct: pricing.surchargePct,
             surchargeAmount: pricing.surchargeAmount,
             installments: pricing.installments,
             installmentAmount: pricing.installmentAmount,
-            pricingSnapshot: {
-              exchangeRateSource: pricing.exchangeRate ? exchangeRateSnapshot?.source ?? null : null,
-              exchangeRate: pricing.exchangeRate?.toFixed(4) ?? null,
-              exchangeRateAt: pricing.exchangeRate ? exchangeRateSnapshot?.fetchedAt.toISOString() ?? null : null,
-              surchargePct: pricing.surchargePct.toFixed(2),
-              installments: pricing.installments,
-            },
+            pricingSnapshot: buildPaymentPricingSnapshot(pricing, exchangeRateSnapshot),
             cashAccountId: isMonetaryPaymentMethod(payment.method) ? payment.cashAccountId || null : null,
             note: payment.note,
             paidAt: payment.paidAt ? new Date(payment.paidAt) : new Date(),
