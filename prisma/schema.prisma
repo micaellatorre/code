@@ -107,8 +107,8 @@ model TenantSettings {
 
   closerCommissionsEnabled Boolean @default(false)
 
-  financialFeeEnabled Boolean @default(false)
-  financialFeeRatePct Decimal @default(0) @db.Decimal(5, 2)
+  financialFeeEnabled Boolean @default(true)
+  financialFeeRatePct Decimal @default(3.5) @db.Decimal(5, 2)
 
   bnaInstallmentsEnabled Boolean @default(false)
   bnaMarkupRatePct Decimal @default(40) @db.Decimal(5, 2)

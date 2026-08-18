@@ -32,10 +32,60 @@ const quoteSchema = z.object({
   payments: z.array(paymentSchema).optional().default([]),
 })
 
-function decimal(value: string | number) {
-  const result = new Prisma.Decimal(String(value))
+type QuoteVisibilityMode = "ADMIN" | "VENDEDOR"
+type SerializedPricingLine = ReturnType<typeof serializePricingResult>
+type PublicPricingLine = Omit<SerializedPricingLine, "surchargePct" | "customerRebatePct"> & {
+  surchargePct: string | null
+  customerRebatePct: string | null
+}
+
+function visibilityModeForRole(role: string | null | undefined): QuoteVisibilityMode {
+  return role === "ADMIN" ? "ADMIN" : "VENDEDOR"
+}
+
+function sanitizePricingLine(line: SerializedPricingLine, visibilityMode: QuoteVisibilityMode): PublicPricingLine {
+  if (visibilityMode === "ADMIN") return line
+
+  return {
+    ...line,
+    surchargePct: null,
+    customerRebatePct: null,
+  }
+}
+
+function serializePricingResultForVisibility(result: Parameters<typeof serializePricingResult>[0], visibilityMode: QuoteVisibilityMode) {
+  return sanitizePricingLine(serializePricingResult(result), visibilityMode)
+}
+
+function normalizeDecimalInput(value: string | number | null | undefined) {
+  if (value == null) return ""
+  const trimmed = String(value).trim()
+  if (!trimmed) return ""
+  if (trimmed.includes(".") && trimmed.includes(",")) return trimmed.replace(/\./g, "").replace(",", ".")
+  if (trimmed.includes(",")) return trimmed.replace(",", ".")
+  if (/^\d{1,3}(\.\d{3})+$/.test(trimmed)) return trimmed.replace(/\./g, "")
+  return trimmed
+}
+
+function hasDecimalInput(value: string | number | null | undefined) {
+  return normalizeDecimalInput(value) !== ""
+}
+
+function decimal(value: string | number | null | undefined, label: string) {
+  const normalized = normalizeDecimalInput(value)
+  if (!normalized) {
+    throw new Error(`${label} debe ser mayor a 0.`)
+  }
+
+  let result: Prisma.Decimal
+  try {
+    result = new Prisma.Decimal(normalized)
+  } catch {
+    throw new Error(`${label} no es valido.`)
+  }
+
   if (!result.isFinite() || result.lessThanOrEqualTo(0)) {
-    throw new Error("El precio base USD debe ser mayor a 0.")
+    throw new Error(`${label} debe ser mayor a 0.`)
   }
   return result
 }
@@ -59,32 +109,36 @@ export async function POST(request: Request) {
     const tenantId = await resolveSessionTenantId(auth.session.user.tenantId)
     if (!tenantId) return NextResponse.json({ error: "Tenant no disponible" }, { status: 403 })
 
-    const baseTotalUsd = decimal(parsed.data.baseTotalUsd)
+    const baseTotalUsd = decimal(parsed.data.baseTotalUsd, "El precio base USD")
+    const visibilityMode = visibilityModeForRole(auth.session.user.activeRole)
     const [settings, rateSnapshot] = await Promise.all([
       getPaymentPricingSettings(tenantId),
       getBlueSellRateSnapshot(),
     ])
+    const quoteSettings = { ...settings, bnaInstallmentsEnabled: true }
 
     const quickMethods: PaymentMethod[] = [
       "EFECTIVO_USD",
       "EFECTIVO_PESOS",
       "TRANSFERENCIA_ARS",
       "USDT",
-      ...(settings.bnaInstallmentsEnabled ? (["BNA_CUOTAS"] as PaymentMethod[]) : []),
+      "BNA_CUOTAS",
     ]
 
-    const quickQuotes = quickMethods.map((method) => serializePricingResult(quoteFromCoveredUsd({
+    const quickQuotes = quickMethods.map((method) => serializePricingResultForVisibility(quoteFromCoveredUsd({
       method,
       coveredUsd: baseTotalUsd,
       exchangeRate: currencyForMethod(method) === "ARS" ? rateSnapshot.rate : null,
-      settings,
-      installments: method === "BNA_CUOTAS" ? settings.bnaDefaultInstallments : null,
-    })))
+      settings: quoteSettings,
+      installments: method === "BNA_CUOTAS" ? quoteSettings.bnaDefaultInstallments : null,
+    }), visibilityMode))
 
     let coveredUsd = new Prisma.Decimal(0)
-    const payments = []
+    const payments: PublicPricingLine[] = []
 
     for (const input of parsed.data.payments) {
+      if (!input.useRemaining && !hasDecimalInput(input.amount)) continue
+
       const method = input.method as PaymentMethod
       const remaining = Prisma.Decimal.max(baseTotalUsd.sub(coveredUsd), 0)
       const result = input.useRemaining
@@ -92,20 +146,20 @@ export async function POST(request: Request) {
             method,
             coveredUsd: remaining,
             exchangeRate: currencyForMethod(method) === "ARS" ? rateSnapshot.rate : null,
-            settings,
+            settings: quoteSettings,
             installments: input.installments,
           })
         : priceNativePayment({
             method,
             currency: currencyForMethod(method),
-            amount: decimal(input.amount ?? 0),
+            amount: decimal(input.amount, "El importe"),
             exchangeRate: currencyForMethod(method) === "ARS" ? rateSnapshot.rate : null,
-            settings,
+            settings: quoteSettings,
             installments: input.installments,
           })
 
       coveredUsd = coveredUsd.add(result.coveredBaseUsd)
-      payments.push(serializePricingResult(result))
+      payments.push(serializePricingResultForVisibility(result, visibilityMode))
     }
 
     const remainingUsd = Prisma.Decimal.max(baseTotalUsd.sub(coveredUsd), 0)
@@ -119,13 +173,14 @@ export async function POST(request: Request) {
       },
       settings: {
         transferFeeEnabled: settings.transferFeeEnabled,
-        transferFeeRatePct: settings.transferFeeRatePct.toFixed(2),
-        bnaInstallmentsEnabled: settings.bnaInstallmentsEnabled,
-        bnaMarkupRatePct: settings.bnaMarkupRatePct.toFixed(2),
-        bnaDefaultInstallments: settings.bnaDefaultInstallments,
-        bnaCustomerRebatePct: settings.bnaCustomerRebatePct.toFixed(2),
-        bnaCustomerRebateCapArs: settings.bnaCustomerRebateCapArs.toFixed(2),
+        transferFeeRatePct: visibilityMode === "ADMIN" ? settings.transferFeeRatePct.toFixed(2) : null,
+        bnaInstallmentsEnabled: quoteSettings.bnaInstallmentsEnabled,
+        bnaMarkupRatePct: visibilityMode === "ADMIN" ? quoteSettings.bnaMarkupRatePct.toFixed(2) : null,
+        bnaDefaultInstallments: quoteSettings.bnaDefaultInstallments,
+        bnaCustomerRebatePct: visibilityMode === "ADMIN" ? quoteSettings.bnaCustomerRebatePct.toFixed(2) : null,
+        bnaCustomerRebateCapArs: quoteSettings.bnaCustomerRebateCapArs.toFixed(2),
       },
+      visibilityMode,
       quickQuotes,
       payments,
       coveredUsd: coveredUsd.toFixed(6),

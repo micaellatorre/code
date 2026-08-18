@@ -6,6 +6,8 @@ import { normalizeAmountUsd } from "@/lib/domain/money"
 
 type Tx = Prisma.TransactionClient
 
+const DEFAULT_TRANSFER_FEE_RATE_PCT = new Prisma.Decimal("3.5")
+
 export type ExchangeRateSource =
   | "DOLARHOY_BLUE_VENTA"
   | "LEGACY_DOLAR_PROVIDER_BLUE_VENTA"
@@ -97,9 +99,12 @@ export async function getPaymentPricingSettings(
   tx: Tx = prisma,
 ): Promise<PaymentPricingSettings> {
   const settings = await ensureTenantSettings(tenantId, tx)
+  const hasTransferFeeRate = settings.financialFeeRatePct.greaterThan(0)
+  const hasLegacyEmptyTransferFee = !settings.financialFeeEnabled && !hasTransferFeeRate
+
   return {
-    transferFeeEnabled: settings.financialFeeEnabled,
-    transferFeeRatePct: settings.financialFeeRatePct,
+    transferFeeEnabled: hasLegacyEmptyTransferFee ? true : settings.financialFeeEnabled,
+    transferFeeRatePct: hasTransferFeeRate ? settings.financialFeeRatePct : DEFAULT_TRANSFER_FEE_RATE_PCT,
     bnaInstallmentsEnabled: settings.bnaInstallmentsEnabled,
     bnaMarkupRatePct: settings.bnaMarkupRatePct,
     bnaDefaultInstallments: settings.bnaDefaultInstallments,

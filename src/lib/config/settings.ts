@@ -2,6 +2,8 @@ import { Prisma, type TenantSettings } from "@prisma/client"
 import { z } from "zod"
 import prisma from "@/lib/prisma"
 
+const DEFAULT_FINANCIAL_FEE_RATE_PCT = new Prisma.Decimal("3.5")
+
 export const settingsPatchSchema = z.object({
   tenantName: z.string().trim().min(1, "El nombre del negocio es obligatorio").max(140).optional(),
   servicePickupAlertDays: z.coerce.number().int().min(0).optional(),
@@ -51,6 +53,9 @@ export const settingsPatchSchema = z.object({
 export type SettingsPatchInput = z.infer<typeof settingsPatchSchema>
 
 export function serializeTenantSettings(settings: TenantSettings) {
+  const hasFinancialFeeRate = settings.financialFeeRatePct.greaterThan(0)
+  const hasLegacyEmptyFinancialFee = !settings.financialFeeEnabled && !hasFinancialFeeRate
+
   return {
     id: settings.id,
     tenantId: settings.tenantId,
@@ -60,8 +65,8 @@ export function serializeTenantSettings(settings: TenantSettings) {
     accessoryLowStockThreshold: settings.accessoryLowStockThreshold,
     wholesalePricesEnabled: settings.wholesalePricesEnabled,
     closerCommissionsEnabled: settings.closerCommissionsEnabled,
-    financialFeeEnabled: settings.financialFeeEnabled,
-    financialFeeRatePct: String(settings.financialFeeRatePct),
+    financialFeeEnabled: hasLegacyEmptyFinancialFee ? true : settings.financialFeeEnabled,
+    financialFeeRatePct: String(hasFinancialFeeRate ? settings.financialFeeRatePct : DEFAULT_FINANCIAL_FEE_RATE_PCT),
     bnaInstallmentsEnabled: settings.bnaInstallmentsEnabled,
     bnaMarkupRatePct: String(settings.bnaMarkupRatePct),
     bnaDefaultInstallments: settings.bnaDefaultInstallments,
@@ -81,7 +86,11 @@ export async function ensureTenantSettings(
   return tx.tenantSettings.upsert({
     where: { tenantId },
     update: {},
-    create: { tenantId },
+    create: {
+      tenantId,
+      financialFeeEnabled: true,
+      financialFeeRatePct: DEFAULT_FINANCIAL_FEE_RATE_PCT,
+    },
   })
 }
 
