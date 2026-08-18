@@ -2,6 +2,7 @@ import type { ComponentType, SVGProps } from "react"
 import {
   ArrowsRightLeftIcon,
   CalendarIcon,
+  CalculatorIcon,
   CircleStackIcon,
   CurrencyDollarIcon,
   BanknotesIcon,
@@ -61,6 +62,13 @@ export const dashboardNavigationGroups: DashboardNavigationGroup[] = [
         allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"],
         quickAddHref: "/dashboard/sales/new",
         quickAddLabel: "Nueva venta",
+      },
+      {
+        key: "quote",
+        label: "Cotizador",
+        href: "/dashboard/sales/quote",
+        icon: CalculatorIcon,
+        allowedRoles: ["ADMIN", "VENDEDOR"],
       },
       {
         key: "appointments",

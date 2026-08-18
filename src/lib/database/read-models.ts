@@ -41,6 +41,7 @@ export type DatabasePaymentLine = {
   amount: number
   exchangeRate: number | null
   amountUsd: number | null
+  coveredBaseUsd: number | null
 }
 
 export type DatabaseRetailSaleRow = {
@@ -288,6 +289,7 @@ function paymentLine(payment: {
   amount: Prisma.Decimal
   exchangeRate?: Prisma.Decimal | null
   amountUsd?: Prisma.Decimal | null
+  coveredBaseUsd?: Prisma.Decimal | null
 }): DatabasePaymentLine {
   return {
     method: payment.method,
@@ -295,6 +297,7 @@ function paymentLine(payment: {
     amount: toNumber(payment.amount),
     exchangeRate: nullableNumber(payment.exchangeRate),
     amountUsd: nullableNumber(payment.amountUsd),
+    coveredBaseUsd: nullableNumber(payment.coveredBaseUsd),
   }
 }
 
@@ -402,6 +405,11 @@ export async function getDatabaseReadModel(params: {
   ])
 
   const activeSales = sales.filter((sale) => sale.status !== "CANCELADA")
+  const cashMovementPaymentIds = new Set(
+    cashMovements
+      .filter((movement) => movement.sourceType === "SALE_PAYMENT" && movement.sourceId && movement.category !== "REVERSAL")
+      .map((movement) => movement.sourceId as string),
+  )
   const retailSales = activeSales.filter((sale) => resolveSaleType(sale) === "MINORISTA")
   const wholesaleSales = activeSales.filter((sale) => resolveSaleType(sale) === "MAYORISTA")
   const serviceMargin = serviceOrders.reduce((sum, order) => sum + toNumber(order.priceAmount) - toNumber(order.costAmount), 0)
@@ -435,6 +443,7 @@ export async function getDatabaseReadModel(params: {
     const agreedPrice = sale.items.reduce((sum, item) => sum + toNumber(item.unitPrice) * item.units, 0)
     const originalAmount = sale.payments.map((payment) => `${payment.currency} ${toNumber(payment.amount).toFixed(2)}`).join(" + ")
     const paidUsd = sale.payments.reduce((sum, payment) => {
+      if (payment.coveredBaseUsd != null) return sum + toNumber(payment.coveredBaseUsd)
       if (payment.amountUsd != null) return sum + toNumber(payment.amountUsd)
       if (payment.currency === "USD" || payment.currency === "USDT") return sum + toNumber(payment.amount)
       return sum
@@ -554,7 +563,7 @@ export async function getDatabaseReadModel(params: {
       type: movement.direction,
     })),
     ...activeSales.flatMap((sale) =>
-      sale.payments.map((payment) => ({
+      sale.payments.filter((payment) => !cashMovementPaymentIds.has(payment.id)).map((payment) => ({
         id: payment.id,
         source: "LEGACY_PAYMENT" as const,
         date: payment.paidAt.toISOString(),

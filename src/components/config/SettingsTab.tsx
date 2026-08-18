@@ -77,6 +77,11 @@ export default function SettingsTab() {
         closerCommissionsEnabled: form.closerCommissionsEnabled,
         financialFeeEnabled: form.financialFeeEnabled,
         financialFeeRatePct: Number(form.financialFeeRatePct),
+        bnaInstallmentsEnabled: form.bnaInstallmentsEnabled,
+        bnaMarkupRatePct: Number(form.bnaMarkupRatePct),
+        bnaDefaultInstallments: form.bnaDefaultInstallments,
+        bnaCustomerRebatePct: Number(form.bnaCustomerRebatePct),
+        bnaCustomerRebateCapArs: Number(form.bnaCustomerRebateCapArs),
         usedDeviceWarrantyDays: form.usedDeviceWarrantyDays,
         warrantyPolicyText: form.warrantyPolicyText,
       }),
@@ -233,13 +238,41 @@ export default function SettingsTab() {
             )}
             <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
               <label className="flex items-center justify-between gap-3 rounded-lg border border-base-300 p-3">
-                <span>Comision financiera</span>
+                <span>Recargo transferencia ARS</span>
                 <input type="checkbox" className="toggle toggle-primary" checked={form.financialFeeEnabled} onChange={(event) => setField("financialFeeEnabled", event.target.checked)} />
               </label>
               <label className="form-control">
                 <span className="label-text">%</span>
                 <input type="number" min={0} max={100} step="0.01" className="input input-bordered" value={form.financialFeeRatePct} onChange={(event) => setField("financialFeeRatePct", event.target.value)} />
               </label>
+            </div>
+            <div className="rounded-lg border border-base-300 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-medium">Cuotas BNA</span>
+                  <p className="text-xs text-base-content/50">Recargo comercial sobre Dolar Blue venta. De 1 a 12 cuotas.</p>
+                </div>
+                <input type="checkbox" className="toggle toggle-primary" checked={form.bnaInstallmentsEnabled} onChange={(event) => setField("bnaInstallmentsEnabled", event.target.checked)} />
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="form-control">
+                  <span className="label-text">Recargo GP %</span>
+                  <input type="number" min={0} max={100} step="0.01" className="input input-bordered" value={form.bnaMarkupRatePct} onChange={(event) => setField("bnaMarkupRatePct", event.target.value)} />
+                </label>
+                <label className="form-control">
+                  <span className="label-text">Cuotas por defecto</span>
+                  <input type="number" min={1} max={12} step="1" className="input input-bordered" value={form.bnaDefaultInstallments} onChange={(event) => setField("bnaDefaultInstallments", Number(event.target.value))} />
+                </label>
+                <label className="form-control">
+                  <span className="label-text">Reintegro cliente %</span>
+                  <input type="number" min={0} max={100} step="0.01" className="input input-bordered" value={form.bnaCustomerRebatePct} onChange={(event) => setField("bnaCustomerRebatePct", event.target.value)} />
+                </label>
+                <label className="form-control">
+                  <span className="label-text">Tope reintegro ARS</span>
+                  <input type="number" min={0} step="1" className="input input-bordered" value={form.bnaCustomerRebateCapArs} onChange={(event) => setField("bnaCustomerRebateCapArs", event.target.value)} />
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-base-content/50">El reintegro es informativo: pertenece al cliente y no reduce el cobro ni Caja.</p>
             </div>
           </div>
         </div>

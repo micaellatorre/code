@@ -9,7 +9,7 @@ import { getProductDisplayModel } from "@/lib/products/display"
 
 type SaleStatusValue = "CONFIRMADA" | "SENADA" | "CANCELADA"
 type CurrencyValue = "USD" | "ARS" | "USDT"
-type PaymentMethodValue = "EFECTIVO_PESOS" | "EFECTIVO_USD" | "TRANSFERENCIA_ARS" | "TRANSFERENCIA_USD" | "TARJETA" | "USDT"
+type PaymentMethodValue = "EFECTIVO_PESOS" | "EFECTIVO_USD" | "TRANSFERENCIA_ARS" | "TRANSFERENCIA_USD" | "TARJETA" | "BNA_CUOTAS" | "USDT" | "PLAN_CANJE"
 
 type CashAccountOption = {
   id: string
@@ -26,6 +26,9 @@ type PaymentDraft = {
   currency: CurrencyValue
   amount: string
   exchangeRate: string
+  amountUsd: string
+  coveredBaseUsd: string
+  installments: number | null
   cashAccountId: string
   note: string
   paidAt: string
@@ -71,11 +74,19 @@ function asPaymentMethod(value: string | null | undefined): PaymentMethodValue {
     value === "TRANSFERENCIA_ARS" ||
     value === "TRANSFERENCIA_USD" ||
     value === "TARJETA" ||
+    value === "BNA_CUOTAS" ||
+    value === "PLAN_CANJE" ||
     value === "USDT"
   ) {
     return value
   }
   return "EFECTIVO_USD"
+}
+
+function currencyForMethod(method: PaymentMethodValue): CurrencyValue {
+  if (method === "EFECTIVO_PESOS" || method === "TRANSFERENCIA_ARS" || method === "TARJETA" || method === "BNA_CUOTAS") return "ARS"
+  if (method === "USDT") return "USDT"
+  return "USD"
 }
 
 function paymentToDraft(payment: SalePaymentSummary): PaymentDraft {
@@ -86,6 +97,9 @@ function paymentToDraft(payment: SalePaymentSummary): PaymentDraft {
     currency: asCurrency(String(payment.currency ?? "")),
     amount: payment.amount ?? "",
     exchangeRate: payment.exchangeRate ?? "",
+    amountUsd: payment.amountUsd ?? "",
+    coveredBaseUsd: payment.coveredBaseUsd ?? payment.amountUsd ?? "",
+    installments: payment.installments ?? null,
     cashAccountId: payment.cashAccountId ?? "",
     note: payment.note ?? "",
     paidAt: paidAtInputValue(payment.paidAt),
@@ -100,6 +114,9 @@ function newPaymentDraft(amount = ""): PaymentDraft {
     currency: "USD",
     amount,
     exchangeRate: "",
+    amountUsd: amount,
+    coveredBaseUsd: amount,
+    installments: null,
     cashAccountId: "",
     note: "",
     paidAt: todayInputValue(),
@@ -108,6 +125,13 @@ function newPaymentDraft(amount = ""): PaymentDraft {
 
 function formatUsd(value: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value)
+}
+
+function coveredUsd(payment: PaymentDraft) {
+  if (payment.coveredBaseUsd) return toNumber(payment.coveredBaseUsd)
+  if (payment.amountUsd) return toNumber(payment.amountUsd)
+  if (payment.currency === "USD" || payment.currency === "USDT") return toNumber(payment.amount)
+  return 0
 }
 
 export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, onSaved }: Props) {
@@ -120,7 +144,7 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
   const [error, setError] = useState<string | null>(null)
 
   const total = toNumber(sale.total)
-  const amountPaid = useMemo(() => payments.reduce((acc, payment) => acc + toNumber(payment.amount), 0), [payments])
+  const amountPaid = useMemo(() => payments.reduce((acc, payment) => acc + coveredUsd(payment), 0), [payments])
   const balanceDue = total - amountPaid
   const executor = session?.user?.name || session?.user?.email || "Usuario actual"
   const activeRole = (session?.user as { activeRole?: string } | undefined)?.activeRole ?? "-"
@@ -162,6 +186,7 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
           currency: payment.currency,
           amount: payment.amount,
           exchangeRate: payment.exchangeRate || null,
+          installments: payment.method === "BNA_CUOTAS" ? payment.installments : null,
           cashAccountId: payment.cashAccountId || null,
           note: payment.note || null,
           paidAt: payment.paidAt,
@@ -257,13 +282,23 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
                     </button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <select className="select select-bordered select-sm" value={payment.method} onChange={(event) => updatePayment(payment.key, { method: event.target.value as PaymentMethodValue })} disabled={saving || !canSave}>
+                    <select
+                      className="select select-bordered select-sm"
+                      value={payment.method}
+                      onChange={(event) => {
+                        const method = event.target.value as PaymentMethodValue
+                        updatePayment(payment.key, { method, currency: currencyForMethod(method), cashAccountId: "" })
+                      }}
+                      disabled={saving || !canSave}
+                    >
                       <option value="EFECTIVO_USD">Efectivo USD</option>
                       <option value="EFECTIVO_PESOS">Efectivo ARS</option>
                       <option value="TRANSFERENCIA_USD">Transferencia USD</option>
                       <option value="TRANSFERENCIA_ARS">Transferencia ARS</option>
+                      <option value="BNA_CUOTAS">BNA Cuotas</option>
                       <option value="USDT">USDT</option>
                       <option value="TARJETA">Tarjeta</option>
+                      <option value="PLAN_CANJE">Plan Canje</option>
                     </select>
                     <select className="select select-bordered select-sm" value={payment.currency} onChange={(event) => updatePayment(payment.key, { currency: event.target.value as CurrencyValue, cashAccountId: "" })} disabled={saving || !canSave}>
                       <option value="USD">USD</option>
@@ -272,6 +307,11 @@ export default function SaleStatusUpdateModal({ sale, open, canSave, onClose, on
                     </select>
                     <input className="input input-bordered input-sm" type="number" step="0.01" placeholder="Monto" value={payment.amount} onChange={(event) => updatePayment(payment.key, { amount: event.target.value })} disabled={saving || !canSave} />
                     <input className="input input-bordered input-sm" type="number" step="0.01" placeholder={payment.currency === "ARS" ? "TC obligatorio" : "TC"} value={payment.exchangeRate} onChange={(event) => updatePayment(payment.key, { exchangeRate: event.target.value })} disabled={saving || !canSave} />
+                    {payment.method === "BNA_CUOTAS" ? (
+                      <select className="select select-bordered select-sm" value={payment.installments ?? 12} onChange={(event) => updatePayment(payment.key, { installments: Number(event.target.value) })} disabled={saving || !canSave}>
+                        {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count} cuotas</option>)}
+                      </select>
+                    ) : null}
                     <select className="select select-bordered select-sm sm:col-span-2" value={payment.cashAccountId} onChange={(event) => updatePayment(payment.key, { cashAccountId: event.target.value })} disabled={saving || !canSave}>
                       <option value="">Seleccionar caja</option>
                       {cashAccounts.filter((account) => account.currency === payment.currency).map((account) => (

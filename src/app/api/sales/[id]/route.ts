@@ -1,13 +1,13 @@
 // code/src/app/api/sales/[id]/route.ts
 
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client"
+import { Currency, PaymentMethod, Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { createAuditLog } from "@/lib/domain/audit"
 import { canManuallyAssignEntityBranch } from "@/lib/domain/user-branches"
 import { isMonetaryPaymentMethod, postSalePaymentToCash, reverseSourceCashMovement } from "@/lib/domain/cash"
-import { normalizeAmountUsd, optionalDecimal } from "@/lib/domain/money"
+import { buildPaymentPricingSnapshot, getBlueSellRateSnapshot, getPaymentPricingSettings, priceNativePayment } from "@/lib/domain/payment-pricing"
 import { normalizeCatalogValue } from "@/lib/config/normalizeCatalogValue"
 import { productCatalogDisplayInclude } from "@/lib/products/selects"
 
@@ -63,6 +63,7 @@ type PaymentInput = {
   cashAccountId?: string | null
   note?: string | null
   paidAt?: string | Date | null
+  installments?: number | null
 }
 
 type SaleItemInput = {
@@ -91,6 +92,10 @@ function decimalEquals(left: unknown, right: unknown) {
   if (left == null && right == null) return true
   if (left == null || right == null) return false
   return decimal(left).equals(decimal(right))
+}
+
+function jsonInput(value: Prisma.JsonValue | Prisma.InputJsonValue | null | undefined) {
+  return value == null ? Prisma.JsonNull : value as Prisma.InputJsonValue
 }
 
 function dateEquals(left: Date | null | undefined, right: Date | null | undefined) {
@@ -246,7 +251,10 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.findFirst({ where: { id, tenantId }, include: { items: { include: { product: true } } } })
+      const sale = await tx.sale.findFirst({
+        where: { id, tenantId },
+        include: { items: { include: { product: true } }, payments: true },
+      })
       if (!sale) throw new Error("Venta no encontrada")
       if (sale.status === "CANCELADA") return
 
@@ -269,6 +277,18 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
         for (const item of sale.items) {
           await tx.product.update({ where: { id: item.productId }, data: { senado: false, senadoAt: null } })
         }
+      }
+
+      for (const payment of sale.payments) {
+        await reverseSourceCashMovement({
+          tx,
+          tenantId: sale.tenantId,
+          actorUserId: auth.session.user.id,
+          actorRole: auth.session.user.activeRole as UserRole,
+          sourceType: "SALE_PAYMENT",
+          sourceId: payment.id,
+          reason: `Venta ${sale.id} cancelada`,
+        })
       }
 
       await tx.sale.update({ where: { id }, data: { status: "CANCELADA" } })
@@ -324,6 +344,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   try {
+    const incomingPaymentsForPricing = Array.isArray(body.payments) ? body.payments as PaymentInput[] : null
+    const paymentPricingSettings = incomingPaymentsForPricing ? await getPaymentPricingSettings(tenantId) : null
+    const needsCurrentArsRate = incomingPaymentsForPricing?.some((payment) => String(payment.currency) === "ARS") ?? false
+    const currentRateSnapshot = needsCurrentArsRate ? await getBlueSellRateSnapshot() : null
+
     const updated = await prisma.$transaction(async (tx) => {
       const sale = await tx.sale.findUnique({
         where: { id },
@@ -355,6 +380,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       const targetStatus = requestedStatus ?? sale.status
 
       const saleData: Prisma.SaleUpdateInput = {}
+      let nextBranchId = sale.branchId
 
       if (Object.prototype.hasOwnProperty.call(body, "date")) {
         if (body.date == null || String(body.date).trim() === "") {
@@ -424,10 +450,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         const branchId = body.branchId == null || String(body.branchId).trim() === "" ? null : String(body.branchId)
         if (!branchId) {
           saleData.branch = { disconnect: true }
+          nextBranchId = null
         } else {
           const branch = await tx.branch.findFirst({ where: { id: branchId, tenantId: sale.tenantId, isActive: true }, select: { id: true } })
           if (!branch) throw new Error("Sucursal no disponible")
           saleData.branch = { connect: { id: branch.id } }
+          nextBranchId = branch.id
         }
       }
 
@@ -824,40 +852,84 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         const existingPayments = new Map(sale.payments.map((payment) => [payment.id, payment]))
         const keptPaymentIds = new Set<string>()
 
+        if (!paymentPricingSettings) throw new Error("Configuracion de medios de pago no disponible")
+
         const paymentsData = payments.map((payment) => {
           const amount = toDecimal(payment.amount)
+          if (!amount || amount.lessThanOrEqualTo(0)) throw new Error("Monto de pago inválido")
+          if (!payment.method || !payment.currency) throw new Error("Cada pago debe tener método y moneda")
 
-          if (!amount || amount.lessThan(0)) {
-            throw new Error("Monto de pago inválido")
+          const existing = payment.id ? existingPayments.get(String(payment.id)) : null
+          const method = payment.method as PaymentMethod
+          const currency = payment.currency as Currency
+          const submittedRate = payment.exchangeRate == null ? null : decimal(payment.exchangeRate)
+          const unchangedExisting = Boolean(
+            existing &&
+            existing.coveredBaseUsd != null &&
+            existing.method === method &&
+            existing.currency === currency &&
+            decimalEquals(existing.amount, amount) &&
+            decimalEquals(existing.exchangeRate, submittedRate) &&
+            existing.installments === (payment.installments ?? null)
+          )
+
+          if (unchangedExisting && existing) {
+            return {
+              id: existing.id,
+              saleId: id,
+              method: existing.method,
+              currency: existing.currency,
+              amount: existing.amount,
+              exchangeRate: existing.exchangeRate,
+              amountUsd: existing.amountUsd,
+              coveredBaseUsd: existing.coveredBaseUsd,
+              surchargePct: existing.surchargePct,
+              surchargeAmount: existing.surchargeAmount,
+              installments: existing.installments,
+              installmentAmount: existing.installmentAmount,
+              pricingSnapshot: jsonInput(existing.pricingSnapshot),
+              cashAccountId: isMonetaryPaymentMethod(method) ? payment.cashAccountId || null : null,
+              note: payment.note == null || String(payment.note).trim() === "" ? null : String(payment.note),
+              paidAt: payment.paidAt ? new Date(payment.paidAt) : existing.paidAt,
+            }
           }
 
-          if (!payment.method || !payment.currency) {
-            throw new Error("Cada pago debe tener método y moneda")
-          }
+          const rate = currency === "ARS" ? currentRateSnapshot?.rate ?? null : null
+          const pricing = priceNativePayment({
+            method,
+            currency,
+            amount,
+            exchangeRate: rate,
+            settings: paymentPricingSettings,
+            installments: payment.installments,
+          })
 
           return {
             id: payment.id == null || String(payment.id).trim() === "" ? null : String(payment.id),
             saleId: id,
-            method: payment.method as any,
-            currency: payment.currency as any,
-            amount,
-            exchangeRate: optionalDecimal(payment.exchangeRate),
-            amountUsd: normalizeAmountUsd(amount, String(payment.currency), optionalDecimal(payment.exchangeRate)),
-            cashAccountId: isMonetaryPaymentMethod(payment.method) ? payment.cashAccountId || null : null,
-            note:
-              payment.note == null || String(payment.note).trim() === ""
-                ? null
-                : String(payment.note),
+            method: pricing.method,
+            currency: pricing.currency,
+            amount: pricing.amount,
+            exchangeRate: pricing.exchangeRate,
+            amountUsd: pricing.amountUsd,
+            coveredBaseUsd: pricing.coveredBaseUsd,
+            surchargePct: pricing.surchargePct,
+            surchargeAmount: pricing.surchargeAmount,
+            installments: pricing.installments,
+            installmentAmount: pricing.installmentAmount,
+            pricingSnapshot: buildPaymentPricingSnapshot(pricing, currentRateSnapshot),
+            cashAccountId: isMonetaryPaymentMethod(method) ? payment.cashAccountId || null : null,
+            note: payment.note == null || String(payment.note).trim() === "" ? null : String(payment.note),
             paidAt: payment.paidAt ? new Date(payment.paidAt) : new Date(),
           }
         })
 
         amountPaid = paymentsData.reduce(
-          (acc, payment) => acc.add(payment.amount),
+          (acc, payment) => acc.add(payment.coveredBaseUsd ?? payment.amountUsd ?? new Prisma.Decimal(0)),
           new Prisma.Decimal(0),
         )
 
-        balanceDue = total.sub(amountPaid)
+        balanceDue = Prisma.Decimal.max(total.sub(amountPaid), 0).toDecimalPlaces(2)
 
         for (const paymentData of paymentsData) {
           const existing = paymentData.id ? existingPayments.get(paymentData.id) : null
@@ -868,6 +940,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             amount: paymentData.amount,
             exchangeRate: paymentData.exchangeRate,
             amountUsd: paymentData.amountUsd,
+            coveredBaseUsd: paymentData.coveredBaseUsd,
+            surchargePct: paymentData.surchargePct,
+            surchargeAmount: paymentData.surchargeAmount,
+            installments: paymentData.installments,
+            installmentAmount: paymentData.installmentAmount,
+            pricingSnapshot: paymentData.pricingSnapshot,
             cashAccountId: paymentData.cashAccountId,
             note: paymentData.note,
             paidAt: paymentData.paidAt,
@@ -886,16 +964,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             existing.cashAccountId !== persisted.cashAccountId ||
             !dateEquals(existing.paidAt, persisted.paidAt)
 
-          if (!changedFinancially || isMonetaryPaymentMethod(persisted.method)) {
+          if (targetStatus !== "CANCELADA" && isMonetaryPaymentMethod(persisted.method)) {
             await postSalePaymentToCash({
               tx,
               tenantId: sale.tenantId,
               actorUserId: auth.session.user.id,
               actorRole: auth.session.user.activeRole as UserRole,
-              sale: { id: sale.id, branchId: sale.branchId },
+              sale: { id: sale.id, branchId: nextBranchId },
               payment: persisted,
             })
-          } else if (existing) {
+          } else if (existing && (targetStatus === "CANCELADA" || changedFinancially)) {
             await reverseSourceCashMovement({
               tx,
               tenantId: sale.tenantId,
@@ -903,7 +981,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
               actorRole: auth.session.user.activeRole as UserRole,
               sourceType: "SALE_PAYMENT",
               sourceId: existing.id,
-              reason: `Pago de venta ${existing.id} convertido a metodo no monetario`,
+              reason: targetStatus === "CANCELADA"
+                ? `Venta ${sale.id} cancelada`
+                : `Pago de venta ${existing.id} convertido a metodo no monetario`,
             })
           }
         }
@@ -923,15 +1003,29 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         }
       }
 
-      if (targetStatus === "CONFIRMADA" && !amountPaid.equals(total)) {
-        throw new Error(`El total de pagos (${amountPaid.toFixed(2)}) debe coincidir con el total de la venta (${total.toFixed(2)}).`)
+      if (targetStatus === "CANCELADA" && sale.status !== "CANCELADA") {
+        for (const payment of sale.payments) {
+          await reverseSourceCashMovement({
+            tx,
+            tenantId: sale.tenantId,
+            actorUserId: auth.session.user.id,
+            actorRole: auth.session.user.activeRole as UserRole,
+            sourceType: "SALE_PAYMENT",
+            sourceId: payment.id,
+            reason: `Venta ${sale.id} cancelada`,
+          })
+        }
+      }
+
+      if (targetStatus === "CONFIRMADA" && amountPaid.sub(total).abs().greaterThan(new Prisma.Decimal("0.01"))) {
+        throw new Error(`La cobertura USD de los pagos (${amountPaid.toFixed(2)}) debe coincidir con el total base de la venta (${total.toFixed(2)}).`)
       }
 
       if (targetStatus === "SENADA") {
         if (amountPaid.lessThanOrEqualTo(0)) {
           throw new Error("La sena debe tener al menos un pago mayor a 0.")
         }
-        if (amountPaid.greaterThan(total)) {
+        if (amountPaid.sub(total).greaterThan(new Prisma.Decimal("0.01"))) {
           throw new Error("La sena no puede superar el total de la venta.")
         }
       }
@@ -942,7 +1036,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       saleData.costTotal = costTotal
       saleData.total = total
       saleData.profit = profit
-      saleData.amountPaid = amountPaid
+      saleData.amountPaid = amountPaid.toDecimalPlaces(2)
       saleData.balanceDue = balanceDue
 
       const updatedSale = await tx.sale.update({
@@ -950,6 +1044,24 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         data: saleData,
         include: saleInclude(),
       })
+
+      const shouldSyncExistingPaymentMovements =
+        targetStatus !== "CANCELADA" &&
+        !Array.isArray(body.payments) &&
+        (sale.branchId !== updatedSale.branchId || sale.status === "CANCELADA")
+
+      if (shouldSyncExistingPaymentMovements) {
+        for (const payment of updatedSale.payments) {
+          await postSalePaymentToCash({
+            tx,
+            tenantId: sale.tenantId,
+            actorUserId: auth.session.user.id,
+            actorRole: auth.session.user.activeRole as UserRole,
+            sale: { id: updatedSale.id, branchId: updatedSale.branchId },
+            payment,
+          })
+        }
+      }
 
       if (Object.prototype.hasOwnProperty.call(body, "branchId") && sale.branchId !== updatedSale.branchId) {
         await createAuditLog({
@@ -1026,6 +1138,12 @@ function serializeSale(sale: any) {
           amount: p.amount != null ? String(p.amount) : null,
           exchangeRate: p.exchangeRate != null ? String(p.exchangeRate) : null,
           amountUsd: p.amountUsd != null ? String(p.amountUsd) : null,
+          coveredBaseUsd: p.coveredBaseUsd != null ? String(p.coveredBaseUsd) : null,
+          surchargePct: p.surchargePct != null ? String(p.surchargePct) : null,
+          surchargeAmount: p.surchargeAmount != null ? String(p.surchargeAmount) : null,
+          installments: p.installments ?? null,
+          installmentAmount: p.installmentAmount != null ? String(p.installmentAmount) : null,
+          pricingSnapshot: p.pricingSnapshot ?? null,
           cashAccountId: p.cashAccountId ?? null,
           originReservationPaymentId: p.originReservationPaymentId ?? null,
         }))

@@ -64,6 +64,12 @@ export type SalePaymentSummary = {
   amount: string | null
   exchangeRate?: string | null
   amountUsd?: string | null
+  coveredBaseUsd?: string | null
+  surchargePct?: string | null
+  surchargeAmount?: string | null
+  installments?: number | null
+  installmentAmount?: string | null
+  pricingSnapshot?: unknown
   cashAccountId?: string | null
   originReservationPaymentId?: string | null
   paidAt?: string | null
@@ -155,6 +161,14 @@ export type PaymentDraft = {
   note?: string
   paidAt?: Date
   exchangeRate?: string
+  amountUsd?: string
+  coveredBaseUsd?: string
+  surchargePct?: string
+  surchargeAmount?: string
+  installments?: number
+  installmentAmount?: string
+  customerRebatePct?: string
+  customerRebateAmount?: string
   cashAccountId?: string
   _id: string
 }

@@ -18,6 +18,7 @@
     "backfill:main-branch": "node scripts/backfill-main-branch.cjs",
     "backfill:cash-branch": "node scripts/run-ts-script.cjs scripts/backfill-cash-branch.ts",
     "backfill:cash-history": "node scripts/run-ts-script.cjs scripts/backfill-cash-history.ts",
+    "verify:payment-pricing": "node scripts/verify-payment-pricing.cjs",
     "db:fix:numerics": "node prisma/fixNumerics.js",
     "migrate:product-origins:suppliers": "node scripts/run-ts-script.cjs scripts/migrate-product-origins-to-suppliers.ts",
     "catalogs:link-products": "node scripts/run-ts-script.cjs scripts/link-products-to-catalogs.ts"

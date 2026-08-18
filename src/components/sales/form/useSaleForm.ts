@@ -28,6 +28,13 @@ function paymentId(prefix = "payment") {
   return `${prefix}-${crypto.randomUUID()}`
 }
 
+function coveredUsd(payment: PaymentDraft) {
+  if (payment.coveredBaseUsd) return toNumber(payment.coveredBaseUsd)
+  if (payment.amountUsd) return toNumber(payment.amountUsd)
+  if (payment.currency === "USD" || payment.currency === "USDT") return toNumber(payment.amount)
+  return 0
+}
+
 export function useSaleForm({
   mode,
   initialData,
@@ -93,7 +100,7 @@ export function useSaleForm({
       .reduce((acc, item) => acc + (toNumber(item.unitCost) + toNumber(item.extraCost)) * item.units, 0)
     const total = subtotal + extraCosts
     const tradeInCredit = tradeInDevices.reduce((acc, device) => acc + device.finalValue, 0)
-    const totalPaid = payments.reduce((acc, payment) => acc + toNumber(payment.amount), 0)
+    const totalPaid = payments.reduce((acc, payment) => acc + coveredUsd(payment), 0)
 
     return {
       subtotal,
@@ -120,6 +127,8 @@ export function useSaleForm({
           method: "PLAN_CANJE",
           currency: "USD",
           amount: totals.tradeInCredit.toFixed(2),
+          amountUsd: totals.tradeInCredit.toFixed(2),
+          coveredBaseUsd: totals.tradeInCredit.toFixed(6),
           note: "Credito Plan Canje",
         },
       ]
@@ -170,11 +179,11 @@ export function useSaleForm({
     if (saleIsLocked) return "Esta venta confirmada solo puede modificarse con rol ADMIN."
     if (items.length === 0 && saleStatus !== "CANCELADA") return "Debe agregar al menos un producto a la operacion."
     if (modeToSubmit === "CONFIRM_SALE" && Math.abs(totals.remaining) > 0.009) {
-      return `El monto de los pagos no coincide con el total. Restan ${totals.remaining.toFixed(2)} USD.`
+      return `La cobertura USD de los pagos no coincide con el total. Restan ${totals.remaining.toFixed(2)} USD.`
     }
     if (modeToSubmit === "RESERVE") {
       if (payments.length === 0 || totals.totalPaid <= 0) return "Para senar, debe registrar al menos un pago mayor a 0."
-      if (totals.totalPaid > totals.total) return "La seña no puede superar el total de la venta."
+      if (totals.totalPaid - totals.total > 0.009) return "La seña no puede superar el total de la venta."
     }
     return null
   }
@@ -211,6 +220,7 @@ export function useSaleForm({
         note: payment.note,
         paidAt: payment.paidAt?.toISOString(),
         exchangeRate: payment.exchangeRate,
+        installments: payment.installments,
         cashAccountId: payment.cashAccountId,
       })),
     }
@@ -233,7 +243,7 @@ export function useSaleForm({
         { label: "Pagos", value: String(payments.length) },
         { label: "Plan Canje", value: planCanjeEnabled ? `${tradeInDevices.length} equipos / USD ${totals.tradeInCredit.toFixed(2)}` : "No" },
         { label: "Precio de venta", value: `USD ${totals.total.toFixed(2)}` },
-        { label: "Pagos", value: `USD ${totals.totalPaid.toFixed(2)}` },
+        { label: "Cobertura de pagos", value: `USD ${totals.totalPaid.toFixed(2)}` },
         { label: "Saldo", value: `USD ${totals.remaining.toFixed(2)}` },
         { label: "Costo total", value: "Calculado por servidor", sensitive: true, visibleForRoles: ["ADMIN", "SOCIO"] },
         { label: "Ganancia", value: "Calculada por servidor", sensitive: true, visibleForRoles: ["ADMIN", "SOCIO"] },

@@ -107,8 +107,14 @@ model TenantSettings {
 
   closerCommissionsEnabled Boolean @default(false)
 
-  financialFeeEnabled Boolean @default(false)
-  financialFeeRatePct Decimal @default(0) @db.Decimal(5, 2)
+  financialFeeEnabled Boolean @default(true)
+  financialFeeRatePct Decimal @default(3.5) @db.Decimal(5, 2)
+
+  bnaInstallmentsEnabled Boolean @default(false)
+  bnaMarkupRatePct Decimal @default(40) @db.Decimal(5, 2)
+  bnaDefaultInstallments Int @default(12)
+  bnaCustomerRebatePct Decimal @default(10) @db.Decimal(5, 2)
+  bnaCustomerRebateCapArs Decimal @default(30000) @db.Decimal(12, 2)
 
   usedDeviceWarrantyDays Int    @default(30)
   warrantyPolicyText     String @default("") @db.Text
@@ -406,6 +412,10 @@ model Sale {
   origin       String? // "Local", "Conocido", "Instagram", etc.
   notes        String?
 
+  exchangeRate       Decimal? @db.Decimal(12, 4)
+  exchangeRateSource String?
+  exchangeRateAt     DateTime?
+
   // Relación con Buyer (opcional)
   buyerId String?
   buyer   Buyer?  @relation(fields: [buyerId], references: [id])
@@ -515,6 +525,12 @@ model Payment {
   amount                     Decimal             @db.Decimal(12, 2)
   exchangeRate               Decimal?            @db.Decimal(12, 4)
   amountUsd                  Decimal?            @db.Decimal(12, 2)
+  coveredBaseUsd             Decimal?            @db.Decimal(14, 6)
+  surchargePct               Decimal?            @db.Decimal(5, 2)
+  surchargeAmount            Decimal?            @db.Decimal(12, 2)
+  installments               Int?
+  installmentAmount          Decimal?            @db.Decimal(12, 2)
+  pricingSnapshot            Json?
   cashAccountId              String?
   cashAccount                CashAccount?        @relation("SalePaymentCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
   originReservationPaymentId String?             @unique
@@ -1246,6 +1262,7 @@ enum PaymentMethod {
   TRANSFERENCIA_ARS
   TRANSFERENCIA_USD
   TARJETA
+  BNA_CUOTAS
   USDT
   PLAN_CANJE
 }
