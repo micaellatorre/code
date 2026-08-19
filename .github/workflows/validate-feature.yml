@@ -13,6 +13,20 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: validation
+          POSTGRES_PASSWORD: validation
+          POSTGRES_DB: validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U validation -d validation"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
       NEXTAUTH_SECRET: validation-only
@@ -26,6 +40,7 @@ jobs:
       - run: npm ci
       - run: npx prisma validate
       - run: npx prisma generate
+      - run: npx prisma migrate deploy
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run build
