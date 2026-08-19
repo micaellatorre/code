@@ -29,6 +29,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      PGPASSWORD: validation
       NEXTAUTH_SECRET: validation-only
       NEXTAUTH_URL: http://localhost:3000
     steps:
@@ -40,7 +41,12 @@ jobs:
       - run: npm ci
       - run: npx prisma validate
       - run: npx prisma generate
-      - run: npx prisma migrate deploy
+      # The repository has a pre-existing historical migration that cannot bootstrap a clean DB
+      # (20260505120000_product_senado_flag references Product.state before that column exists).
+      # Build the current baseline from schema.prisma, then apply only this feature's additive SQL.
+      - run: npx prisma db push --force-reset --accept-data-loss
+      - run: psql -h localhost -U validation -d validation -v ON_ERROR_STOP=1 -f prisma/migrations/20260818220000_customer_orders_on_demand/migration.sql
+      - run: psql -h localhost -U validation -d validation -v ON_ERROR_STOP=1 -f prisma/migrations/20260818221000_customer_order_metadata/migration.sql
       - run: node scripts/run-ts-script.cjs scripts/verify-customer-orders.ts
       - run: npx tsc --noEmit
       - run: npm run lint
