@@ -70,11 +70,11 @@ export async function POST(request: Request) {
   try {
     const branch = await resolveOperationBranch({
       tenantId,
-      userId: auth.session.user.id,
-      role: auth.session.user.activeRole,
+      actorUserId: auth.session.user.id,
+      actorRole: auth.session.user.activeRole,
       requestedBranchId: body.branchId ?? null,
+      entityLabel: "venta",
     })
-    if (!branch) throw new Error("Sucursal operativa no disponible.")
 
     const pricingSettings = await getPaymentPricingSettings(tenantId)
     const requiresArs = body.payments.some((payment) => payment.currency === "ARS")
