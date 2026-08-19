@@ -1,9 +1,13 @@
-name: Validate payment pricing feature
+name: Validate feature
 
 on:
+  pull_request:
+    branches:
+      - master
   push:
     branches:
       - feature/payment-pricing-cotizador
+      - agent/customer-orders-on-demand
 
 jobs:
   validate:
