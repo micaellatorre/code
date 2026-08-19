@@ -41,6 +41,7 @@ jobs:
       - run: npx prisma validate
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - run: node scripts/run-ts-script.cjs scripts/verify-customer-orders.ts
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run build
