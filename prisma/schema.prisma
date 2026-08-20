@@ -33,19 +33,21 @@ model User {
   invitedBy       User?     @relation("UserInvitations", fields: [invitedById], references: [id], onDelete: SetNull)
   invitedUsers    User[]    @relation("UserInvitations")
 
-  appointments          Appointment[]
-  sales                 Sale[]               @relation("SaleCreatedBy")
-  closedSales           Sale[]               @relation("SaleCloser")
-  reservations          Reservation[]
-  serviceOrders         ServiceOrder[]       @relation("ServiceOrderTechnician")
-  createdServiceOrders  ServiceOrder[]       @relation("ServiceOrderCreatedBy")
-  auditLogs             AuditLog[]           @relation("AuditLogActor")
-  generatedSaleReceipts SaleReceipt[]        @relation("SaleReceiptGeneratedBy")
-  cashMovements         CashMovement[]
-  cashTransfers         CashTransfer[]
-  closedCashDays        CashDailyClose[]     @relation("CashDailyCloseClosedBy")
-  closerCommissions     CloserCommission[]   @relation("CloserCommissionCloser")
-  branchCoverages       UserBranchCoverage[]
+  appointments           Appointment[]
+  sales                  Sale[]               @relation("SaleCreatedBy")
+  closedSales            Sale[]               @relation("SaleCloser")
+  reservations           Reservation[]
+  serviceOrders          ServiceOrder[]       @relation("ServiceOrderTechnician")
+  createdServiceOrders   ServiceOrder[]       @relation("ServiceOrderCreatedBy")
+  auditLogs              AuditLog[]           @relation("AuditLogActor")
+  generatedSaleReceipts  SaleReceipt[]        @relation("SaleReceiptGeneratedBy")
+  customerOrdersCreated  CustomerOrder[]      @relation("CustomerOrderCreatedBy")
+  customerOrdersAssigned CustomerOrder[]      @relation("CustomerOrderAssignedSeller")
+  cashMovements          CashMovement[]
+  cashTransfers          CashTransfer[]
+  closedCashDays         CashDailyClose[]     @relation("CashDailyCloseClosedBy")
+  closerCommissions      CloserCommission[]   @relation("CloserCommissionCloser")
+  branchCoverages        UserBranchCoverage[]
 
   @@index([currentBranchId])
   @@index([invitedById])
@@ -62,6 +64,7 @@ model Tenant {
   products              Product[]
   sales                 Sale[]
   orders                WholesaleOrder[]
+  customerOrders        CustomerOrder[]
   costProfiles          CostProfile[]
   purchases             Purchase[]
   suppliers             Supplier[]
@@ -110,11 +113,15 @@ model TenantSettings {
   financialFeeEnabled Boolean @default(true)
   financialFeeRatePct Decimal @default(3.5) @db.Decimal(5, 2)
 
-  bnaInstallmentsEnabled Boolean @default(false)
-  bnaMarkupRatePct Decimal @default(40) @db.Decimal(5, 2)
-  bnaDefaultInstallments Int @default(12)
-  bnaCustomerRebatePct Decimal @default(10) @db.Decimal(5, 2)
+  bnaInstallmentsEnabled  Boolean @default(false)
+  bnaMarkupRatePct        Decimal @default(40) @db.Decimal(5, 2)
+  bnaDefaultInstallments  Int     @default(12)
+  bnaCustomerRebatePct    Decimal @default(10) @db.Decimal(5, 2)
   bnaCustomerRebateCapArs Decimal @default(30000) @db.Decimal(12, 2)
+
+  customerOrderMinimumDepositUsd   Decimal @default(100) @db.Decimal(12, 2)
+  customerOrderDefaultDeliveryDays Int     @default(7)
+  customerOrderDeliveryDisclaimer  String  @default("Fecha de entrega estimada. Puede presentar demoras por logística, disponibilidad de proveedor o causas ajenas al negocio.") @db.Text
 
   usedDeviceWarrantyDays Int    @default(30)
   warrantyPolicyText     String @default("") @db.Text
@@ -156,6 +163,7 @@ model ProductCatalogModel {
   products                 Product[]
   phoneCompatibilities     ProductModelCompatibility[] @relation("CompatiblePhoneModel")
   accessoryCompatibilities ProductModelCompatibility[] @relation("CompatibleAccessoryModel")
+  customerOrderItems       CustomerOrderItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -175,7 +183,8 @@ model ProductCatalogCapacity {
   isActive   Boolean       @default(true)
   sortOrder  Int           @default(0)
 
-  products Product[]
+  products           Product[]
+  customerOrderItems CustomerOrderItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -214,8 +223,9 @@ model ProductCatalogColor {
   isActive       Boolean       @default(true)
   sortOrder      Int           @default(0)
 
-  aliases  ProductCatalogColorAlias[]
-  products Product[]
+  aliases            ProductCatalogColorAlias[]
+  products           Product[]
+  customerOrderItems CustomerOrderItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -323,9 +333,12 @@ model Product {
   PurchaseItem PurchaseItem[]
 
   // NUEVO: productos marcados como “de interés” en citas
-  appointmentInterests AppointmentInterest[]
-  reservationItems     ReservationItem[]
-  serviceOrders        ServiceOrder[]
+  appointmentInterests        AppointmentInterest[]
+  reservationItems            ReservationItem[]
+  serviceOrders               ServiceOrder[]
+  customerOrderStockItems     CustomerOrderItem[]                @relation("CustomerOrderItemStockProduct")
+  customerOrderFulfilledItems CustomerOrderItem[]                @relation("CustomerOrderItemFulfilledProduct")
+  customerOrderAllocations    CustomerOrderInventoryAllocation[]
 
   @@index([tenantId, type, modelName])
   @@index([tenantId, modelName, capacityGB, condition])
@@ -369,9 +382,10 @@ model Buyer {
 
   sales Sale[]
 
-  appointments  Appointment[]
-  reservations  Reservation[]
-  serviceOrders ServiceOrder[]
+  appointments   Appointment[]
+  reservations   Reservation[]
+  serviceOrders  ServiceOrder[]
+  customerOrders CustomerOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -412,7 +426,7 @@ model Sale {
   origin       String? // "Local", "Conocido", "Instagram", etc.
   notes        String?
 
-  exchangeRate       Decimal? @db.Decimal(12, 4)
+  exchangeRate       Decimal?  @db.Decimal(12, 4)
   exchangeRateSource String?
   exchangeRateAt     DateTime?
 
@@ -423,6 +437,7 @@ model Sale {
   items             SaleItem[]
   payments          Payment[]
   receipt           SaleReceipt?
+  customerOrder     CustomerOrder?
   closerCommissions CloserCommission[]
 
   // NUEVO: citas que terminaron en esta venta (en la práctica suele ser 0 o 1)
@@ -520,28 +535,195 @@ model Payment {
   saleId String
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
-  method                     PaymentMethod
-  currency                   Currency            @default(USD) // es mas complejo porque puede estar en diferentes currencies, pero lo ideal seria llevar los payments con currency != USD a su valor equivalente en USD
-  amount                     Decimal             @db.Decimal(12, 2)
-  exchangeRate               Decimal?            @db.Decimal(12, 4)
-  amountUsd                  Decimal?            @db.Decimal(12, 2)
-  coveredBaseUsd             Decimal?            @db.Decimal(14, 6)
-  surchargePct               Decimal?            @db.Decimal(5, 2)
-  surchargeAmount            Decimal?            @db.Decimal(12, 2)
-  installments               Int?
-  installmentAmount          Decimal?            @db.Decimal(12, 2)
-  pricingSnapshot            Json?
-  cashAccountId              String?
-  cashAccount                CashAccount?        @relation("SalePaymentCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
-  originReservationPaymentId String?             @unique
-  originReservationPayment   ReservationPayment? @relation("ReservationPaymentConvertedToSalePayment", fields: [originReservationPaymentId], references: [id], onDelete: SetNull)
-  paidAt                     DateTime            @default(now())
-  note                       String?
+  method                       PaymentMethod
+  currency                     Currency              @default(USD) // es mas complejo porque puede estar en diferentes currencies, pero lo ideal seria llevar los payments con currency != USD a su valor equivalente en USD
+  amount                       Decimal               @db.Decimal(12, 2)
+  exchangeRate                 Decimal?              @db.Decimal(12, 4)
+  amountUsd                    Decimal?              @db.Decimal(12, 2)
+  coveredBaseUsd               Decimal?              @db.Decimal(14, 6)
+  surchargePct                 Decimal?              @db.Decimal(5, 2)
+  surchargeAmount              Decimal?              @db.Decimal(12, 2)
+  installments                 Int?
+  installmentAmount            Decimal?              @db.Decimal(12, 2)
+  pricingSnapshot              Json?
+  cashAccountId                String?
+  cashAccount                  CashAccount?          @relation("SalePaymentCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
+  originReservationPaymentId   String?               @unique
+  originReservationPayment     ReservationPayment?   @relation("ReservationPaymentConvertedToSalePayment", fields: [originReservationPaymentId], references: [id], onDelete: SetNull)
+  originCustomerOrderPaymentId String?               @unique
+  originCustomerOrderPayment   CustomerOrderPayment? @relation("CustomerOrderPaymentConvertedToSalePayment", fields: [originCustomerOrderPaymentId], references: [id], onDelete: SetNull)
+  paidAt                       DateTime              @default(now())
+  note                         String?
 
   createdAt DateTime @default(now())
 
   @@index([saleId, paidAt])
   @@index([cashAccountId])
+  @@index([coveredBaseUsd])
+}
+
+model CustomerOrder {
+  id          String @id @default(cuid())
+  orderNumber Int    @unique @default(autoincrement())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  buyerId String
+  buyer   Buyer  @relation(fields: [buyerId], references: [id])
+
+  createdById String?
+  createdBy   User?   @relation("CustomerOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  assignedSellerId String?
+  assignedSeller   User?   @relation("CustomerOrderAssignedSeller", fields: [assignedSellerId], references: [id], onDelete: SetNull)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  convertedSaleId String? @unique
+  convertedSale   Sale?   @relation(fields: [convertedSaleId], references: [id], onDelete: SetNull)
+
+  status CustomerOrderStatus @default(CONFIRMED)
+  source CustomerOrderSource @default(INTERNAL)
+
+  requestedAt         DateTime  @default(now())
+  estimatedDeliveryAt DateTime?
+
+  agreedTotalUsd Decimal @db.Decimal(12, 2)
+  amountPaidUsd  Decimal @default(0) @db.Decimal(12, 2)
+  balanceDueUsd  Decimal @default(0) @db.Decimal(12, 2)
+
+  notes                      String?
+  customerNameSnapshot       String?
+  customerDocumentSnapshot   String?
+  customerPhoneSnapshot      String?
+  customerEmailSnapshot      String?
+  deliveryDisclaimerSnapshot String?
+
+  cancelledAt DateTime?
+  convertedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  items       CustomerOrderItem[]
+  payments    CustomerOrderPayment[]
+  allocations CustomerOrderInventoryAllocation[]
+
+  @@index([tenantId, requestedAt])
+  @@index([tenantId, status])
+  @@index([buyerId])
+  @@index([createdById])
+  @@index([assignedSellerId])
+  @@index([branchId])
+  @@index([appointmentId])
+}
+
+model CustomerOrderItem {
+  id      String        @id @default(cuid())
+  orderId String
+  order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  kind CustomerOrderItemKind
+
+  stockProductId String?
+  stockProduct   Product? @relation("CustomerOrderItemStockProduct", fields: [stockProductId], references: [id], onDelete: SetNull)
+
+  fulfilledProductId String?
+  fulfilledProduct   Product? @relation("CustomerOrderItemFulfilledProduct", fields: [fulfilledProductId], references: [id], onDelete: SetNull)
+
+  purchaseItemId String?
+  purchaseItem   PurchaseItem? @relation(fields: [purchaseItemId], references: [id], onDelete: SetNull)
+
+  catalogModelId String?
+  catalogModel   ProductCatalogModel? @relation(fields: [catalogModelId], references: [id], onDelete: SetNull)
+
+  catalogCapacityId String?
+  catalogCapacity   ProductCatalogCapacity? @relation(fields: [catalogCapacityId], references: [id], onDelete: SetNull)
+
+  catalogColorId String?
+  catalogColor   ProductCatalogColor? @relation(fields: [catalogColorId], references: [id], onDelete: SetNull)
+
+  descriptionSnapshot String
+  modelNameSnapshot   String?
+  capacityGBSnapshot  Int?
+  colorSnapshot       String?
+  conditionSnapshot   Condition?
+
+  quantity     Int      @default(1)
+  unitPriceUsd Decimal  @db.Decimal(12, 2)
+  unitCostUsd  Decimal? @db.Decimal(12, 2)
+  lineTotalUsd Decimal  @db.Decimal(12, 2)
+  notes        String?
+
+  allocation CustomerOrderInventoryAllocation?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([orderId])
+  @@index([stockProductId])
+  @@index([fulfilledProductId])
+  @@index([purchaseItemId])
+  @@index([catalogModelId])
+}
+
+model CustomerOrderInventoryAllocation {
+  id      String        @id @default(cuid())
+  orderId String
+  order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  itemId String            @unique
+  item   CustomerOrderItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Int
+  status   CustomerOrderAllocationStatus @default(ACTIVE)
+
+  reservedAt DateTime  @default(now())
+  consumedAt DateTime?
+  releasedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([orderId, status])
+  @@index([productId, status])
+}
+
+model CustomerOrderPayment {
+  id      String        @id @default(cuid())
+  orderId String
+  order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  method   PaymentMethod
+  currency Currency      @default(USD)
+  amount   Decimal       @db.Decimal(12, 2)
+
+  exchangeRate      Decimal? @db.Decimal(12, 4)
+  amountUsd         Decimal? @db.Decimal(12, 2)
+  coveredBaseUsd    Decimal? @db.Decimal(14, 6)
+  surchargePct      Decimal? @db.Decimal(5, 2)
+  surchargeAmount   Decimal? @db.Decimal(12, 2)
+  installments      Int?
+  installmentAmount Decimal? @db.Decimal(12, 2)
+  pricingSnapshot   Json?
+
+  cashAccountId String?
+  cashAccount   CashAccount? @relation("CustomerOrderPaymentCashAccount", fields: [cashAccountId], references: [id], onDelete: SetNull)
+
+  salePayment Payment? @relation("CustomerOrderPaymentConvertedToSalePayment")
+
+  paidAt    DateTime @default(now())
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId, paidAt])
+  @@index([cashAccountId])
+  @@index([coveredBaseUsd])
 }
 
 /// “Pedidos mayoristas” (leads/órdenes) previo a convertir en venta.
@@ -651,14 +833,15 @@ model Purchase {
 
 /// Ítem de una compra: cuántas unidades de un producto se compraron y a qué costo.
 model PurchaseItem {
-  id         String   @id @default(cuid())
-  purchaseId String
-  productId  String
-  purchase   Purchase @relation(fields: [purchaseId], references: [id])
-  product    Product  @relation(fields: [productId], references: [id])
-  units      Int
-  unitCost   Decimal  @db.Decimal(12, 2)
-  totalCost  Decimal  @db.Decimal(12, 2)
+  id                 String              @id @default(cuid())
+  purchaseId         String
+  productId          String
+  purchase           Purchase            @relation(fields: [purchaseId], references: [id])
+  product            Product             @relation(fields: [productId], references: [id])
+  units              Int
+  unitCost           Decimal             @db.Decimal(12, 2)
+  totalCost          Decimal             @db.Decimal(12, 2)
+  customerOrderItems CustomerOrderItem[]
 
   @@index([purchaseId])
   @@index([productId])
@@ -696,7 +879,8 @@ model Appointment {
   resultNotes       String? // notas internas sobre cómo fue la cita
 
   /// Productos de interés del Buyer para esta cita
-  interests AppointmentInterest[]
+  interests      AppointmentInterest[]
+  customerOrders CustomerOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -756,6 +940,7 @@ model Branch {
   cashTransfers     CashTransfer[]
   cashDailyCloses   CashDailyClose[]
   reservations      Reservation[]
+  customerOrders    CustomerOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1004,14 +1189,15 @@ model CashAccount {
   sortOrder Int              @default(0)
   isActive  Boolean          @default(true)
 
-  movements           CashMovement[]
-  transfersFrom       CashTransfer[]                  @relation("CashTransferFrom")
-  transfersTo         CashTransfer[]                  @relation("CashTransferTo")
-  closeSnapshots      CashDailyCloseAccountSnapshot[]
-  salePayments        Payment[]                       @relation("SalePaymentCashAccount")
-  purchasePayments    PurchasePayment[]               @relation("PurchasePaymentCashAccount")
-  reservationPayments ReservationPayment[]            @relation("ReservationPaymentCashAccount")
-  closerCommissions   CloserCommission[]              @relation("CloserCommissionCashAccount")
+  movements             CashMovement[]
+  transfersFrom         CashTransfer[]                  @relation("CashTransferFrom")
+  transfersTo           CashTransfer[]                  @relation("CashTransferTo")
+  closeSnapshots        CashDailyCloseAccountSnapshot[]
+  salePayments          Payment[]                       @relation("SalePaymentCashAccount")
+  purchasePayments      PurchasePayment[]               @relation("PurchasePaymentCashAccount")
+  reservationPayments   ReservationPayment[]            @relation("ReservationPaymentCashAccount")
+  customerOrderPayments CustomerOrderPayment[]          @relation("CustomerOrderPaymentCashAccount")
+  closerCommissions     CloserCommission[]              @relation("CloserCommissionCashAccount")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1256,15 +1442,46 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum CustomerOrderStatus {
+  CONFIRMED
+  PROCUREMENT_PENDING
+  ORDERED_TO_SUPPLIER
+  IN_TRANSIT
+  RECEIVED
+  READY_FOR_DELIVERY
+  CONVERTED
+  CANCELLED
+}
+
+enum CustomerOrderSource {
+  INTERNAL
+  INSTAGRAM
+  OFFICE
+  ECOMMERCE
+  WHATSAPP
+  OTHER
+}
+
+enum CustomerOrderItemKind {
+  STOCK
+  ON_DEMAND
+}
+
+enum CustomerOrderAllocationStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
+}
+
 enum PaymentMethod {
   EFECTIVO_PESOS
   EFECTIVO_USD
   TRANSFERENCIA_ARS
   TRANSFERENCIA_USD
   TARJETA
-  BNA_CUOTAS
   USDT
   PLAN_CANJE
+  BNA_CUOTAS
 }
 
 /// Moneda utilizada en compras/pagos.
@@ -1363,12 +1580,18 @@ enum AuditAction {
   CASH_MOVEMENT_CORRECTED
   CASH_ACCOUNT_REASSIGNED
   CASH_BACKFILL
+  ORDER_CREATED
+  ORDER_STATUS_CHANGE
+  ORDER_CANCELLED
+  ORDER_CONVERTED
+  ORDER_ITEM_ALLOCATED
 }
 
 enum AuditModule {
   AUTH
   CONFIG
   CATALOG
+  ORDER
   PRODUCT
   SALE
   PURCHASE
@@ -1413,6 +1636,7 @@ enum CashMovementCategory {
   CONVERSION
   ADJUSTMENT
   REVERSAL
+  CUSTOMER_ORDER_PAYMENT
 }
 
 enum CashMovementSource {
@@ -1424,6 +1648,7 @@ enum CashMovementSource {
   CLOSER_COMMISSION
   TRANSFER
   MANUAL
+  CUSTOMER_ORDER_PAYMENT
 }
 
 enum CashTransferKind {

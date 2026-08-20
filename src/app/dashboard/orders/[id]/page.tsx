@@ -29,7 +29,7 @@ export default async function CustomerOrderDetailPage({ params }: { params: Prom
 
   const [products, cashAccounts] = await Promise.all([
     prisma.product.findMany({
-      where: { tenantId, branchId: order.branchId, stockAvailable: { gt: 0 }, status: "AVAILABLE" },
+      where: { tenantId, branchId: order.branchId, stockAvailable: { gt: 0 }, status: "AVAILABLE", state: { in: ["EN_STOCK", "DISPONIBLE"] } },
       orderBy: [{ type: "asc" }, { modelName: "asc" }],
       select: { id: true, modelName: true, capacityGB: true, color: true, stockAvailable: true },
     }),

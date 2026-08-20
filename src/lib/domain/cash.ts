@@ -119,6 +119,7 @@ export function getCashMovementCategoryLabel(category: string) {
   const labels: Record<string, string> = {
     SALE_PAYMENT: "Cobro de venta",
     RESERVATION_DEPOSIT: "Sena de reserva",
+    CUSTOMER_ORDER_PAYMENT: "Cobro de pedido",
     PURCHASE_PAYMENT: "Pago de compra",
     EXPENSE: "Gasto",
     SERVICE_PAYMENT: "Servicio tecnico",
@@ -382,9 +383,10 @@ export async function postSalePaymentToCash(params: ActorParams & {
     paidAt: Date
     cashAccountId?: string | null
     originReservationPaymentId?: string | null
+    originCustomerOrderPaymentId?: string | null
   }
 }) {
-  if (params.payment.originReservationPaymentId) return null
+  if (params.payment.originReservationPaymentId || params.payment.originCustomerOrderPaymentId) return null
   return postDomainPaymentMovement({
     ...params,
     branchId: params.sale.branchId,

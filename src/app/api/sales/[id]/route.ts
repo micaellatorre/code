@@ -1,7 +1,7 @@
 // code/src/app/api/sales/[id]/route.ts
 
 import { NextRequest, NextResponse } from "next/server"
-import { Currency, PaymentMethod, Prisma, ProductState, SaleItemKind, SaleStatus, UserRole } from "@prisma/client"
+import { Currency, PaymentMethod, Prisma, ProductState, SaleItemKind, SaleStatus, UserRole, type CashMovementSource } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { requireRoleApi } from "@/lib/auth/auth"
 import { createAuditLog } from "@/lib/domain/audit"
@@ -100,6 +100,16 @@ function jsonInput(value: Prisma.JsonValue | Prisma.InputJsonValue | null | unde
 
 function dateEquals(left: Date | null | undefined, right: Date | null | undefined) {
   return (left?.getTime() ?? null) === (right?.getTime() ?? null)
+}
+
+function paymentCashSource(payment: { id: string; originReservationPaymentId?: string | null; originCustomerOrderPaymentId?: string | null }): { sourceType: CashMovementSource; sourceId: string } {
+  if (payment.originCustomerOrderPaymentId) return { sourceType: "CUSTOMER_ORDER_PAYMENT", sourceId: payment.originCustomerOrderPaymentId }
+  if (payment.originReservationPaymentId) return { sourceType: "RESERVATION_PAYMENT", sourceId: payment.originReservationPaymentId }
+  return { sourceType: "SALE_PAYMENT", sourceId: payment.id }
+}
+
+function isExternalOriginPayment(payment: { originReservationPaymentId?: string | null; originCustomerOrderPaymentId?: string | null }) {
+  return Boolean(payment.originReservationPaymentId || payment.originCustomerOrderPaymentId)
 }
 
 function nextProductState(type: string, stock: number, state: ProductState): ProductState {
@@ -280,13 +290,14 @@ export async function DELETE(_: NextRequest, { params }: Ctx) {
       }
 
       for (const payment of sale.payments) {
+        const cashSource = paymentCashSource(payment)
         await reverseSourceCashMovement({
           tx,
           tenantId: sale.tenantId,
           actorUserId: auth.session.user.id,
           actorRole: auth.session.user.activeRole as UserRole,
-          sourceType: "SALE_PAYMENT",
-          sourceId: payment.id,
+          sourceType: cashSource.sourceType,
+          sourceId: cashSource.sourceId,
           reason: `Venta ${sale.id} cancelada`,
         })
       }
@@ -863,6 +874,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           const method = payment.method as PaymentMethod
           const currency = payment.currency as Currency
           const submittedRate = payment.exchangeRate == null ? null : decimal(payment.exchangeRate)
+          const submittedCashAccountId = isMonetaryPaymentMethod(method) ? payment.cashAccountId || null : null
+          const submittedPaidAt = payment.paidAt ? new Date(payment.paidAt) : existing?.paidAt ?? new Date()
           const unchangedExisting = Boolean(
             existing &&
             existing.coveredBaseUsd != null &&
@@ -872,6 +885,17 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             decimalEquals(existing.exchangeRate, submittedRate) &&
             existing.installments === (payment.installments ?? null)
           )
+
+          if (targetStatus !== "CANCELADA" && existing && isExternalOriginPayment(existing)) {
+            const externalPaymentChanged =
+              !unchangedExisting ||
+              existing.cashAccountId !== submittedCashAccountId ||
+              !dateEquals(existing.paidAt, submittedPaidAt)
+
+            if (externalPaymentChanged) {
+              throw new Error("Los pagos originados en reservas o pedidos no se editan desde la venta.")
+            }
+          }
 
           if (unchangedExisting && existing) {
             return {
@@ -888,9 +912,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
               installments: existing.installments,
               installmentAmount: existing.installmentAmount,
               pricingSnapshot: jsonInput(existing.pricingSnapshot),
-              cashAccountId: isMonetaryPaymentMethod(method) ? payment.cashAccountId || null : null,
+              cashAccountId: submittedCashAccountId,
               note: payment.note == null || String(payment.note).trim() === "" ? null : String(payment.note),
-              paidAt: payment.paidAt ? new Date(payment.paidAt) : existing.paidAt,
+              paidAt: submittedPaidAt,
             }
           }
 
@@ -918,9 +942,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
             installments: pricing.installments,
             installmentAmount: pricing.installmentAmount,
             pricingSnapshot: buildPaymentPricingSnapshot(pricing, currentRateSnapshot),
-            cashAccountId: isMonetaryPaymentMethod(method) ? payment.cashAccountId || null : null,
+            cashAccountId: submittedCashAccountId,
             note: payment.note == null || String(payment.note).trim() === "" ? null : String(payment.note),
-            paidAt: payment.paidAt ? new Date(payment.paidAt) : new Date(),
+            paidAt: submittedPaidAt,
           }
         })
 
@@ -974,13 +998,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
               payment: persisted,
             })
           } else if (existing && (targetStatus === "CANCELADA" || changedFinancially)) {
+            const cashSource = paymentCashSource(existing)
             await reverseSourceCashMovement({
               tx,
               tenantId: sale.tenantId,
               actorUserId: auth.session.user.id,
               actorRole: auth.session.user.activeRole as UserRole,
-              sourceType: "SALE_PAYMENT",
-              sourceId: existing.id,
+              sourceType: cashSource.sourceType,
+              sourceId: cashSource.sourceId,
               reason: targetStatus === "CANCELADA"
                 ? `Venta ${sale.id} cancelada`
                 : `Pago de venta ${existing.id} convertido a metodo no monetario`,
@@ -990,13 +1015,17 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
         for (const existing of sale.payments) {
           if (keptPaymentIds.has(existing.id)) continue
+          if (targetStatus !== "CANCELADA" && isExternalOriginPayment(existing)) {
+            throw new Error("Los pagos originados en reservas o pedidos no se eliminan desde la venta.")
+          }
+          const cashSource = paymentCashSource(existing)
           await reverseSourceCashMovement({
             tx,
             tenantId: sale.tenantId,
             actorUserId: auth.session.user.id,
             actorRole: auth.session.user.activeRole as UserRole,
-            sourceType: "SALE_PAYMENT",
-            sourceId: existing.id,
+            sourceType: cashSource.sourceType,
+            sourceId: cashSource.sourceId,
             reason: `Pago de venta ${existing.id} eliminado`,
           })
           await tx.payment.delete({ where: { id: existing.id } })
@@ -1005,13 +1034,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
       if (targetStatus === "CANCELADA" && sale.status !== "CANCELADA") {
         for (const payment of sale.payments) {
+          const cashSource = paymentCashSource(payment)
           await reverseSourceCashMovement({
             tx,
             tenantId: sale.tenantId,
             actorUserId: auth.session.user.id,
             actorRole: auth.session.user.activeRole as UserRole,
-            sourceType: "SALE_PAYMENT",
-            sourceId: payment.id,
+            sourceType: cashSource.sourceType,
+            sourceId: cashSource.sourceId,
             reason: `Venta ${sale.id} cancelada`,
           })
         }
@@ -1146,6 +1176,7 @@ function serializeSale(sale: any) {
           pricingSnapshot: p.pricingSnapshot ?? null,
           cashAccountId: p.cashAccountId ?? null,
           originReservationPaymentId: p.originReservationPaymentId ?? null,
+          originCustomerOrderPaymentId: p.originCustomerOrderPaymentId ?? null,
         }))
       : [],
     items: Array.isArray(sale.items)

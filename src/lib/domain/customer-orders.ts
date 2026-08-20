@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto"
-import { Prisma, type Currency, type PaymentMethod, type UserRole } from "@prisma/client"
+import { Prisma, type Currency, type PaymentMethod, type ProductState, type ProductStatus, type ProductType, type UserRole } from "@prisma/client"
 import prisma from "@/lib/prisma"
 import { assertCashBusinessDateOpen, isMonetaryPaymentMethod } from "@/lib/domain/cash"
 
@@ -19,6 +19,18 @@ export type CustomerOrderSource = "INTERNAL" | "INSTAGRAM" | "OFFICE" | "ECOMMER
 export type CustomerOrderItemKind = "STOCK" | "ON_DEMAND"
 
 type Actor = { tenantId: string; actorUserId: string; actorRole: UserRole | string }
+
+const RESERVABLE_PRODUCT_STATES: ProductState[] = ["EN_STOCK", "DISPONIBLE"]
+
+function assertReservableProduct(product: { status: ProductStatus; state: ProductState }, description: string) {
+  if (product.status !== "AVAILABLE" || !RESERVABLE_PRODUCT_STATES.includes(product.state)) {
+    throw new Error(`Producto no disponible para reservar: ${description}`)
+  }
+}
+
+function soldOutState(type: ProductType): ProductState {
+  return type === "PHONE" ? "VENDIDO" : "FUERA_DE_STOCK"
+}
 
 export type PricedOrderPayment = {
   method: PaymentMethod
@@ -314,22 +326,27 @@ export async function createCustomerOrder(params: Actor & { input: CreateCustome
 
     for (const item of params.input.items) {
       if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new Error("La cantidad de cada ítem debe ser un entero positivo.")
+      const unitPrice = usd(item.unitPriceUsd)
+      if (unitPrice.lessThan(0)) throw new Error("El precio de cada item no puede ser negativo.")
       const itemId = randomUUID()
       let unitCost = item.unitCostUsd ?? null
       let fulfilledProductId: string | null = null
       if (item.kind === "STOCK") {
         if (!item.stockProductId) throw new Error("Los ítems de stock requieren producto.")
-        const product = await tx.product.findFirst({ where: { id: item.stockProductId, tenantId: params.tenantId }, select: { id: true, branchId: true, costPrice: true, stockAvailable: true } })
+        const product = await tx.product.findFirst({ where: { id: item.stockProductId, tenantId: params.tenantId }, select: { id: true, branchId: true, costPrice: true, stockAvailable: true, status: true, state: true } })
         if (!product || product.branchId !== branch.id) throw new Error(`Producto de stock no disponible en la sucursal: ${item.description}`)
+        assertReservableProduct(product, item.description)
         const reserved = await tx.product.updateMany({
-          where: { id: product.id, tenantId: params.tenantId, stockAvailable: { gte: item.quantity } },
+          where: { id: product.id, tenantId: params.tenantId, status: "AVAILABLE", state: { in: RESERVABLE_PRODUCT_STATES }, stockAvailable: { gte: item.quantity } },
           data: { stockAvailable: { decrement: item.quantity } },
         })
         if (reserved.count !== 1) throw new Error(`Stock insuficiente para reservar: ${item.description}`)
         unitCost = product.costPrice
         fulfilledProductId = product.id
+      } else if (item.stockProductId) {
+        throw new Error("Los items bajo demanda no deben traer producto de stock.")
       }
-      const lineTotal = usd(item.unitPriceUsd).mul(item.quantity).toDecimalPlaces(2)
+      const lineTotal = unitPrice.mul(item.quantity).toDecimalPlaces(2)
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO "CustomerOrderItem" (
           "id", "orderId", "kind", "stockProductId", "fulfilledProductId", "catalogModelId", "catalogCapacityId", "catalogColorId",
@@ -339,7 +356,7 @@ export async function createCustomerOrder(params: Actor & { input: CreateCustome
           ${itemId}, ${orderId}, ${item.kind}::"CustomerOrderItemKind", ${item.stockProductId ?? null}, ${fulfilledProductId},
           ${item.catalogModelId ?? null}, ${item.catalogCapacityId ?? null}, ${item.catalogColorId ?? null}, ${item.description},
           ${item.modelName ?? null}, ${item.capacityGB ?? null}, ${item.color ?? null}, ${item.condition ?? null}::"Condition",
-          ${item.quantity}, ${usd(item.unitPriceUsd)}, ${unitCost}, ${lineTotal}, ${item.notes ?? null}, NOW(), NOW()
+          ${item.quantity}, ${unitPrice}, ${unitCost}, ${lineTotal}, ${item.notes ?? null}, NOW(), NOW()
         )
       `)
       if (fulfilledProductId) {
@@ -412,9 +429,10 @@ export async function assignOrderItemProduct(params: Actor & { orderId: string; 
     const item = items[0]
     if (!item) throw new Error("Ítem de pedido no encontrado.")
     if (item.fulfilledProductId) throw new Error("El ítem ya tiene producto asignado.")
-    const product = await tx.product.findFirst({ where: { id: params.productId, tenantId: params.tenantId }, select: { id: true, branchId: true, costPrice: true } })
+    const product = await tx.product.findFirst({ where: { id: params.productId, tenantId: params.tenantId }, select: { id: true, branchId: true, costPrice: true, status: true, state: true } })
     if (!product || product.branchId !== order.branchId) throw new Error("Producto no disponible en la sucursal del pedido.")
-    const reserved = await tx.product.updateMany({ where: { id: product.id, tenantId: params.tenantId, stockAvailable: { gte: item.quantity } }, data: { stockAvailable: { decrement: item.quantity } } })
+    assertReservableProduct(product, "producto asignado")
+    const reserved = await tx.product.updateMany({ where: { id: product.id, tenantId: params.tenantId, status: "AVAILABLE", state: { in: RESERVABLE_PRODUCT_STATES }, stockAvailable: { gte: item.quantity } }, data: { stockAvailable: { decrement: item.quantity } } })
     if (reserved.count !== 1) throw new Error("Stock disponible insuficiente para asignar el producto.")
     await tx.$executeRaw(Prisma.sql`
       UPDATE "CustomerOrderItem" SET "fulfilledProductId" = ${product.id}, "unitCostUsd" = ${product.costPrice}, "updatedAt" = NOW() WHERE "id" = ${item.id}
@@ -445,7 +463,8 @@ export async function transitionCustomerOrder(params: Actor & { orderId: string;
         SELECT "id", "productId", "quantity" FROM "CustomerOrderInventoryAllocation" WHERE "orderId" = ${order.id} AND "status" = 'ACTIVE'::"CustomerOrderAllocationStatus"
       `)
       for (const allocation of allocations) {
-        await tx.product.update({ where: { id: allocation.productId }, data: { stockAvailable: { increment: allocation.quantity } } })
+        const released = await tx.product.updateMany({ where: { id: allocation.productId, tenantId: params.tenantId }, data: { stockAvailable: { increment: allocation.quantity } } })
+        if (released.count !== 1) throw new Error("No se pudo liberar una reserva de stock del pedido.")
       }
       await tx.$executeRaw(Prisma.sql`
         UPDATE "CustomerOrderInventoryAllocation" SET "status" = 'RELEASED'::"CustomerOrderAllocationStatus", "releasedAt" = NOW()
@@ -488,7 +507,7 @@ export async function convertCustomerOrderToSale(params: Actor & { orderId: stri
       SELECT "itemId", "productId", "quantity" FROM "CustomerOrderInventoryAllocation" WHERE "orderId" = ${order.id} AND "status" = 'ACTIVE'::"CustomerOrderAllocationStatus"
     `)
     if (allocations.length !== items.length) throw new Error("El pedido no tiene todas las reservas de inventario activas.")
-    const products = await tx.product.findMany({ where: { id: { in: items.map((item) => item.fulfilledProductId as string) }, tenantId: params.tenantId }, select: { id: true, stock: true, costPrice: true } })
+    const products = await tx.product.findMany({ where: { id: { in: items.map((item) => item.fulfilledProductId as string) }, tenantId: params.tenantId }, select: { id: true, type: true, stock: true, costPrice: true } })
     const productMap = new Map(products.map((product) => [product.id, product]))
     for (const allocation of allocations) {
       const product = productMap.get(allocation.productId)
@@ -538,6 +557,10 @@ export async function convertCustomerOrderToSale(params: Actor & { orderId: stri
       })
       const updated = await tx.product.updateMany({ where: { id: productId, tenantId: params.tenantId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } })
       if (updated.count !== 1) throw new Error("Conflicto de stock al convertir el pedido en venta.")
+      const remaining = await tx.product.findFirst({ where: { id: productId, tenantId: params.tenantId }, select: { stock: true } })
+      if (remaining && remaining.stock <= 0) {
+        await tx.product.updateMany({ where: { id: productId, tenantId: params.tenantId }, data: { state: soldOutState(product.type) } })
+      }
     }
     const payments = await tx.$queryRaw<Array<{
       id: string
@@ -598,14 +621,20 @@ export async function updateCustomerOrderSettings(params: Actor & {
 }) {
   if (params.minimumDepositUsd.lessThan(0)) throw new Error("La seña mínima no puede ser negativa.")
   if (!Number.isInteger(params.defaultDeliveryDays) || params.defaultDeliveryDays < 0 || params.defaultDeliveryDays > 365) throw new Error("Los días de entrega deben estar entre 0 y 365.")
-  await prisma.$executeRaw(Prisma.sql`
-    UPDATE "TenantSettings" SET
-      "customerOrderMinimumDepositUsd" = ${params.minimumDepositUsd},
-      "customerOrderDefaultDeliveryDays" = ${params.defaultDeliveryDays},
-      "customerOrderDeliveryDisclaimer" = ${params.deliveryDisclaimer},
-      "updatedAt" = NOW()
-    WHERE "tenantId" = ${params.tenantId}
-  `)
+  await prisma.tenantSettings.upsert({
+    where: { tenantId: params.tenantId },
+    create: {
+      tenantId: params.tenantId,
+      customerOrderMinimumDepositUsd: params.minimumDepositUsd,
+      customerOrderDefaultDeliveryDays: params.defaultDeliveryDays,
+      customerOrderDeliveryDisclaimer: params.deliveryDisclaimer,
+    },
+    update: {
+      customerOrderMinimumDepositUsd: params.minimumDepositUsd,
+      customerOrderDefaultDeliveryDays: params.defaultDeliveryDays,
+      customerOrderDeliveryDisclaimer: params.deliveryDisclaimer,
+    },
+  })
   return rawSettings(params.tenantId)
 }
 

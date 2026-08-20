@@ -26,7 +26,7 @@ export default async function NewCustomerOrderPage() {
       select: { id: true, name: true, surname: true, dni: true, phone: true, email: true },
     }),
     prisma.product.findMany({
-      where: { tenantId, branchId, type: "ACCESSORY", stockAvailable: { gt: 0 }, status: "AVAILABLE" },
+      where: { tenantId, branchId, type: "ACCESSORY", stockAvailable: { gt: 0 }, status: "AVAILABLE", state: { in: ["EN_STOCK", "DISPONIBLE"] } },
       orderBy: { modelName: "asc" },
       select: { id: true, modelName: true, color: true, salePrice: true, stockAvailable: true },
     }),
