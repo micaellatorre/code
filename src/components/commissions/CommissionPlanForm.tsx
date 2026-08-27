@@ -1,15 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-export default function CommissionPlanForm() {
+type CommissionPlanFormProps = {
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: () => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+const emptyForm = { name: "", base: "SALE_PROFIT", ratePct: "", isActive: true }
+
+export default function CommissionPlanForm({ formId, hideActions = false, onSuccess, onCancel, onDirtyChange, onSubmittingChange }: CommissionPlanFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnCloserId = searchParams.get("closerId")
-  const [form, setForm] = useState({ name: "", base: "SALE_PROFIT", ratePct: "", isActive: true })
+  const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const initialSnapshot = useMemo(() => JSON.stringify(emptyForm), [])
+  const dirty = JSON.stringify(form) !== initialSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSaving)
+  }, [isSaving, onSubmittingChange])
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -29,12 +50,16 @@ export default function CommissionPlanForm() {
       return
     }
 
-    router.push(returnCloserId ? `/dashboard/commissions/${returnCloserId}/edit` : "/dashboard/commissions")
-    router.refresh()
+    if (onSuccess) {
+      onSuccess()
+    } else {
+      router.push(returnCloserId ? `/dashboard/commissions/${returnCloserId}/edit` : "/dashboard/commissions")
+      router.refresh()
+    }
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form id={formId} onSubmit={submit} className="space-y-4">
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
 
       <section className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-4">
@@ -91,13 +116,15 @@ export default function CommissionPlanForm() {
         </div>
       </section>
 
-      <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-base-300 bg-base-100/95 px-1 py-3 backdrop-blur">
-        <button type="button" className="btn btn-ghost" onClick={() => router.push("/dashboard/commissions")} disabled={isSaving}>Cancelar</button>
-        <button type="submit" className="btn btn-primary" disabled={isSaving}>
-          {isSaving ? <span className="loading loading-spinner loading-xs" /> : null}
-          Crear plan
-        </button>
-      </div>
+      {!hideActions ? (
+        <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-base-300 bg-base-100/95 px-1 py-3 backdrop-blur">
+          <button type="button" className="btn btn-ghost" onClick={onCancel ?? (() => router.push("/dashboard/commissions"))} disabled={isSaving}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={isSaving}>
+            {isSaving ? <span className="loading loading-spinner loading-xs" /> : null}
+            Crear plan
+          </button>
+        </div>
+      ) : null}
     </form>
   )
 }

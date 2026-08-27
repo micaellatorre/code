@@ -1,10 +1,13 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import SupplierForm from "@/components/suppliers/SupplierForm"
 
 export default function NewSupplierForm() {
+  const router = useRouter()
+
   return (
     <DashboardLayout>
       <Breadcrumbs
@@ -19,7 +22,14 @@ export default function NewSupplierForm() {
           <h1 className="text-2xl font-bold">Nuevo proveedor</h1>
           <p className="text-sm text-base-content/60">Carga datos comerciales, ubicacion y cobertura por sucursal.</p>
         </div>
-        <SupplierForm mode="create" />
+        <SupplierForm
+          mode="create"
+          onCancel={() => router.push("/dashboard/suppliers")}
+          onSuccess={() => {
+            router.push("/dashboard/suppliers")
+            router.refresh()
+          }}
+        />
       </div>
     </DashboardLayout>
   )

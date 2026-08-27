@@ -4,11 +4,15 @@ import { useEffect, useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import SaleForm from "@/components/sales/form/SaleForm"
-import type { SaleFormInitialData, SaleItemDraft, PaymentDraft } from "@/components/sales/types"
+import type { SaleFormInitialData, SaleFormSuccess, SaleItemDraft, PaymentDraft } from "@/components/sales/types"
 import type { Currency, PaymentMethod, SaleItemKind } from "@prisma/client"
 
 interface EditSaleFormProps {
   id: string
+  presentation?: "page" | "dialog"
+  onSuccess?: (success: SaleFormSuccess) => void
+  onCancel?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
 }
 
 async function readApiError(res: Response) {
@@ -20,7 +24,7 @@ async function readApiError(res: Response) {
   return (await res.text().catch(() => "")) || "Error inesperado."
 }
 
-export default function EditSaleForm({ id }: EditSaleFormProps) {
+export default function EditSaleForm({ id, presentation = "page", onSuccess, onCancel, onSubmittingChange }: EditSaleFormProps) {
   const [initialData, setInitialData] = useState<SaleFormInitialData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -97,6 +101,8 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
   }, [id])
 
   if (loading) {
+    if (presentation === "dialog") return <div className="p-6">Cargando venta...</div>
+
     return (
       <DashboardLayout>
         <div className="p-6">Cargando venta...</div>
@@ -105,12 +111,29 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
   }
 
   if (error || !initialData) {
+    if (presentation === "dialog") {
+      return <div className="alert alert-error">{error || "No se pudo cargar la venta."}</div>
+    }
+
     return (
       <DashboardLayout>
         <div className="alert alert-error">{error || "No se pudo cargar la venta."}</div>
       </DashboardLayout>
     )
   }
+
+  const content = (
+    <SaleForm
+      mode="edit"
+      initialData={initialData}
+      presentation={presentation}
+      onSuccess={onSuccess}
+      onCancel={onCancel}
+      onSubmittingChange={onSubmittingChange}
+    />
+  )
+
+  if (presentation === "dialog") return content
 
   return (
     <DashboardLayout>
@@ -121,7 +144,7 @@ export default function EditSaleForm({ id }: EditSaleFormProps) {
           { label: "Editar Venta" },
         ]}
       />
-      <SaleForm mode="edit" initialData={initialData} />
+      {content}
     </DashboardLayout>
   )
 }

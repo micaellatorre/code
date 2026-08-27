@@ -1,5 +1,6 @@
 "use client"
 
+import type { FormEvent, ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
@@ -127,7 +128,23 @@ function paymentStatusLabel(status: SuccessPayload["summary"]["paymentStatus"]) 
   return "EN CUENTA CORRIENTE"
 }
 
-export default function NewPurchaseForm() {
+type NewPurchaseFormProps = {
+  presentation?: "page" | "dialog"
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: (payload: SuccessPayload) => void
+  onCancel?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export default function NewPurchaseForm({
+  presentation = "page",
+  formId,
+  hideActions = false,
+  onSuccess,
+  onCancel,
+  onSubmittingChange,
+}: NewPurchaseFormProps) {
   const { data: session } = useSession()
   const activeRole = (session?.user as { activeRole?: Role } | undefined)?.activeRole ?? null
   const [branches, setBranches] = useState<BranchOption[]>([])
@@ -194,6 +211,22 @@ export default function NewPurchaseForm() {
     () => items.every((item) => item.catalogModelId && (item.type !== "PHONE" || item.catalogCapacityId)),
     [items],
   )
+  const canConfirmPurchase = Boolean(form.branchId && form.supplierId && hasValidCatalogItems)
+
+  useEffect(() => {
+    onSubmittingChange?.(saving)
+  }, [saving, onSubmittingChange])
+
+  function renderChrome(children: ReactNode) {
+    if (presentation === "dialog") return <>{children}</>
+
+    return (
+      <DashboardLayout>
+        <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Compras", href: "/dashboard/purchases" }, { label: "Nueva compra" }]} />
+        {children}
+      </DashboardLayout>
+    )
+  }
 
   function updateItem(itemId: string, patch: Partial<PurchaseItemForm>) {
     setItems((prev) => prev.map((item) => item.id === itemId ? { ...item, ...patch } : item))
@@ -319,8 +352,24 @@ export default function NewPurchaseForm() {
       setConfirmOpen(false)
       return
     }
-    setSuccess(payload as SuccessPayload)
+    const successPayload = payload as SuccessPayload
+    if (onSuccess) {
+      onSuccess(successPayload)
+    } else {
+      setSuccess(successPayload)
+    }
     setConfirmOpen(false)
+  }
+
+  function requestConfirmation(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
+    if (saving) return
+    if (!canConfirmPurchase) {
+      setError("Completa sucursal, proveedor e items de catalogo antes de confirmar.")
+      return
+    }
+    setError(null)
+    setConfirmOpen(true)
   }
 
   if (success) {
@@ -335,9 +384,7 @@ export default function NewPurchaseForm() {
       accessoryUnits ? `${accessoryUnits} accesorios` : null,
     ].filter(Boolean).join(" y ")
 
-    return (
-      <DashboardLayout>
-        <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Compras", href: "/dashboard/purchases" }, { label: "Nueva compra" }]} />
+    return renderChrome(
         <div className="mx-auto max-w-2xl rounded border border-success/30 bg-success/5 p-6 text-center">
           <h1 className="text-2xl font-bold">Compra registrada con exito</h1>
           <p className="mt-2 text-base-content/70">
@@ -351,19 +398,17 @@ export default function NewPurchaseForm() {
             ) : null}
             <button type="button" className="btn btn-ghost" onClick={() => window.location.reload()}>Registrar otra compra</button>
           </div>
-        </div>
-      </DashboardLayout>
+        </div>,
     )
   }
 
-  return (
-    <DashboardLayout>
-      <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Compras", href: "/dashboard/purchases" }, { label: "Nueva compra" }]} />
-      <div className="mx-auto max-w-5xl space-y-5">
-        <div>
+  return renderChrome(
+    <>
+      <form id={formId} onSubmit={requestConfirmation} className="mx-auto max-w-5xl space-y-5">
+        {presentation !== "dialog" ? <div>
           <h1 className="text-2xl font-bold">Nueva compra</h1>
           <p className="text-sm text-base-content/60">Registra mercaderia, pagos e ingreso automatico a stock.</p>
-        </div>
+        </div> : null}
 
         {error ? <div className="alert alert-error text-sm">{error}</div> : null}
         {supplierFeedback ? <div className="alert alert-warning text-sm" onClick={() => setSupplierFeedback(null)}>{supplierFeedback}</div> : null}
@@ -393,10 +438,6 @@ export default function NewPurchaseForm() {
         <section className="space-y-3 rounded border border-base-300 bg-base-100 p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Items</h2>
-            <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem("PHONE")])}>+ Telefono</button>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem("ACCESSORY")])}>+ Accesorio</button>
-            </div>
           </div>
           <div className="space-y-4">
             {items.map((item, index) => (
@@ -488,6 +529,10 @@ export default function NewPurchaseForm() {
               </div>
             ))}
           </div>
+          <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem("PHONE")])}>+ Telefono</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setItems((prev) => [...prev, newItem("ACCESSORY")])}>+ Accesorio</button>
+          </div>
         </section>
 
         {items.some((item) => item.type === "PHONE") ? (
@@ -551,12 +596,19 @@ export default function NewPurchaseForm() {
           </div>
         </section>
 
-        <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={() => setConfirmOpen(true)} disabled={!form.branchId || !form.supplierId || !hasValidCatalogItems || saving}>
-            Confirmar compra
-          </button>
-        </div>
-      </div>
+        {!hideActions ? (
+          <div className="flex justify-end gap-2">
+            {onCancel ? (
+              <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={saving}>
+                Cancelar
+              </button>
+            ) : null}
+            <button type="submit" className="btn btn-primary" disabled={!canConfirmPurchase || saving}>
+              Confirmar compra
+            </button>
+          </div>
+        ) : null}
+      </form>
 
       {confirmOpen ? (
         <div className="modal modal-open">
@@ -597,6 +649,6 @@ export default function NewPurchaseForm() {
           <div className="modal-backdrop" onClick={() => !saving && setConfirmOpen(false)} />
         </div>
       ) : null}
-    </DashboardLayout>
+    </>,
   )
 }

@@ -1,19 +1,58 @@
 "use client"
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 import ProductCatalogSelectors from "@/components/products/ProductCatalogSelectors"
+import { DialogSummaryActions } from "@/components/ui/dialog"
 
 export const dynamic = "force-dynamic"
 
 type ProductType = "PHONE" | "ACCESSORY"
 type SupplierOption = { id: string; name: string }
 
-export default function NewProductForm() {
+type NewProductFormProps = {
+  presentation?: "page" | "dialog"
+  onSuccess?: () => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+const emptyProductForm = {
+  modelName: "",
+  location: "",
+  branchId: "",
+  supplierId: "",
+  origin: "",
+  brand: "",
+  imei: "",
+  capacityGB: "",
+  condition: "",
+  color: "",
+  batteryPct: "",
+  costPrice: "",
+  salePrice: "",
+  wholesalePrice: "",
+  shippingCost: "",
+  catalogModelId: "",
+  catalogCapacityId: "",
+  catalogColorId: "",
+  type: "PHONE" as ProductType,
+  senado: false,
+  notes: "",
+}
+
+export default function NewProductForm({
+  presentation = "page",
+  onSuccess,
+  onCancel,
+  onDirtyChange,
+  onSubmittingChange,
+}: NewProductFormProps) {
   const router = useRouter()
   const { data: session } = useSession()
   const isAdmin = session?.user?.activeRole === "ADMIN"
@@ -23,30 +62,18 @@ export default function NewProductForm() {
   const [wholesaleEnabled, setWholesaleEnabled] = useState(false)
   const [currentBranch, setCurrentBranch] = useState<BranchOption | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    modelName: "",
-    location: "",
-    branchId: "",
-    supplierId: "",
-    origin: "",
-    brand: "",
-    imei: "",
-    capacityGB: "",
-    condition: "",
-    color: "",
-    batteryPct: "",
-    costPrice: "",
-    salePrice: "",
-    wholesalePrice: "",
-    shippingCost: "",
-    catalogModelId: "",
-    catalogCapacityId: "",
-    catalogColorId: "",
-    type: "PHONE" as ProductType,
-    senado: false,
-    notes: "",
-  })
+  const [form, setForm] = useState(emptyProductForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const initialSnapshot = useMemo(() => JSON.stringify(emptyProductForm), [])
+  const dirty = JSON.stringify(form) !== initialSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSubmitting)
+  }, [isSubmitting, onSubmittingChange])
 
   useEffect(() => {
     fetch("/api/users/me/branches")
@@ -116,7 +143,12 @@ export default function NewProductForm() {
     })
     try {
       if (res.ok) {
-        router.push("/dashboard/products")
+        if (onSuccess) {
+          onSuccess()
+        } else {
+          router.push("/dashboard/products")
+        }
+        router.refresh()
       } else {
         const payload = await res.json().catch(() => null)
         setError(payload?.error ?? "Error al crear producto")
@@ -132,16 +164,40 @@ export default function NewProductForm() {
     ? branches.find((branch) => branch.id === form.branchId)?.name
     : currentBranch?.name
 
-  return (
-    <DashboardLayout>
-      <Breadcrumbs
-        items={[
-          { label: "Inicio", href: "/" },
-          { label: "Productos", href: "/dashboard/products" },
-          { label: "Nuevo Producto" },
-        ]}
-      />
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:p-4 lg:grid-cols-[1fr_320px]">
+  const summaryContent = (
+    <dl className="space-y-2 text-sm">
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Tipo</dt>
+        <dd className="font-medium">{productTypeLabel}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Modelo</dt>
+        <dd className="text-right font-medium">{form.modelName || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Origen</dt>
+        <dd className="text-right font-medium">{form.origin || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Proveedor</dt>
+        <dd className="text-right font-medium">{selectedSupplier?.name || "Sin asociar"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Sucursal</dt>
+        <dd className="text-right font-medium">{selectedBranchName || form.location || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Venta</dt>
+        <dd className="font-medium">{form.salePrice ? `USD ${form.salePrice}` : "Pendiente"}</dd>
+      </div>
+    </dl>
+  )
+
+  const formContent = (
+      <form
+        onSubmit={handleSubmit}
+        className={`relative grid grid-cols-1 gap-4 pb-28 sm:pb-28 ${presentation === "dialog" ? "lg:pb-28" : "sm:p-4 lg:grid-cols-[1fr_320px] lg:pb-4"}`}
+      >
         {error ? <div className="alert alert-error py-3 text-sm lg:col-span-2">{error}</div> : null}
 
         <section className="rounded-lg border border-base-300 bg-base-100 p-4">
@@ -325,46 +381,39 @@ export default function NewProductForm() {
           </div>
         </section>
 
-        <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4">
-          <h2 className="font-semibold">Resumen</h2>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Tipo</dt>
-              <dd className="font-medium">{productTypeLabel}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Modelo</dt>
-              <dd className="text-right font-medium">{form.modelName || "Pendiente"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Origen</dt>
-              <dd className="text-right font-medium">{form.origin || "Pendiente"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Proveedor</dt>
-              <dd className="text-right font-medium">{selectedSupplier?.name || "Sin asociar"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Sucursal</dt>
-              <dd className="text-right font-medium">{selectedBranchName || form.location || "Pendiente"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Venta</dt>
-              <dd className="font-medium">{form.salePrice ? `USD ${form.salePrice}` : "Pendiente"}</dd>
-            </div>
-          </dl>
-
-          <div className="mt-4 flex flex-col gap-2">
-            <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
-              {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
-              {isSubmitting ? "Creando..." : "Crear producto"}
-            </button>
-            <button type="button" className="btn btn-ghost w-full" onClick={() => router.back()} disabled={isSubmitting}>
-              Volver
-            </button>
-          </div>
-        </aside>
+        <DialogSummaryActions
+          layout={presentation === "dialog" ? "drawer" : "aside"}
+          title="Resumen"
+          mobileLabel={productTypeLabel}
+          mobileValue={form.salePrice ? `USD ${form.salePrice}` : "Sin precio"}
+          summary={summaryContent}
+          actions={({ compact }) => (
+            <>
+              <button type="submit" className={`btn btn-primary ${compact ? "" : "w-full"}`} disabled={isSubmitting}>
+                {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
+                {isSubmitting ? (compact ? "..." : "Creando...") : compact ? "Crear" : "Crear producto"}
+              </button>
+              <button type="button" className={`btn btn-ghost ${compact ? "" : "w-full"}`} onClick={onCancel ?? (() => router.back())} disabled={isSubmitting}>
+                Volver
+              </button>
+            </>
+          )}
+        />
       </form>
+  )
+
+  if (presentation === "dialog") return formContent
+
+  return (
+    <DashboardLayout>
+      <Breadcrumbs
+        items={[
+          { label: "Inicio", href: "/" },
+          { label: "Productos", href: "/dashboard/products" },
+          { label: "Nuevo Producto" },
+        ]}
+      />
+      {formContent}
     </DashboardLayout>
   )
 }

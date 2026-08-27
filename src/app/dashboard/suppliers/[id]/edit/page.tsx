@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
-import SupplierForm from "@/components/suppliers/SupplierForm"
 import { requireRolePage } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
 import { getSupplierDetail } from "@/lib/domain/suppliers"
+import EditSupplierForm from "./form"
 
 type EditSupplierPageProps = {
   params: Promise<{ id: string }>
@@ -32,7 +32,7 @@ export default async function EditSupplierPage({ params }: EditSupplierPageProps
           <h1 className="text-2xl font-bold">Editar proveedor</h1>
           <p className="text-sm text-base-content/60">Actualiza datos, sucursal principal y cobertura de abastecimiento.</p>
         </div>
-        <SupplierForm mode="edit" supplier={supplier} />
+        <EditSupplierForm supplier={supplier} />
       </div>
     </DashboardLayout>
   )

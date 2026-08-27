@@ -1,13 +1,18 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 import type { ProvinceOption, SupplierListItem } from "./types"
 
 type SupplierFormProps = {
   mode: "create" | "edit"
   supplier?: SupplierListItem
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: (supplier: SupplierListItem) => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
 }
 
 type FormState = {
@@ -40,13 +45,31 @@ function buildInitialState(supplier?: SupplierListItem): FormState {
   }
 }
 
-export default function SupplierForm({ mode, supplier }: SupplierFormProps) {
-  const router = useRouter()
+export default function SupplierForm({
+  mode,
+  supplier,
+  formId,
+  hideActions = false,
+  onSuccess,
+  onCancel,
+  onDirtyChange,
+  onSubmittingChange,
+}: SupplierFormProps) {
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [provinces, setProvinces] = useState<ProvinceOption[]>([])
   const [form, setForm] = useState<FormState>(() => buildInitialState(supplier))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const initialSnapshot = useMemo(() => JSON.stringify(buildInitialState(supplier)), [supplier])
+  const dirty = JSON.stringify(form) !== initialSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onSubmittingChange?.(saving)
+  }, [saving, onSubmittingChange])
 
   useEffect(() => {
     async function loadOptions() {
@@ -102,23 +125,28 @@ export default function SupplierForm({ mode, supplier }: SupplierFormProps) {
     event.preventDefault()
     setError(null)
     setSaving(true)
-    const response = await fetch(mode === "create" ? "/api/suppliers" : `/api/suppliers/${supplier?.id}`, {
-      method: mode === "create" ? "POST" : "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    })
-    const payload = await response.json().catch(() => null)
-    setSaving(false)
-    if (!response.ok) {
-      setError(payload?.error ?? "No se pudo guardar el proveedor")
-      return
+
+    try {
+      const response = await fetch(mode === "create" ? "/api/suppliers" : `/api/suppliers/${supplier?.id}`, {
+        method: mode === "create" ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const payload = await response.json().catch(() => null) as SupplierListItem | { error?: string } | null
+      if (!response.ok) {
+        setError(payload && "error" in payload ? payload.error ?? "No se pudo guardar el proveedor" : "No se pudo guardar el proveedor")
+        return
+      }
+      onSuccess?.(payload as SupplierListItem)
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el proveedor")
+    } finally {
+      setSaving(false)
     }
-    router.push("/dashboard/suppliers")
-    router.refresh()
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form id={formId} onSubmit={submit} className="space-y-4">
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
 
       <section className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-4">
@@ -214,13 +242,15 @@ export default function SupplierForm({ mode, supplier }: SupplierFormProps) {
         </div>
       </section>
 
-      <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-base-300 bg-base-100/95 px-1 py-3 backdrop-blur">
-        <button type="button" className="btn btn-ghost" onClick={() => router.push("/dashboard/suppliers")} disabled={saving}>Cancelar</button>
-        <button type="submit" className="btn btn-primary" disabled={saving}>
-          {saving ? <span className="loading loading-spinner loading-xs" /> : null}
-          {mode === "create" ? "Crear proveedor" : "Guardar cambios"}
-        </button>
-      </div>
+      {!hideActions ? (
+        <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-base-300 bg-base-100/95 px-1 py-3 backdrop-blur">
+          {onCancel ? <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancelar</button> : null}
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? <span className="loading loading-spinner loading-xs" /> : null}
+            {mode === "create" ? "Crear proveedor" : "Guardar cambios"}
+          </button>
+        </div>
+      ) : null}
     </form>
   )
 }

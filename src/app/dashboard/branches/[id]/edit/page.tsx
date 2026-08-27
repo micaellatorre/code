@@ -1,9 +1,9 @@
 import Breadcrumbs from "@/components/Breadcrumbs"
 import DashboardLayout from "@/components/DashboardLayout"
-import BranchForm from "@/components/branches/BranchForm"
 import prisma from "@/lib/prisma"
 import { requireRolePage } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
+import EditBranchForm from "./form"
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -24,7 +24,7 @@ export default async function EditBranchPage({ params }: Props) {
       <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Sucursales", href: "/dashboard/branches" }, { label: "Editar sucursal" }]} />
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">Editar sucursal</h1>
-        <BranchForm
+        <EditBranchForm
           initial={{
             id: branch.id,
             code: branch.code,

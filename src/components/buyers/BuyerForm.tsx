@@ -1,12 +1,13 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { BuyerType } from "@prisma/client"
 import { fromArgDateInputValue } from "@/lib/timezone"
 import { POSTAL_CODE_ERROR_MESSAGE } from "@/lib/domain/argentina/provinces"
+import { DialogSummaryActions } from "@/components/ui/dialog"
 import { BUYER_TYPE_LABELS } from "./buyerTypes"
-import { normalizeInstagram } from "./buyerUtils"
+import { normalizeInstagram, toBuyerType } from "./buyerUtils"
+import type { SerializedBuyer } from "./types"
 
 export type BuyerFormInitialData = {
   id: string
@@ -57,6 +58,15 @@ type BranchOption = { id: string; name: string; code: string; isActive?: boolean
 type BuyerFormProps = {
   mode: "create" | "edit"
   initialData?: BuyerFormInitialData
+  presentation?: "page" | "dialog"
+  onSuccess?: (buyer: SerializedBuyer) => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+type BuyerApiPayload = {
+  buyer?: unknown
 }
 
 function initialState(initialData?: BuyerFormInitialData): BuyerFormState {
@@ -94,6 +104,32 @@ async function readApiError(response: Response) {
     return body?.error || body?.message || "Error inesperado."
   }
   return (await response.text().catch(() => "")) || "Error inesperado."
+}
+
+export function normalizeBuyerFormInitialData(buyer: unknown): BuyerFormInitialData {
+  const data = buyer && typeof buyer === "object" ? buyer as Record<string, unknown> : {}
+
+  return {
+    id: String(data.id ?? ""),
+    type: toBuyerType(data.type),
+    name: String(data.name ?? ""),
+    surname: typeof data.surname === "string" ? data.surname : null,
+    businessName: typeof data.businessName === "string" ? data.businessName : null,
+    dob: typeof data.dob === "string" ? data.dob : null,
+    province: typeof data.province === "string" ? data.province : null,
+    provinceId: typeof data.provinceId === "string" ? data.provinceId : null,
+    registeredBranchId: typeof data.registeredBranchId === "string" ? data.registeredBranchId : null,
+    city: typeof data.city === "string" ? data.city : null,
+    postalCode: typeof data.postalCode === "string" ? data.postalCode : null,
+    notes: typeof data.notes === "string" ? data.notes : null,
+    phone: typeof data.phone === "string" ? data.phone : null,
+    instagram: typeof data.instagram === "string" ? data.instagram : null,
+    email: typeof data.email === "string" ? data.email : null,
+    addressStreet: typeof data.addressStreet === "string" ? data.addressStreet : null,
+    addressNumber: typeof data.addressNumber === "string" ? data.addressNumber : null,
+    cuit: typeof data.cuit === "string" ? data.cuit : null,
+    dni: typeof data.dni === "string" ? data.dni : null,
+  }
 }
 
 function validate(form: BuyerFormState) {
@@ -142,13 +178,22 @@ function buildPayload(form: BuyerFormState) {
   }
 }
 
-export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
-  const router = useRouter()
+export default function BuyerForm({ mode, initialData, presentation = "page", onSuccess, onCancel, onDirtyChange, onSubmittingChange }: BuyerFormProps) {
   const [form, setForm] = useState<BuyerFormState>(() => initialState(initialData))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [provinces, setProvinces] = useState<ProvinceOption[]>([])
   const [branches, setBranches] = useState<BranchOption[]>([])
+  const initialSnapshot = useMemo(() => JSON.stringify(initialState(initialData)), [initialData])
+  const dirty = JSON.stringify(form) !== initialSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSubmitting)
+  }, [isSubmitting, onSubmittingChange])
 
   useEffect(() => {
     let cancelled = false
@@ -189,19 +234,49 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
 
       if (!response.ok) throw new Error(await readApiError(response))
 
-      router.push("/dashboard/buyers")
-      router.refresh()
-    } catch (submitError: any) {
-      setError(submitError?.message || "No se pudo guardar el cliente.")
+      const payload = await response.json() as BuyerApiPayload
+      if (!payload.buyer) throw new Error("La API no devolvio el cliente guardado.")
+      onSuccess?.(payload.buyer as SerializedBuyer)
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar el cliente.")
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const isWholesale = form.type === "MAYORISTA"
+  const summaryContent = (
+    <dl className="space-y-2 text-sm">
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Tipo</dt>
+        <dd className="font-medium">{BUYER_TYPE_LABELS[form.type]}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Cliente</dt>
+        <dd className="font-medium text-right">
+          {isWholesale && form.businessName ? form.businessName : [form.name, form.surname].filter(Boolean).join(" ") || "Pendiente"}
+        </dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Documento</dt>
+        <dd className="font-medium text-right">{isWholesale ? form.cuit || "Pendiente" : form.dni || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Contacto</dt>
+        <dd className="font-medium text-right">{form.phone || form.email || form.instagram || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Sucursal</dt>
+        <dd className="font-medium text-right">{branches.find((branch) => branch.id === form.registeredBranchId)?.name ?? "Pendiente"}</dd>
+      </div>
+    </dl>
+  )
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:p-4 lg:grid-cols-[1fr_320px]">
+    <form
+      onSubmit={handleSubmit}
+      className={`relative grid grid-cols-1 gap-4 pb-28 sm:pb-28 ${presentation === "dialog" ? "lg:pb-28" : "sm:p-4 lg:grid-cols-[1fr_320px] lg:pb-4"}`}
+    >
       {error ? <div className="alert alert-error py-3 text-sm lg:col-span-2">{error}</div> : null}
 
       <section className="rounded-lg border border-base-300 bg-base-100 p-4">
@@ -312,43 +387,26 @@ export default function BuyerForm({ mode, initialData }: BuyerFormProps) {
         </div>
       </section>
 
-      <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4">
-        <h2 className="font-semibold">Resumen</h2>
-        <dl className="mt-3 space-y-2 text-sm">
-          <div className="flex justify-between gap-3">
-            <dt className="text-base-content/60">Tipo</dt>
-            <dd className="font-medium">{BUYER_TYPE_LABELS[form.type]}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-base-content/60">Cliente</dt>
-            <dd className="font-medium text-right">
-              {isWholesale && form.businessName ? form.businessName : [form.name, form.surname].filter(Boolean).join(" ") || "Pendiente"}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-base-content/60">Documento</dt>
-            <dd className="font-medium text-right">{isWholesale ? form.cuit || "Pendiente" : form.dni || "Pendiente"}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-base-content/60">Contacto</dt>
-            <dd className="font-medium text-right">{form.phone || form.email || form.instagram || "Pendiente"}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-base-content/60">Sucursal</dt>
-            <dd className="font-medium text-right">{branches.find((branch) => branch.id === form.registeredBranchId)?.name ?? "Pendiente"}</dd>
-          </div>
-        </dl>
-
-        <div className="mt-4 flex flex-col gap-2">
-          <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
-            {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
-            {isSubmitting ? "Guardando..." : mode === "create" ? "Crear cliente" : "Guardar cambios"}
-          </button>
-          <button type="button" className="btn btn-ghost w-full" onClick={() => router.back()} disabled={isSubmitting}>
-            Volver
-          </button>
-        </div>
-      </aside>
+      <DialogSummaryActions
+        layout={presentation === "dialog" ? "drawer" : "aside"}
+        title="Resumen"
+        mobileLabel={BUYER_TYPE_LABELS[form.type]}
+        mobileValue={isWholesale ? form.cuit || "Sin CUIT" : form.dni || "Sin DNI"}
+        summary={summaryContent}
+        actions={({ compact }) => (
+          <>
+            <button type="submit" className={`btn btn-primary ${compact ? "" : "w-full"}`} disabled={isSubmitting}>
+              {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
+              {isSubmitting ? (compact ? "..." : "Guardando...") : mode === "create" ? (compact ? "Crear" : "Crear cliente") : compact ? "Guardar" : "Guardar cambios"}
+            </button>
+            {onCancel ? (
+              <button type="button" className={`btn btn-ghost ${compact ? "" : "w-full"}`} onClick={onCancel} disabled={isSubmitting}>
+                Volver
+              </button>
+            ) : null}
+          </>
+        )}
+      />
     </form>
   )
 }

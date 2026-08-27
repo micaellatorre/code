@@ -1,7 +1,7 @@
 import Breadcrumbs from "@/components/Breadcrumbs"
 import DashboardLayout from "@/components/DashboardLayout"
-import BranchForm from "@/components/branches/BranchForm"
 import { requireRolePage } from "@/lib/auth/auth"
+import NewBranchForm from "./form"
 
 export default async function NewBranchPage() {
   await requireRolePage(["ADMIN"])
@@ -11,7 +11,7 @@ export default async function NewBranchPage() {
       <Breadcrumbs items={[{ label: "Inicio", href: "/" }, { label: "Sucursales", href: "/dashboard/branches" }, { label: "Nueva sucursal" }]} />
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">Nueva sucursal</h1>
-        <BranchForm />
+        <NewBranchForm />
       </div>
     </DashboardLayout>
   )

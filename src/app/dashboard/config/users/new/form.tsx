@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import DashboardLayout from "@/components/DashboardLayout"
 import UserForm from "@/components/users/UserForm"
@@ -14,6 +15,8 @@ type Props = {
 }
 
 export default function NewUserForm(props: Props) {
+  const router = useRouter()
+
   return (
     <DashboardLayout>
       <Breadcrumbs
@@ -28,7 +31,15 @@ export default function NewUserForm(props: Props) {
           <h1 className="text-2xl font-bold">Nuevo usuario</h1>
           <p className="text-sm text-base-content/60">Crea accesos operativos y asigna el contexto inicial de sucursal.</p>
         </div>
-        <UserForm mode="create" {...props} />
+        <UserForm
+          mode="create"
+          {...props}
+          onCancel={() => router.push("/dashboard/config?tab=equipo")}
+          onSuccess={(user) => {
+            router.push(`/dashboard/config/users/new/success?userId=${encodeURIComponent(user.id)}`)
+            router.refresh()
+          }}
+        />
       </div>
     </DashboardLayout>
   )

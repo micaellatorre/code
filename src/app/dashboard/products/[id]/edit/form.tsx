@@ -6,18 +6,31 @@ import { useSession } from "next-auth/react"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
+import { DialogSummaryActions } from "@/components/ui/dialog"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 import ProductCatalogSelectors, { type CatalogCapacityDto, type CatalogColorDto, type CatalogModelDto } from "@/components/products/ProductCatalogSelectors"
 
 interface EditProductFormProps {
   id: string
+  presentation?: "page" | "dialog"
+  onSuccess?: () => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
 }
 
 type ProductType = "PHONE" | "ACCESSORY"
 type SupplierOption = { id: string; name: string }
 
-export default function EditProductForm({ id }: EditProductFormProps) {
+export default function EditProductForm({
+  id,
+  presentation = "page",
+  onSuccess,
+  onCancel,
+  onDirtyChange,
+  onSubmittingChange,
+}: EditProductFormProps) {
   const router = useRouter()
   const { data: session } = useSession()
   const isAdmin = session?.user?.activeRole === "ADMIN"
@@ -54,6 +67,16 @@ export default function EditProductForm({ id }: EditProductFormProps) {
     notes: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null)
+  const dirty = initialSnapshot != null && JSON.stringify(form) !== initialSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSubmitting || loading)
+  }, [isSubmitting, loading, onSubmittingChange])
 
   useEffect(() => {
     async function load() {
@@ -66,7 +89,7 @@ export default function EditProductForm({ id }: EditProductFormProps) {
       if (productRes.ok) {
         const data = await productRes.json()
         setCurrentBranch(data.branch ?? null)
-        setForm({
+        const nextForm = {
           modelName: data.modelName ?? "",
           location: data.location ?? "",
           branchId: data.branchId ?? "",
@@ -88,7 +111,9 @@ export default function EditProductForm({ id }: EditProductFormProps) {
           type: data.type ?? "PHONE",
           senado: Boolean(data.senado),
           notes: data.notes ?? "",
-        })
+        }
+        setForm(nextForm)
+        setInitialSnapshot(JSON.stringify(nextForm))
         setInitialCatalogs({
           model: data.catalogModel ?? null,
           capacity: data.catalogCapacity ?? null,
@@ -171,7 +196,12 @@ export default function EditProductForm({ id }: EditProductFormProps) {
     })
     try {
       if (res.ok) {
-        router.push("/dashboard/products")
+        if (onSuccess) {
+          onSuccess()
+        } else {
+          router.push("/dashboard/products")
+        }
+        router.refresh()
       } else {
         const payload = await res.json().catch(() => null)
         setError(payload?.error ?? "Error al actualizar producto")
@@ -206,7 +236,12 @@ export default function EditProductForm({ id }: EditProductFormProps) {
       onConfirm: async () => {
         const res = await fetch(`/api/products/${id}`, { method: "DELETE" })
         if (res.ok) {
-          router.push("/dashboard/products")
+          if (onSuccess) {
+            onSuccess()
+          } else {
+            router.push("/dashboard/products")
+          }
+          router.refresh()
         }
       },
     })
@@ -219,6 +254,14 @@ export default function EditProductForm({ id }: EditProductFormProps) {
     : currentBranch?.name
 
   if (loading) {
+    if (presentation === "dialog") {
+      return (
+        <div className="flex min-h-72 items-center justify-center">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
+      )
+    }
+
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center py-10">
@@ -228,16 +271,40 @@ export default function EditProductForm({ id }: EditProductFormProps) {
     )
   }
 
-  return (
-    <DashboardLayout>
-      <Breadcrumbs
-        items={[
-          { label: "Inicio", href: "/" },
-          { label: "Productos", href: "/dashboard/products" },
-          { label: "Editar Producto" },
-        ]}
-      />
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:p-4 lg:grid-cols-[1fr_320px]">
+  const summaryContent = (
+    <dl className="space-y-2 text-sm">
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Tipo</dt>
+        <dd className="font-medium">{productTypeLabel}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Modelo</dt>
+        <dd className="text-right font-medium">{form.modelName || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Origen</dt>
+        <dd className="text-right font-medium">{form.origin || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Proveedor</dt>
+        <dd className="text-right font-medium">{selectedSupplier?.name || "Sin asociar"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Sucursal</dt>
+        <dd className="text-right font-medium">{selectedBranchName || form.location || "Pendiente"}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-base-content/60">Venta</dt>
+        <dd className="font-medium">{form.salePrice ? `USD ${form.salePrice}` : "Pendiente"}</dd>
+      </div>
+    </dl>
+  )
+
+  const formContent = (
+      <form
+        onSubmit={handleSubmit}
+        className={`relative grid grid-cols-1 gap-4 pb-28 sm:pb-28 ${presentation === "dialog" ? "lg:pb-28" : "sm:p-4 lg:grid-cols-[1fr_320px] lg:pb-4"}`}
+      >
         {error ? <div className="alert alert-error py-3 text-sm lg:col-span-2">{error}</div> : null}
 
         <section className="rounded-lg border border-base-300 bg-base-100 p-4">
@@ -419,49 +486,42 @@ export default function EditProductForm({ id }: EditProductFormProps) {
           </div>
         </section>
 
-        <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4">
-          <h2 className="font-semibold">Resumen</h2>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Tipo</dt>
-              <dd className="font-medium">{productTypeLabel}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Modelo</dt>
-              <dd className="text-right font-medium">{form.modelName || "Pendiente"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Origen</dt>
-              <dd className="text-right font-medium">{form.origin || "Pendiente"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Proveedor</dt>
-              <dd className="text-right font-medium">{selectedSupplier?.name || "Sin asociar"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Sucursal</dt>
-              <dd className="text-right font-medium">{selectedBranchName || form.location || "Pendiente"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-base-content/60">Venta</dt>
-              <dd className="font-medium">{form.salePrice ? `USD ${form.salePrice}` : "Pendiente"}</dd>
-            </div>
-          </dl>
-
-          <div className="mt-4 flex flex-col gap-2">
-            <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
-              {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
-              {isSubmitting ? "Guardando..." : "Guardar cambios"}
-            </button>
-            <button type="button" className="btn btn-error w-full" onClick={handleDelete} disabled={isSubmitting}>
-              Eliminar
-            </button>
-            <button type="button" className="btn btn-ghost w-full" onClick={() => router.back()} disabled={isSubmitting}>
-              Volver
-            </button>
-          </div>
-        </aside>
+        <DialogSummaryActions
+          layout={presentation === "dialog" ? "drawer" : "aside"}
+          title="Resumen"
+          mobileLabel={productTypeLabel}
+          mobileValue={form.salePrice ? `USD ${form.salePrice}` : "Sin precio"}
+          summary={summaryContent}
+          actions={({ compact }) => (
+            <>
+              <button type="submit" className={`btn btn-primary ${compact ? "" : "w-full"}`} disabled={isSubmitting}>
+                {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
+                {isSubmitting ? (compact ? "..." : "Guardando...") : compact ? "Guardar" : "Guardar cambios"}
+              </button>
+              <button type="button" className={`btn btn-error ${compact ? "" : "w-full"}`} onClick={handleDelete} disabled={isSubmitting}>
+                Eliminar
+              </button>
+              <button type="button" className={`btn btn-ghost ${compact ? "" : "w-full"}`} onClick={onCancel ?? (() => router.back())} disabled={isSubmitting}>
+                Volver
+              </button>
+            </>
+          )}
+        />
       </form>
+  )
+
+  if (presentation === "dialog") return formContent
+
+  return (
+    <DashboardLayout>
+      <Breadcrumbs
+        items={[
+          { label: "Inicio", href: "/" },
+          { label: "Productos", href: "/dashboard/products" },
+          { label: "Editar Producto" },
+        ]}
+      />
+      {formContent}
     </DashboardLayout>
   )
 }

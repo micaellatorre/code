@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import DashboardLayout from "@/components/DashboardLayout"
-import UserForm from "@/components/users/UserForm"
 import { requireRolePage } from "@/lib/auth/auth"
 import { resolveSessionTenantId } from "@/lib/tenant"
 import { getUserDetail, getUserFormOptions, userRoleValues } from "@/lib/domain/users"
+import EditUserForm from "./form"
 
 type EditUserPageProps = {
   params: Promise<{ id: string }>
@@ -43,8 +43,7 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
           <h1 className="text-2xl font-bold">Editar usuario</h1>
           <p className="text-sm text-base-content/60">Actualiza datos de acceso, estado y contexto operativo.</p>
         </div>
-        <UserForm
-          mode="edit"
+        <EditUserForm
           user={{
             id: user.id,
             email: user.email,

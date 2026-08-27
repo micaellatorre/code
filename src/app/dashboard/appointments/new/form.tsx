@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import AppointmentDepositStep from "@/components/appointments/form/AppointmentDepositStep"
@@ -14,11 +14,43 @@ import AppointmentStickySummary from "@/components/appointments/form/Appointment
 import AppointmentSummaryStep from "@/components/appointments/form/AppointmentSummaryStep"
 import AppointmentTradeInStep from "@/components/appointments/form/AppointmentTradeInStep"
 import { useAppointmentForm } from "@/components/appointments/form/useAppointmentForm"
+import { formatMoney } from "@/components/appointments/appointmentUtils"
+import { DialogSummaryActions } from "@/components/ui/dialog"
 
-export default function NewAppointmentForm() {
-  const form = useAppointmentForm("create")
+type NewAppointmentFormProps = {
+  presentation?: "page" | "dialog"
+  onSuccess?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export default function NewAppointmentForm({ presentation = "page", onSuccess, onSubmittingChange }: NewAppointmentFormProps) {
+  const form = useAppointmentForm("create", undefined, { onSuccess })
+
+  useEffect(() => {
+    onSubmittingChange?.(form.isSubmitting)
+  }, [form.isSubmitting, onSubmittingChange])
 
   if (form.success) {
+    const successContent = (
+      <div className="mx-auto max-w-2xl rounded-lg border border-base-300 bg-base-100 p-8 text-center">
+        <h1 className="text-2xl font-bold">Reunion registrada con exito</h1>
+        <p className="mt-2 text-base-content/70">
+          Programada para {form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "el cliente seleccionado"}.
+        </p>
+        <p className="mt-1 text-sm text-base-content/60">Sena de {form.depositTotal} registrada como dato local del flujo.</p>
+        <div className="mt-6 flex justify-center gap-2">
+          <Link href="/dashboard/appointments" className="btn btn-primary">
+            Ver citas
+          </Link>
+          <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>
+            Nueva cita
+          </button>
+        </div>
+      </div>
+    )
+
+    if (presentation === "dialog") return successContent
+
     return (
       <DashboardLayout>
         <Breadcrumbs
@@ -28,21 +60,7 @@ export default function NewAppointmentForm() {
             { label: "Reserva creada" },
           ]}
         />
-        <div className="mx-auto max-w-2xl rounded-lg border border-base-300 bg-base-100 p-8 text-center">
-          <h1 className="text-2xl font-bold">Reunion registrada con exito</h1>
-          <p className="mt-2 text-base-content/70">
-            Programada para {form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "el cliente seleccionado"}.
-          </p>
-          <p className="mt-1 text-sm text-base-content/60">Seña de {form.depositTotal} registrada como dato local del flujo.</p>
-          <div className="mt-6 flex justify-center gap-2">
-            <Link href="/dashboard/appointments" className="btn btn-primary">
-              Ver citas
-            </Link>
-            <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>
-              Nueva cita
-            </button>
-          </div>
-        </div>
+        {successContent}
       </DashboardLayout>
     )
   }
@@ -99,8 +117,8 @@ export default function NewAppointmentForm() {
     },
     {
       key: "deposit",
-      title: "Seña",
-      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin seña",
+      title: "Sena",
+      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin sena",
       node: (
         <AppointmentDepositStep
           enabled={form.depositEnabled}
@@ -151,6 +169,89 @@ export default function NewAppointmentForm() {
   )
 
   const stepperSteps = steps.map((step) => ({ label: step.title, summary: step.summary }))
+  const isDialog = presentation === "dialog"
+  const summaryContent = (
+    <div className="space-y-3 text-sm">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="text-base-content/50">Cliente</p>
+          <p className="font-medium">{form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "Pendiente"}</p>
+        </div>
+        <div>
+          <p className="text-base-content/50">Items</p>
+          <p className="font-medium">{form.items.length}</p>
+        </div>
+      </div>
+      <div className="divide-y divide-base-300 rounded-lg border border-base-300">
+        <p className="flex justify-between p-2"><span>Total</span><span>{formatMoney(form.agreedTotal)}</span></p>
+        <p className="flex justify-between p-2"><span>Senas</span><span>{formatMoney(form.depositTotal)}</span></p>
+        <p className="flex justify-between p-2"><span>Plan Canje</span><span>{formatMoney(form.tradeInCredit)}</span></p>
+        <p className="flex justify-between p-2 font-semibold"><span>Saldo</span><span>{formatMoney(form.balance)}</span></p>
+      </div>
+      {form.error ? <div className="alert alert-error text-sm">{form.error}</div> : null}
+    </div>
+  )
+
+  const formContent = (
+    <div className={`space-y-4 ${isDialog ? "pb-28 sm:pb-28" : "sm:p-4"}`}>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        {!isDialog ? <div>
+          <h1 className="text-2xl font-bold">Crear Cita</h1>
+          <p className="mt-1 text-sm text-base-content/60">Gestiona cliente, items, sena, Plan Canje y seguimiento comercial.</p>
+        </div> : null}
+        <div className={`flex flex-wrap items-center gap-2 ${isDialog ? "w-full justify-end" : ""}`}>
+          <span className="text-sm text-base-content/80">Plan Canje</span>
+          <div className="join">
+            <button type="button" className={`btn btn-sm join-item ${form.planCanjeEnabled ? "btn-outline" : "btn-primary"}`} onClick={() => form.setPlanCanjeEnabled(false)}>
+              No
+            </button>
+            <button type="button" className={`btn btn-sm join-item ${form.planCanjeEnabled ? "btn-primary" : "btn-outline"}`} onClick={() => form.setPlanCanjeEnabled(true)}>
+              Si
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <AppointmentFormStepper steps={stepperSteps} activeStep={form.activeStep} onStepChange={form.setActiveStep} />
+
+      <div className={`grid grid-cols-1 gap-4 ${isDialog ? "" : "lg:grid-cols-[1fr_320px]"}`}>
+        <div className="space-y-3">
+          {steps.map((step, index) => (
+            <AppointmentStepCard key={step.key} index={index} title={step.title} summary={step.summary} activeStep={form.activeStep} onStepChange={form.setActiveStep}>
+              {step.node}
+            </AppointmentStepCard>
+          ))}
+        </div>
+
+        {!isDialog ? <AppointmentStickySummary
+          selectedBuyer={form.selectedBuyer}
+          items={form.items}
+          agreedTotal={form.agreedTotal}
+          depositTotal={form.depositTotal}
+          tradeInCredit={form.tradeInCredit}
+          balance={form.balance}
+          isSubmitting={form.isSubmitting}
+          onSubmit={form.requestSubmit}
+        /> : null}
+      </div>
+      {isDialog ? (
+        <DialogSummaryActions
+          layout="drawer"
+          title="Resumen"
+          mobileLabel={form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "Cita"}
+          mobileValue={formatMoney(form.balance)}
+          summary={summaryContent}
+          actions={({ compact }) => (
+            <button type="button" className="btn btn-primary" onClick={form.requestSubmit} disabled={form.isSubmitting}>
+              {form.isSubmitting ? (compact ? "..." : "Guardando...") : compact ? "Confirmar" : "Confirmar cita"}
+            </button>
+          )}
+        />
+      ) : null}
+    </div>
+  )
+
+  if (presentation === "dialog") return formContent
 
   return (
     <DashboardLayout>
@@ -161,48 +262,7 @@ export default function NewAppointmentForm() {
           { label: "Crear Cita" },
         ]}
       />
-      <div className="space-y-4 sm:p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Crear Cita</h1>
-            <p className="mt-1 text-sm text-base-content/60">Gestiona cliente, items, seña, Plan Canje y seguimiento comercial.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-base-content/80">Plan Canje</span>
-            <div className="join">
-              <button type="button" className={`btn btn-sm join-item ${form.planCanjeEnabled ? "btn-outline" : "btn-primary"}`} onClick={() => form.setPlanCanjeEnabled(false)}>
-                No
-              </button>
-              <button type="button" className={`btn btn-sm join-item ${form.planCanjeEnabled ? "btn-primary" : "btn-outline"}`} onClick={() => form.setPlanCanjeEnabled(true)}>
-                Si
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <AppointmentFormStepper steps={stepperSteps} activeStep={form.activeStep} onStepChange={form.setActiveStep} />
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-3">
-            {steps.map((step, index) => (
-              <AppointmentStepCard key={step.key} index={index} title={step.title} summary={step.summary} activeStep={form.activeStep} onStepChange={form.setActiveStep}>
-                {step.node}
-              </AppointmentStepCard>
-            ))}
-          </div>
-
-          <AppointmentStickySummary
-            selectedBuyer={form.selectedBuyer}
-            items={form.items}
-            agreedTotal={form.agreedTotal}
-            depositTotal={form.depositTotal}
-            tradeInCredit={form.tradeInCredit}
-            balance={form.balance}
-            isSubmitting={form.isSubmitting}
-            onSubmit={form.requestSubmit}
-          />
-        </div>
-      </div>
+      {formContent}
     </DashboardLayout>
   )
 }

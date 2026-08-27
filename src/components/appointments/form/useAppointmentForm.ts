@@ -41,11 +41,15 @@ export type AppointmentDepositFormDraft = {
 
 export type CustomerKind = "retail" | "wholesale"
 
+type AppointmentFormOptions = {
+  onSuccess?: (saved: { id?: string }) => void
+}
+
 function stripAppointmentMeta(value: string | null | undefined) {
   return (value ?? "").replace(/\n*\[appointment-meta\][\s\S]*?\[\/appointment-meta\]\n*/g, "").trim()
 }
 
-export function useAppointmentForm(mode: AppointmentFormMode, initialData?: AppointmentFormInitialData) {
+export function useAppointmentForm(mode: AppointmentFormMode, initialData?: AppointmentFormInitialData, options?: AppointmentFormOptions) {
   const router = useRouter()
   const { data: session } = useSession()
   const confirmDialog = useConfirmDialog()
@@ -225,7 +229,9 @@ export function useAppointmentForm(mode: AppointmentFormMode, initialData?: Appo
       }
 
       const saved = (await response.json()) as { id?: string }
-      if (mode === "create") {
+      if (options?.onSuccess) {
+        options.onSuccess(saved)
+      } else if (mode === "create") {
         setSuccess({ appointmentId: saved.id })
       } else {
         router.push("/dashboard/appointments")
