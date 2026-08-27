@@ -32,7 +32,10 @@ export default async function ReservationDetailPage({ params }: Props) {
             <h1 className="text-2xl font-bold">Reserva</h1>
             <p className="text-sm text-base-content/60">{reservation.buyer ? [reservation.buyer.name, reservation.buyer.surname].filter(Boolean).join(" ") : "Sin comprador"} · {reservation.status}</p>
           </div>
-          {reservation.convertedSale ? <Link className="btn btn-outline btn-sm" href={`/dashboard/sales/${reservation.convertedSale.id}/edit`}>Ver venta</Link> : null}
+          <div className="flex flex-wrap gap-2">
+            <Link className="btn btn-ghost btn-sm" href={`/dashboard/reservations/${reservation.id}/edit`}>Editar</Link>
+            {reservation.convertedSale ? <Link className="btn btn-outline btn-sm" href={`/dashboard/sales/${reservation.convertedSale.id}/edit`}>Ver venta</Link> : null}
+          </div>
         </div>
         <ReservationDetailActions id={reservation.id} status={reservation.status} />
         <div className="grid gap-4 lg:grid-cols-2">

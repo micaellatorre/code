@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
 
 type ProvinceOption = {
   id: string
@@ -9,7 +8,7 @@ type ProvinceOption = {
   name: string
 }
 
-type BranchFormValue = {
+export type BranchFormValue = {
   id?: string
   code: string
   name: string
@@ -36,12 +35,31 @@ const emptyBranch: BranchFormValue = {
   isActive: true,
 }
 
-export default function BranchForm({ initial }: { initial?: BranchFormValue }) {
-  const router = useRouter()
+type BranchFormProps = {
+  initial?: BranchFormValue
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: (branch: unknown) => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export default function BranchForm({ initial, formId, hideActions = false, onSuccess, onCancel, onDirtyChange, onSubmittingChange }: BranchFormProps) {
   const [form, setForm] = useState<BranchFormValue>(initial ?? emptyBranch)
   const [provinces, setProvinces] = useState<ProvinceOption[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const initialSnapshot = useMemo(() => JSON.stringify(initial ?? emptyBranch), [initial])
+  const dirty = JSON.stringify(form) !== initialSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSaving)
+  }, [isSaving, onSubmittingChange])
 
   useEffect(() => {
     let cancelled = false
@@ -78,25 +96,29 @@ export default function BranchForm({ initial }: { initial?: BranchFormValue }) {
     setIsSaving(true)
     setError(null)
 
-    const response = await fetch(initial?.id ? `/api/branches/${initial.id}` : "/api/branches", {
-      method: initial?.id ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    })
+    try {
+      const response = await fetch(initial?.id ? `/api/branches/${initial.id}` : "/api/branches", {
+        method: initial?.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const payload = await response.json().catch(() => null) as { branch?: unknown; error?: string } | null
 
-    setIsSaving(false)
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null)
-      setError(payload?.error ?? "No se pudo guardar la sucursal")
-      return
+      if (!response.ok) {
+        setError(payload?.error ?? "No se pudo guardar la sucursal")
+        return
+      }
+
+      onSuccess?.(payload?.branch)
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo guardar la sucursal")
+    } finally {
+      setIsSaving(false)
     }
-
-    router.push("/dashboard/branches")
-    router.refresh()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-4">
+    <form id={formId} onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-4">
       <fieldset className="rounded-lg border border-base-300 bg-base-100 p-4">
         <legend className="px-1 text-sm font-semibold uppercase text-base-content/60">Datos de sucursal</legend>
         <div className="grid gap-3 md:grid-cols-2">
@@ -172,12 +194,14 @@ export default function BranchForm({ initial }: { initial?: BranchFormValue }) {
 
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
 
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn btn-ghost" onClick={() => router.back()} disabled={isSaving}>Volver</button>
-        <button type="submit" className="btn btn-primary" disabled={isSaving}>
-          {isSaving ? <><span className="loading loading-spinner loading-xs" /> Guardando...</> : "Guardar sucursal"}
-        </button>
-      </div>
+      {!hideActions ? (
+        <div className="flex justify-end gap-2">
+          {onCancel ? <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={isSaving}>Volver</button> : null}
+          <button type="submit" className="btn btn-primary" disabled={isSaving}>
+            {isSaving ? <><span className="loading loading-spinner loading-xs" /> Guardando...</> : "Guardar sucursal"}
+          </button>
+        </div>
+      ) : null}
     </form>
   )
 }

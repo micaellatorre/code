@@ -1,16 +1,35 @@
-name: Validate payment pricing feature
+name: Validate feature
 
 on:
+  pull_request:
+    branches:
+      - master
   push:
     branches:
       - feature/payment-pricing-cotizador
+      - agent/customer-orders-on-demand
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: validation
+          POSTGRES_PASSWORD: validation
+          POSTGRES_DB: validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U validation -d validation"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      PGPASSWORD: validation
       NEXTAUTH_SECRET: validation-only
       NEXTAUTH_URL: http://localhost:3000
     steps:
@@ -22,6 +41,13 @@ jobs:
       - run: npm ci
       - run: npx prisma validate
       - run: npx prisma generate
+      # The repository has a pre-existing historical migration that cannot bootstrap a clean DB
+      # (20260505120000_product_senado_flag references Product.state before that column exists).
+      # Build the current baseline from schema.prisma, then apply only this feature's additive SQL.
+      - run: npx prisma db push --force-reset --accept-data-loss
+      - run: psql -h localhost -U validation -d validation -v ON_ERROR_STOP=1 -f prisma/migrations/20260818220000_customer_orders_on_demand/migration.sql
+      - run: psql -h localhost -U validation -d validation -v ON_ERROR_STOP=1 -f prisma/migrations/20260818221000_customer_order_metadata/migration.sql
+      - run: node scripts/run-ts-script.cjs scripts/verify-customer-orders.ts
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run build

@@ -1,7 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
 import { ChevronDownIcon } from "@heroicons/react/24/solid"
 import BranchAutocomplete from "@/components/branches/BranchAutocomplete"
 import type { UserBranchOption, UserTenantOption } from "@/lib/domain/users"
@@ -26,6 +25,17 @@ type UserFormProps = {
   defaultTenantId: string
   defaultBranchId: string | null
   user?: UserFormUser
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: (user: UserFormSavedUser) => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onCanSubmitChange?: (canSubmit: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export type UserFormSavedUser = {
+  id: string
 }
 
 type FormState = {
@@ -49,16 +59,30 @@ function buildInitialState(props: UserFormProps): FormState {
 }
 
 export default function UserForm(props: UserFormProps) {
-  const router = useRouter()
   const [form, setForm] = useState<FormState>(() => buildInitialState(props))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const initialSnapshot = useMemo(() => JSON.stringify(buildInitialState(props)), [props.defaultBranchId, props.defaultTenantId, props.user])
+  const dirty = JSON.stringify(form) !== initialSnapshot
+  const canSubmit = Boolean(form.currentBranchId)
 
   const selectedTenant = props.tenantOptions.find((tenant) => tenant.tenantId === form.tenantId) ?? null
   const tenantBranches = useMemo(
     () => props.branches.filter((branch) => branch.tenantId === form.tenantId),
     [props.branches, form.tenantId],
   )
+
+  useEffect(() => {
+    props.onDirtyChange?.(dirty)
+  }, [dirty, props])
+
+  useEffect(() => {
+    props.onSubmittingChange?.(saving)
+  }, [saving, props])
+
+  useEffect(() => {
+    props.onCanSubmitChange?.(canSubmit)
+  }, [canSubmit, props])
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -94,17 +118,16 @@ export default function UserForm(props: UserFormProps) {
       return
     }
 
-    const userId = payload?.user?.id
-    if (props.mode === "create" && userId) {
-      router.push(`/dashboard/config/users/new/success?userId=${encodeURIComponent(userId)}`)
-    } else {
-      router.push("/dashboard/config?tab=equipo")
+    const savedUser = payload?.user
+    if (!savedUser?.id || typeof savedUser.id !== "string") {
+      setError("La API no devolvio el usuario guardado")
+      return
     }
-    router.refresh()
+    props.onSuccess?.({ id: savedUser.id })
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form id={props.formId} onSubmit={submit} className="space-y-4">
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
 
       <section className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-4">
@@ -187,13 +210,15 @@ export default function UserForm(props: UserFormProps) {
         )}
       </section>
 
-      <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-base-300 bg-base-100/95 px-1 py-3 backdrop-blur">
-        <button type="button" className="btn btn-ghost" onClick={() => router.push("/dashboard/config?tab=equipo")} disabled={saving}>Cancelar</button>
-        <button type="submit" className="btn btn-primary" disabled={saving || !form.currentBranchId}>
-          {saving ? <span className="loading loading-spinner loading-xs" /> : null}
-          {props.mode === "create" ? "Crear usuario" : "Guardar cambios"}
-        </button>
-      </div>
+      {!props.hideActions ? (
+        <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-base-300 bg-base-100/95 px-1 py-3 backdrop-blur">
+          {props.onCancel ? <button type="button" className="btn btn-ghost" onClick={props.onCancel} disabled={saving}>Cancelar</button> : null}
+          <button type="submit" className="btn btn-primary" disabled={saving || !canSubmit}>
+            {saving ? <span className="loading loading-spinner loading-xs" /> : null}
+            {props.mode === "create" ? "Crear usuario" : "Guardar cambios"}
+          </button>
+        </div>
+      ) : null}
     </form>
   )
 }

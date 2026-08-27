@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import type { ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import Breadcrumbs from "@/components/Breadcrumbs"
 import AppointmentDepositStep from "@/components/appointments/form/AppointmentDepositStep"
@@ -14,13 +13,37 @@ import AppointmentStickySummary from "@/components/appointments/form/Appointment
 import AppointmentSummaryStep from "@/components/appointments/form/AppointmentSummaryStep"
 import AppointmentTradeInStep from "@/components/appointments/form/AppointmentTradeInStep"
 import { type AppointmentFormInitialData, useAppointmentForm } from "@/components/appointments/form/useAppointmentForm"
+import { formatMoney } from "@/components/appointments/appointmentUtils"
+import { DialogSummaryActions } from "@/components/ui/dialog"
 
 interface EditAppointmentFormProps {
   id: string
+  presentation?: "page" | "dialog"
+  onSuccess?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
 }
 
-function EditAppointmentFormContent({ initialData }: { initialData: AppointmentFormInitialData }) {
-  const form = useAppointmentForm("edit", initialData)
+type AppointmentInterestApi = AppointmentFormInitialData["interests"][number] & {
+  id?: string
+  product?: { salePrice?: unknown } | null
+}
+
+function EditAppointmentFormContent({
+  initialData,
+  presentation,
+  onSuccess,
+  onSubmittingChange,
+}: {
+  initialData: AppointmentFormInitialData
+  presentation: "page" | "dialog"
+  onSuccess?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
+}) {
+  const form = useAppointmentForm("edit", initialData, { onSuccess })
+
+  useEffect(() => {
+    onSubmittingChange?.(form.isSubmitting)
+  }, [form.isSubmitting, onSubmittingChange])
 
   const steps: { key: string; title: string; summary: string; node: ReactNode }[] = []
 
@@ -74,8 +97,8 @@ function EditAppointmentFormContent({ initialData }: { initialData: AppointmentF
     },
     {
       key: "deposit",
-      title: "Seña",
-      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin seña",
+      title: "Sena",
+      summary: form.depositEnabled ? `${form.deposits.length} pagos cargados` : "Sin sena",
       node: (
         <AppointmentDepositStep
           enabled={form.depositEnabled}
@@ -126,15 +149,37 @@ function EditAppointmentFormContent({ initialData }: { initialData: AppointmentF
   )
 
   const stepperSteps = steps.map((step) => ({ label: step.title, summary: step.summary }))
+  const isDialog = presentation === "dialog"
+  const summaryContent = (
+    <div className="space-y-3 text-sm">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="text-base-content/50">Cliente</p>
+          <p className="font-medium">{form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "Pendiente"}</p>
+        </div>
+        <div>
+          <p className="text-base-content/50">Items</p>
+          <p className="font-medium">{form.items.length}</p>
+        </div>
+      </div>
+      <div className="divide-y divide-base-300 rounded-lg border border-base-300">
+        <p className="flex justify-between p-2"><span>Total</span><span>{formatMoney(form.agreedTotal)}</span></p>
+        <p className="flex justify-between p-2"><span>Senas</span><span>{formatMoney(form.depositTotal)}</span></p>
+        <p className="flex justify-between p-2"><span>Plan Canje</span><span>{formatMoney(form.tradeInCredit)}</span></p>
+        <p className="flex justify-between p-2 font-semibold"><span>Saldo</span><span>{formatMoney(form.balance)}</span></p>
+      </div>
+      {form.error ? <div className="alert alert-error text-sm">{form.error}</div> : null}
+    </div>
+  )
 
   return (
-    <div className="space-y-4 sm:p-4">
+    <div className={`space-y-4 ${isDialog ? "pb-28 sm:pb-28" : "sm:p-4"}`}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Editar reserva</h1>
+        {!isDialog ? <div>
+          <h1 className="text-2xl font-bold">Editar cita</h1>
           <p className="mt-1 text-sm text-base-content/60">Actualiza cliente, fecha, items, resultado, Plan Canje y notas de seguimiento.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+        </div> : null}
+        <div className={`flex flex-wrap items-center gap-2 ${isDialog ? "w-full justify-end" : ""}`}>
           <span className="text-sm text-base-content/80">Plan Canje</span>
           <div className="join">
             <button type="button" className={`btn btn-sm join-item ${form.planCanjeEnabled ? "btn-outline" : "btn-primary"}`} onClick={() => form.setPlanCanjeEnabled(false)}>
@@ -149,7 +194,7 @@ function EditAppointmentFormContent({ initialData }: { initialData: AppointmentF
 
       <AppointmentFormStepper steps={stepperSteps} activeStep={form.activeStep} onStepChange={form.setActiveStep} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+      <div className={`grid grid-cols-1 gap-4 ${isDialog ? "" : "lg:grid-cols-[1fr_320px]"}`}>
         <div className="space-y-3">
           {steps.map((step, index) => (
             <AppointmentStepCard key={step.key} index={index} title={step.title} summary={step.summary} activeStep={form.activeStep} onStepChange={form.setActiveStep}>
@@ -158,7 +203,7 @@ function EditAppointmentFormContent({ initialData }: { initialData: AppointmentF
           ))}
         </div>
 
-        <AppointmentStickySummary
+        {!isDialog ? <AppointmentStickySummary
           selectedBuyer={form.selectedBuyer}
           items={form.items}
           agreedTotal={form.agreedTotal}
@@ -167,13 +212,27 @@ function EditAppointmentFormContent({ initialData }: { initialData: AppointmentF
           balance={form.balance}
           isSubmitting={form.isSubmitting}
           onSubmit={form.requestSubmit}
-        />
+        /> : null}
       </div>
+      {isDialog ? (
+        <DialogSummaryActions
+          layout="drawer"
+          title="Resumen"
+          mobileLabel={form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "Cita"}
+          mobileValue={formatMoney(form.balance)}
+          summary={summaryContent}
+          actions={({ compact }) => (
+            <button type="button" className="btn btn-primary" onClick={form.requestSubmit} disabled={form.isSubmitting}>
+              {form.isSubmitting ? (compact ? "..." : "Guardando...") : compact ? "Guardar" : "Guardar cita"}
+            </button>
+          )}
+        />
+      ) : null}
     </div>
   )
 }
 
-export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
+export default function EditAppointmentForm({ id, presentation = "page", onSuccess, onSubmittingChange }: EditAppointmentFormProps) {
   const [initialData, setInitialData] = useState<AppointmentFormInitialData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -185,8 +244,9 @@ export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
       setIsLoading(true)
       try {
         const response = await fetch(`/api/appointments/${id}`)
-        if (!response.ok) throw new Error("No se pudo cargar la reserva.")
+        if (!response.ok) throw new Error("No se pudo cargar la cita.")
         const data = await response.json()
+        const interests = Array.isArray(data.interests) ? data.interests as AppointmentInterestApi[] : []
         setInitialData({
           id: data.id,
           scheduledAt: data.scheduledAt,
@@ -197,16 +257,16 @@ export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
           noSaleReasonOther: data.noSaleReasonOther,
           resultNotes: data.resultNotes,
           buyer: data.buyer,
-          interests: (data.interests ?? []).map((interest: any) => ({
+          interests: interests.map((interest) => ({
             ...interest,
-            _id: interest.id,
+            _id: interest.id ?? interest.productId,
             agreedPrice: Number(interest.product?.salePrice ?? 0),
             quantity: 1,
             kind: "NORMAL",
           })),
         })
-      } catch (fetchError: any) {
-        setError(fetchError?.message || "Error de conexion.")
+      } catch (fetchError) {
+        setError(fetchError instanceof Error ? fetchError.message : "Error de conexion.")
       } finally {
         setIsLoading(false)
       }
@@ -215,23 +275,29 @@ export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
     void fetchAppointment()
   }, [id])
 
+  useEffect(() => {
+    onSubmittingChange?.(isLoading)
+  }, [isLoading, onSubmittingChange])
+
   if (isLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex h-full items-center justify-center">
-          <span className="loading loading-lg" />
-        </div>
-      </DashboardLayout>
+    const loader = (
+      <div className="flex h-full min-h-72 items-center justify-center">
+        <span className="loading loading-lg" />
+      </div>
     )
+    if (presentation === "dialog") return loader
+    return <DashboardLayout>{loader}</DashboardLayout>
   }
 
   if (error || !initialData) {
-    return (
-      <DashboardLayout>
-        <div className="alert alert-error">{error || "No se pudo cargar la reserva."}</div>
-      </DashboardLayout>
-    )
+    const errorContent = <div className="alert alert-error">{error || "No se pudo cargar la cita."}</div>
+    if (presentation === "dialog") return errorContent
+    return <DashboardLayout>{errorContent}</DashboardLayout>
   }
+
+  const formContent = <EditAppointmentFormContent initialData={initialData} presentation={presentation} onSuccess={onSuccess} onSubmittingChange={onSubmittingChange} />
+
+  if (presentation === "dialog") return formContent
 
   return (
     <DashboardLayout>
@@ -239,10 +305,10 @@ export default function EditAppointmentForm({ id }: EditAppointmentFormProps) {
         items={[
           { label: "Inicio", href: "/" },
           { label: "Citas", href: "/dashboard/appointments" },
-          { label: "Editar reserva" },
+          { label: "Editar cita" },
         ]}
       />
-      <EditAppointmentFormContent initialData={initialData} />
+      {formContent}
     </DashboardLayout>
   )
 }

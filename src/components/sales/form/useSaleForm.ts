@@ -39,10 +39,12 @@ export function useSaleForm({
   mode,
   initialData,
   initialAppointmentId,
+  onSuccess,
 }: {
   mode: "create" | "edit"
   initialData?: SaleFormInitialData
   initialAppointmentId?: string | null
+  onSuccess?: (success: SaleFormSuccess) => void
 }) {
   const router = useRouter()
   const { data: session } = useSession()
@@ -266,13 +268,19 @@ export function useSaleForm({
           const body = await response.json().catch(() => null)
           if (!response.ok) throw new Error(body?.error || body?.message || "No se pudo guardar la venta.")
           const saleId = body?.id || body?.sale?.id
+          const successPayload = {
+            saleId,
+            customerName: selectedBuyer ? `${selectedBuyer.name} ${selectedBuyer.surname ?? ""}`.trim() : "Consumidor Final",
+            total: totals.total,
+          }
+
+          if (onSuccess) {
+            onSuccess(successPayload)
+            return
+          }
 
           if (mode === "create") {
-            setSuccess({
-              saleId,
-              customerName: selectedBuyer ? `${selectedBuyer.name} ${selectedBuyer.surname ?? ""}`.trim() : "Consumidor Final",
-              total: totals.total,
-            })
+            setSuccess(successPayload)
           } else {
             router.refresh()
             router.push("/dashboard/sales")

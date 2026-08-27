@@ -16,7 +16,15 @@ type Option = {
   catalogColor?: ProductCatalogDisplayColor | null
 }
 
-export default function ServiceOrderForm() {
+type ServiceOrderFormProps = {
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: (payload: { order?: { id: string } }) => void
+  onCancel?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export default function ServiceOrderForm({ formId, hideActions = false, onSuccess, onCancel, onSubmittingChange }: ServiceOrderFormProps = {}) {
   const router = useRouter()
   const [buyers, setBuyers] = useState<Option[]>([])
   const [products, setProducts] = useState<Option[]>([])
@@ -46,6 +54,10 @@ export default function ServiceOrderForm() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSaving)
+  }, [isSaving, onSubmittingChange])
 
   function setField(field: keyof typeof form, value: string) {
     setForm((prev) => {
@@ -81,8 +93,13 @@ export default function ServiceOrderForm() {
       setError(payload?.error ?? "No se pudo crear la orden")
       return
     }
-    router.push("/dashboard/database?tab=service")
-    router.refresh()
+    const payload = await response.json().catch(() => ({}))
+    if (onSuccess) {
+      onSuccess(payload)
+    } else {
+      router.push("/dashboard/database?tab=service")
+      router.refresh()
+    }
   }
 
   const selectedBuyer = buyers.find((buyer) => buyer.id === form.buyerId)
@@ -92,7 +109,7 @@ export default function ServiceOrderForm() {
   const buyerName = selectedBuyer ? [selectedBuyer.name, selectedBuyer.surname].filter(Boolean).join(" ") : ""
 
   return (
-    <form onSubmit={submit} className="grid grid-cols-1 gap-4 sm:p-4 lg:grid-cols-[1fr_320px]">
+    <form id={formId} onSubmit={submit} className="grid grid-cols-1 gap-4 sm:p-4 lg:grid-cols-[1fr_320px]">
       {error ? <div className="alert alert-error py-3 text-sm lg:col-span-2">{error}</div> : null}
 
       <div className="space-y-3">
@@ -207,7 +224,7 @@ export default function ServiceOrderForm() {
         </section>
       </div>
 
-      <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4">
+      <aside className="h-fit rounded-lg border border-base-300 bg-base-100 p-4 lg:sticky lg:top-4">
         <h2 className="font-semibold">Resumen</h2>
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
@@ -234,15 +251,17 @@ export default function ServiceOrderForm() {
           </div>
         </dl>
 
-        <div className="mt-4 flex flex-col gap-2">
-          <button type="submit" className="btn btn-primary w-full" disabled={isSaving}>
-            {isSaving ? <span className="loading loading-spinner loading-xs" /> : null}
-            {isSaving ? "Registrando..." : "Crear orden"}
-          </button>
-          <button type="button" className="btn btn-ghost w-full" onClick={() => router.back()} disabled={isSaving}>
-            Volver
-          </button>
-        </div>
+        {!hideActions ? (
+          <div className="mt-4 flex flex-col gap-2">
+            <button type="submit" className="btn btn-primary w-full" disabled={isSaving}>
+              {isSaving ? <span className="loading loading-spinner loading-xs" /> : null}
+              {isSaving ? "Registrando..." : "Crear orden"}
+            </button>
+            <button type="button" className="btn btn-ghost w-full" onClick={onCancel ?? (() => router.back())} disabled={isSaving}>
+              Volver
+            </button>
+          </div>
+        ) : null}
       </aside>
     </form>
   )

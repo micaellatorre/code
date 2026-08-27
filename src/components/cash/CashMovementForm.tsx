@@ -5,7 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 type Account = { id: string; name: string; code: string; currency: string; scope?: string; branch?: { name: string } | null }
 
-export default function CashMovementForm() {
+type CashMovementFormProps = {
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: () => void
+  onCancel?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export default function CashMovementForm({ formId, hideActions = false, onSuccess, onCancel, onSubmittingChange }: CashMovementFormProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -38,6 +46,10 @@ export default function CashMovementForm() {
     }))
   }, [searchParams])
 
+  useEffect(() => {
+    onSubmittingChange?.(isSaving)
+  }, [isSaving, onSubmittingChange])
+
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     setIsSaving(true)
@@ -49,8 +61,12 @@ export default function CashMovementForm() {
       setError(payload?.error ?? "No se pudo registrar el movimiento")
       return
     }
-    router.push("/dashboard/cash")
-    router.refresh()
+    if (onSuccess) {
+      onSuccess()
+    } else {
+      router.push("/dashboard/cash")
+      router.refresh()
+    }
   }
 
   function selectAccount(accountId: string) {
@@ -59,7 +75,7 @@ export default function CashMovementForm() {
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-2xl space-y-4">
+    <form id={formId} onSubmit={submit} className="mx-auto max-w-2xl space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <label className="form-control"><span className="label-text">Cuenta *</span><select required className="select select-bordered" value={form.accountId} onChange={(event) => selectAccount(event.target.value)}><option value="">Seleccionar</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.currency})</option>)}</select></label>
         <label className="form-control"><span className="label-text">Tipo *</span><select className="select select-bordered" value={form.direction} onChange={(event) => setForm((prev) => ({ ...prev, direction: event.target.value }))}><option value="INCOME">Ingreso</option><option value="EXPENSE">Egreso</option></select></label>
@@ -70,7 +86,9 @@ export default function CashMovementForm() {
         <label className="form-control md:col-span-2"><span className="label-text">Detalle *</span><textarea required className="textarea textarea-bordered" value={form.detail} onChange={(event) => setForm((prev) => ({ ...prev, detail: event.target.value }))} /></label>
       </div>
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
-      <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={() => router.back()} disabled={isSaving}>Volver</button><button className="btn btn-primary" disabled={isSaving}>{isSaving ? "Registrando..." : "Registrar movimiento"}</button></div>
+      {!hideActions ? (
+        <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onCancel ?? (() => router.back())} disabled={isSaving}>Volver</button><button className="btn btn-primary" disabled={isSaving}>{isSaving ? "Registrando..." : "Registrar movimiento"}</button></div>
+      ) : null}
     </form>
   )
 }

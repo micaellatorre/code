@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import type { ReactNode } from "react"
+import { useEffect } from "react"
 import SaleBuyerStep from "./SaleBuyerStep"
 import SaleFormStepper from "./SaleFormStepper"
 import SaleItemsStep from "./SaleItemsStep"
@@ -14,18 +15,34 @@ import SaleSuccessScreen from "./SaleSuccessScreen"
 import SaleSummaryStep from "./SaleSummaryStep"
 import SaleTradeInStep from "./SaleTradeInStep"
 import { useSaleForm } from "./useSaleForm"
-import type { SaleFormInitialData } from "@/components/sales/types"
+import { DialogSummaryActions } from "@/components/ui/dialog"
+import { formatUsd } from "@/components/sales/salesUtils"
+import type { SaleFormInitialData, SaleFormSuccess } from "@/components/sales/types"
 
 export default function SaleForm({
   mode,
   initialData,
   initialAppointmentId,
+  presentation = "page",
+  onSuccess,
+  onCancel,
+  onSubmittingChange,
 }: {
   mode: "create" | "edit"
   initialData?: SaleFormInitialData
   initialAppointmentId?: string | null
+  presentation?: "page" | "dialog"
+  onSuccess?: (success: SaleFormSuccess) => void
+  onCancel?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
 }) {
-  const form = useSaleForm({ mode, initialData, initialAppointmentId })
+  const form = useSaleForm({ mode, initialData, initialAppointmentId, onSuccess })
+  const busy = form.isSubmitting || form.isReserving
+  const isDialog = presentation === "dialog"
+
+  useEffect(() => {
+    onSubmittingChange?.(busy)
+  }, [busy, onSubmittingChange])
 
   if (form.success) return <SaleSuccessScreen success={form.success} />
 
@@ -146,7 +163,7 @@ export default function SaleForm({
           setStatus={form.setSaleStatus}
           canChangeStatus={form.canChangeStatus}
           error={form.error}
-          isSubmitting={form.isSubmitting || form.isReserving}
+          isSubmitting={busy}
           onConfirm={() => form.submit("CONFIRM_SALE")}
           onReserve={() => form.submit("RESERVE")}
         />
@@ -155,15 +172,39 @@ export default function SaleForm({
   )
 
   const stepperSteps = steps.map((step) => ({ label: step.title, summary: step.summary }))
+  const summaryContent = (
+    <div className="space-y-3 text-sm">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="text-base-content/50">Cliente</p>
+          <p className="font-medium">{form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "Consumidor Final"}</p>
+        </div>
+        <div>
+          <p className="text-base-content/50">Items</p>
+          <p className="font-medium">{form.items.length}</p>
+          {form.items.some((item) => item.parentClientLineId) ? (
+            <p className="text-xs text-primary">{form.items.filter((item) => item.parentClientLineId).length} accesorios asociados</p>
+          ) : null}
+        </div>
+      </div>
+      <div className="divide-y divide-base-300 rounded-lg border border-base-300">
+        <p className="flex justify-between p-2"><span>Total</span><span>{formatUsd(form.totals.total)}</span></p>
+        <p className="flex justify-between p-2"><span>Plan Canje</span><span>{formatUsd(form.totals.tradeInCredit)}</span></p>
+        <p className="flex justify-between p-2"><span>Pagado</span><span>{formatUsd(form.totals.totalPaid)}</span></p>
+        <p className="flex justify-between p-2 font-semibold"><span>Restante</span><span>{formatUsd(form.totals.remaining)}</span></p>
+      </div>
+      {form.error ? <div className="alert alert-error text-sm">{form.error}</div> : null}
+    </div>
+  )
 
   return (
-    <div className="space-y-4 sm:p-4">
+    <div className={`space-y-4 ${isDialog ? "pb-28 sm:pb-28" : "sm:p-4"}`}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        {!isDialog ? <div>
           <h1 className="text-2xl font-bold">{mode === "create" ? "Nueva venta" : "Editar venta"}</h1>
           <p className="mt-1 text-sm text-base-content/60">Flujo guiado para ventas directas, reservas y Plan Canje.</p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
+        </div> : null}
+        <div className={`flex flex-wrap gap-2 items-center ${isDialog ? "w-full justify-end" : ""}`}>
           {/* Plan Canje */}
           <span className="text-sm text-base-content/80">Plan Canje</span>
           <div className="join">
@@ -182,7 +223,13 @@ export default function SaleForm({
               Reserva
             </button>
           </div>
-          <Link href="/dashboard/sales" className="btn btn-ghost btn-sm">Volver</Link>
+          {onCancel && !isDialog ? (
+            <button type="button" onClick={onCancel} className="btn btn-ghost btn-sm" disabled={busy}>
+              Volver
+            </button>
+          ) : !onCancel ? (
+            <Link href="/dashboard/sales" className="btn btn-ghost btn-sm">Volver</Link>
+          ) : null}
         </div>
       </div>
 
@@ -192,7 +239,7 @@ export default function SaleForm({
 
       <SaleFormStepper steps={stepperSteps} activeStep={form.activeStep} onStepChange={form.setActiveStep} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+      <div className={`grid grid-cols-1 gap-4 ${isDialog ? "" : "lg:grid-cols-[1fr_320px]"}`}>
         <div className="space-y-3">
           {steps.map((step, index) => (
             <SaleStepCard key={step.key} index={index} title={step.title} summary={step.summary} activeStep={form.activeStep} onStepChange={form.setActiveStep}>
@@ -200,18 +247,44 @@ export default function SaleForm({
             </SaleStepCard>
           ))}
         </div>
-        <SaleStickySummary
+        {!isDialog ? <SaleStickySummary
           buyer={form.selectedBuyer}
           items={form.items}
           total={form.totals.total}
           paid={form.totals.totalPaid}
           remaining={form.totals.remaining}
           tradeInCredit={form.totals.tradeInCredit}
-          isSubmitting={form.isSubmitting || form.isReserving}
+          isSubmitting={busy}
           onConfirm={() => form.submit("CONFIRM_SALE")}
           onReserve={() => form.submit("RESERVE")}
-        />
+        /> : null}
       </div>
+
+      {isDialog ? (
+        <DialogSummaryActions
+          layout="drawer"
+          title="Resumen"
+          mobileLabel={form.selectedBuyer ? `${form.selectedBuyer.name} ${form.selectedBuyer.surname ?? ""}`.trim() : "Consumidor Final"}
+          mobileValue={formatUsd(form.totals.remaining)}
+          summary={summaryContent}
+          actions={({ compact }) => (
+            <>
+              <button type="button" className="btn btn-primary" disabled={busy} onClick={() => form.submit("CONFIRM_SALE")}>
+                {busy ? <span className="loading loading-spinner loading-xs" /> : null}
+                {compact ? "Confirmar" : "Confirmar venta"}
+              </button>
+              <button type="button" className="btn btn-outline" disabled={busy} onClick={() => form.submit("RESERVE")}>
+                {compact ? "Seña" : "Registrar seña / reservar"}
+              </button>
+              {onCancel ? (
+                <button type="button" className="btn btn-ghost" disabled={busy} onClick={onCancel}>
+                  Volver
+                </button>
+              ) : null}
+            </>
+          )}
+        />
+      ) : null}
     </div>
   )
 }

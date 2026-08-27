@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation"
 
 type Account = { id: string; name: string; currency: string }
 
-export default function CashTransferForm() {
+type CashTransferFormProps = {
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: () => void
+  onCancel?: () => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export default function CashTransferForm({ formId, hideActions = false, onSuccess, onCancel, onSubmittingChange }: CashTransferFormProps = {}) {
   const router = useRouter()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -15,6 +23,10 @@ export default function CashTransferForm() {
   useEffect(() => {
     fetch("/api/cash-accounts").then((res) => res.ok ? res.json() : null).then((data) => setAccounts(data?.accounts ?? []))
   }, [])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSaving)
+  }, [isSaving, onSubmittingChange])
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -27,12 +39,16 @@ export default function CashTransferForm() {
       setError(payload?.error ?? "No se pudo registrar la conversion")
       return
     }
-    router.push("/dashboard/cash")
-    router.refresh()
+    if (onSuccess) {
+      onSuccess()
+    } else {
+      router.push("/dashboard/cash")
+      router.refresh()
+    }
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-2xl space-y-4">
+    <form id={formId} onSubmit={submit} className="mx-auto max-w-2xl space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <label className="form-control"><span className="label-text">Operacion</span><select className="select select-bordered" value={form.kind} onChange={(event) => setForm((prev) => ({ ...prev, kind: event.target.value }))}><option value="CONVERSION">Conversion</option><option value="TRANSFER">Transferencia</option></select></label>
         <label className="form-control"><span className="label-text">Cuenta origen *</span><select required className="select select-bordered" value={form.fromAccountId} onChange={(event) => setForm((prev) => ({ ...prev, fromAccountId: event.target.value }))}><option value="">Seleccionar</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}</select></label>
@@ -43,7 +59,9 @@ export default function CashTransferForm() {
         <label className="form-control"><span className="label-text">Detalle</span><input className="input input-bordered" value={form.detail} onChange={(event) => setForm((prev) => ({ ...prev, detail: event.target.value }))} /></label>
       </div>
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
-      <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={() => router.back()} disabled={isSaving}>Volver</button><button className="btn btn-primary" disabled={isSaving}>{isSaving ? "Guardando..." : "Registrar operacion"}</button></div>
+      {!hideActions ? (
+        <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onCancel ?? (() => router.back())} disabled={isSaving}>Volver</button><button className="btn btn-primary" disabled={isSaving}>{isSaving ? "Guardando..." : "Registrar operacion"}</button></div>
+      ) : null}
     </form>
   )
 }

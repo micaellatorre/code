@@ -7,6 +7,7 @@ import {
   CurrencyDollarIcon,
   BanknotesIcon,
   ClipboardDocumentCheckIcon,
+  ClipboardDocumentListIcon,
   Cog6ToothIcon,
   DevicePhoneMobileIcon,
   MapPinIcon,
@@ -62,6 +63,15 @@ export const dashboardNavigationGroups: DashboardNavigationGroup[] = [
         allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"],
         quickAddHref: "/dashboard/sales/new",
         quickAddLabel: "Nueva venta",
+      },
+      {
+        key: "orders",
+        label: "Pedidos",
+        href: "/dashboard/orders",
+        icon: ClipboardDocumentListIcon,
+        allowedRoles: ["ADMIN", "VENDEDOR", "SOCIO"],
+        quickAddHref: "/dashboard/orders/new",
+        quickAddLabel: "Nuevo pedido",
       },
       {
         key: "quote",

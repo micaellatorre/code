@@ -72,6 +72,7 @@ export type SalePaymentSummary = {
   pricingSnapshot?: unknown
   cashAccountId?: string | null
   originReservationPaymentId?: string | null
+  originCustomerOrderPaymentId?: string | null
   paidAt?: string | null
   note?: string | null
 }

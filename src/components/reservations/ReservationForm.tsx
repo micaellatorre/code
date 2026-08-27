@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getProductDisplayModel, type ProductCatalogDisplayCapacity, type ProductCatalogDisplayColor, type ProductCatalogDisplayModel } from "@/lib/products/display"
 import { toArgDateTimeInputValue } from "@/lib/timezone"
@@ -18,7 +18,16 @@ type Product = {
 type Gift = { label: string }
 type CashAccount = { id: string; name: string; currency: string; scope: string; branch?: { name: string } | null }
 
-export default function ReservationForm() {
+type ReservationFormProps = {
+  formId?: string
+  hideActions?: boolean
+  onSuccess?: () => void
+  onCancel?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSubmittingChange?: (submitting: boolean) => void
+}
+
+export default function ReservationForm({ formId, hideActions = false, onSuccess, onCancel, onDirtyChange, onSubmittingChange }: ReservationFormProps) {
   const router = useRouter()
   const [buyers, setBuyers] = useState<Buyer[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -45,6 +54,16 @@ export default function ReservationForm() {
     paymentCashAccountId: "",
     paymentNote: "",
   })
+  const initialSnapshot = useMemo(() => JSON.stringify({ form, gifts: [] as Gift[] }), [])
+  const dirty = JSON.stringify({ form, gifts }) !== initialSnapshot
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onSubmittingChange?.(isSaving)
+  }, [isSaving, onSubmittingChange])
 
   useEffect(() => {
     async function load() {
@@ -93,38 +112,47 @@ export default function ReservationForm() {
           note: form.paymentNote || null,
         }]
       : []
-    const response = await fetch("/api/reservations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        buyerId: form.buyerId || null,
-        reservedAt: form.reservedAt ? new Date(form.reservedAt).toISOString() : null,
-        pickupAt: form.pickupAt ? new Date(form.pickupAt).toISOString() : null,
-        agreedTotal: form.agreedTotal || null,
-        notes: form.notes || null,
-        items: [{
-          productId: form.productId || null,
-          itemName: form.itemName,
-          imeiSerial: form.imeiSerial || null,
-          quantity: form.quantity,
-          unitPrice: form.unitPrice || null,
-          gifts,
-        }],
-        payments,
-      }),
-    })
-    setIsSaving(false)
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null)
-      setError(payload?.error ?? "No se pudo crear la reserva")
-      return
+    try {
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          buyerId: form.buyerId || null,
+          reservedAt: form.reservedAt ? new Date(form.reservedAt).toISOString() : null,
+          pickupAt: form.pickupAt ? new Date(form.pickupAt).toISOString() : null,
+          agreedTotal: form.agreedTotal || null,
+          notes: form.notes || null,
+          items: [{
+            productId: form.productId || null,
+            itemName: form.itemName,
+            imeiSerial: form.imeiSerial || null,
+            quantity: form.quantity,
+            unitPrice: form.unitPrice || null,
+            gifts,
+          }],
+          payments,
+        }),
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        setError(payload?.error ?? "No se pudo crear la reserva")
+        return
+      }
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        router.push("/dashboard/database?tab=reservations")
+        router.refresh()
+      }
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo crear la reserva")
+    } finally {
+      setIsSaving(false)
     }
-    router.push("/dashboard/database?tab=reservations")
-    router.refresh()
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-4xl space-y-4">
+    <form id={formId} onSubmit={submit} className="mx-auto max-w-4xl space-y-4">
       <fieldset className="rounded-lg border border-base-300 p-4">
         <legend className="px-1 text-sm font-semibold uppercase text-base-content/60">Cliente</legend>
         <label className="form-control">
@@ -184,10 +212,12 @@ export default function ReservationForm() {
         </div>
       </fieldset>
       {error ? <div className="alert alert-error text-sm">{error}</div> : null}
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn btn-ghost" onClick={() => router.back()} disabled={isSaving}>Volver</button>
-        <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? <><span className="loading loading-spinner loading-xs" /> Registrando...</> : "Crear reserva"}</button>
-      </div>
+      {!hideActions ? (
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn btn-ghost" onClick={onCancel ?? (() => router.back())} disabled={isSaving}>Volver</button>
+          <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? <><span className="loading loading-spinner loading-xs" /> Registrando...</> : "Crear reserva"}</button>
+        </div>
+      ) : null}
     </form>
   )
 }
