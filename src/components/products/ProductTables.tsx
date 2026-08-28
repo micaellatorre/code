@@ -17,7 +17,7 @@ import { formatDecimal, getProductCode, newestCreatedAt, rangeLabelFromItems } f
 type ProductTablesProps = { inventory: ProductsInventory }
 
 export default function ProductTables({ inventory }: ProductTablesProps) {
-  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, startEditField, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup, branches, savingBranchProductId, changeProductBranch, stockSettings } = inventory
+  const { inventorySegment, isTableExpanded, isLoading, productsLocal, phoneSections, operationalProducts, viewMode, visibleOriginColumn, visibleProveedorColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, hasProductActions, filteredProducts, grouped, groupedCounts, generalColumnCount, expandedGroups, showSensitiveColumns, setShowSensitiveColumns, canEditField, editableCellProps, startEditField, isEditing, getEditingValue, updateEditingValue, commitEditField, cancelEditField, savingField, conditionOptions, conditionLabelMap, canEditStock, changeStockBy, startEditStock, canEditState, stateOptions, stateColorMap, stateLabelMap, savingStateId, changeState, canEditProducts, canDuplicateProducts, canDeleteProducts, duplicatingId, deletingId, duplicateProduct, deleteProduct, selectedProductIds, toggleProductSelection, toggleGroup, branches, savingBranchProductId, changeProductBranch, stockSettings } = inventory
   const [copiedImeiProductId, setCopiedImeiProductId] = React.useState<string | null>(null)
   const copiedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -259,9 +259,11 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
           </td>
         ) : null}
 
-        <td>
-          <SupplierCell product={p} />
-        </td>
+        {visibleProveedorColumn ? (
+          <td>
+            <SupplierCell product={p} />
+          </td>
+        ) : null}
 
         {visibleLocationColumn ? (
           <td>
@@ -815,9 +817,11 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
             </span>
           </OperationalEditableCell>
         </td>
-        <td>
-          <SupplierCell product={product} />
-        </td>
+        {visibleProveedorColumn ? (
+          <td>
+            <SupplierCell product={product} />
+          </td>
+        ) : null}
         {visibleImeiColumn ? (
           <td className="font-mono text-xs">
             {canEditField("imei") && isEditing(product.id, "imei") ? (
@@ -919,7 +923,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
               <th>Codigo</th>
               <th>Rotacion</th>
               <th>Modelo</th>
-              <th>Proveedor</th>
+              {visibleProveedorColumn ? <th>Proveedor</th> : null}
               {visibleImeiColumn ? <th>IMEI</th> : null}
               <th>GB</th>
               <th>Color</th>
@@ -1005,7 +1009,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                 <th>Agregado</th>
                 <th>Rotacion</th>
                 {visibleOriginColumn ? <th>Origen</th> : null}
-                <th>Proveedor</th>
+                {visibleProveedorColumn ? <th>Proveedor</th> : null}
                 {visibleLocationColumn ? <th>Sucursal</th> : null}
                 {visibleImeiColumn ? <th>IMEI</th> : null}
                 <th>Modelo</th>
@@ -1114,7 +1118,7 @@ export default function ProductTables({ inventory }: ProductTablesProps) {
                                     <th>Agregado</th>
                                     <th>Rotacion</th>
                                     {visibleOriginColumn ? <th>Origen</th> : null}
-                                    <th>Proveedor</th>
+                                    {visibleProveedorColumn ? <th>Proveedor</th> : null}
                                     {visibleLocationColumn ? <th>Sucursal</th> : null}
                                     {visibleImeiColumn ? <th>IMEI</th> : null}
                                     <th>Modelo</th>

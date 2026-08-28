@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useState } from "react"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
 import ProductColorSwatch from "@/components/products/ProductColorSwatch"
-import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayColorHex, getProductDisplayModel, type ProductCatalogDisplayProduct } from "@/lib/products/display"
+import { getConditionLabel, getProductDisplayCapacity, getProductDisplayColor, getProductDisplayColorHex, getProductDisplayModel, type ProductCatalogDisplayProduct } from "@/lib/products/display"
 import ProductSelectionModal from "../sales/ProductSelectionModal"
 
 export type AppointmentInterestDraft = {
@@ -128,7 +128,7 @@ export default function AppointmentInterestSection({ items, setItems }: Appointm
                     <td>
                       <div className="flex flex-wrap gap-1">
                         {capacity ? <span className="badge badge-outline badge-xs">{capacity}</span> : null}
-                        {item.product.condition ? <span className="badge badge-outline badge-xs">{item.product.condition}</span> : null}
+                        {item.product.condition ? <span className="badge badge-outline badge-xs">{getConditionLabel(item.product.condition)}</span> : null}
                         {item.product.batteryPct ? <span className="badge badge-outline badge-xs">{item.product.batteryPct}% bat.</span> : null}
                         {color ? (
                           <span className="badge badge-outline badge-xs gap-1">

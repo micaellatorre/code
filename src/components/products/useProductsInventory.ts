@@ -8,7 +8,7 @@ import { fromArgDateInputValue } from "@/lib/timezone"
 import type { Role } from "@/lib/auth/roles"
 import { useConfirmDialog } from "@/components/ui/confirm-dialog"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
-import { getProductDisplayCapacityGB, getProductDisplayColor, getProductDisplayModel } from "@/lib/products/display"
+import { CONDITION_LABELS, CONDITION_OPTIONS, getProductDisplayCapacityGB, getProductDisplayColor, getProductDisplayModel } from "@/lib/products/display"
 import type { BranchOption } from "@/components/branches/BranchAutocomplete"
 import type { InventorySegment, ProductsApiResponse, SerializedProduct } from "./types"
 import { compareIphoneModels, getIphoneSeries, getSeriesSortValue, isSealedPhone, normalizeModelKey } from "./utils"
@@ -86,6 +86,7 @@ export function useProductsInventory() {
   const [showSensitiveColumns, setShowSensitiveColumns] = useState(true)
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const visibleOriginColumn = showSensitiveColumns
+  const visibleProveedorColumn = showSensitiveColumns && !isSeller
   const visibleLocationColumn = showSensitiveColumns
   const visibleImeiColumn = showSensitiveColumns
   const visibleCostColumn = canSeeCosts && showSensitiveColumns
@@ -197,14 +198,8 @@ export function useProductsInventory() {
     FUERA_DE_STOCK: "Fuera de stock",
   }
 
-  const conditionOptions = ["A_PLUS", "OEM", "ASIS", "ASIS_PLUS", "SEALED"] as const
-  const conditionLabelMap: Record<string, string> = {
-    A_PLUS: "A+",
-    OEM: "OEM",
-    ASIS: "ASIS",
-    ASIS_PLUS: "ASIS+",
-    SEALED: "Sellado",
-  }
+  const conditionOptions = CONDITION_OPTIONS
+  const conditionLabelMap: Record<string, string> = CONDITION_LABELS
 
   // derived filter values from loaded page
   const brands = useMemo(
@@ -895,7 +890,7 @@ export function useProductsInventory() {
     activeRole, isAdmin, isSeller, isStock, isSocio, canSeeCosts, canSeeSalePrice, canCreateProducts, canEditProducts, canDuplicateProducts, canDeleteProducts, canEditStock, canEditState, isReadOnly, hasProductActions,
     viewMode, setViewMode, inventorySegment, setInventorySegment, search, setSearch, typeFilter, setTypeFilter, stateFilter, setStateFilter, senadoFilter, setSenadoFilter,
     brandFilter, setBrandFilter, conditionFilter, setConditionFilter, batteryMin, setBatteryMin, batteryMax, setBatteryMax, colorFilter, setColorFilter, capacityFilter, setCapacityFilter, originFilter, setOriginFilter, locationFilter, setLocationFilter, imeiSearch, setImeiSearch,
-    isTableExpanded, setIsTableExpanded, drawerOpen, setDrawerOpen, expandedGroups, setExpandedGroups, showSensitiveColumns, setShowSensitiveColumns, selectedProductIds, setSelectedProductIds, visibleOriginColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, generalColumnCount,
+    isTableExpanded, setIsTableExpanded, drawerOpen, setDrawerOpen, expandedGroups, setExpandedGroups, showSensitiveColumns, setShowSensitiveColumns, selectedProductIds, setSelectedProductIds, visibleOriginColumn, visibleProveedorColumn, visibleLocationColumn, visibleImeiColumn, visibleCostColumn, visibleSalePriceColumn, generalColumnCount,
     editingFields, savingField, savingStateId, savingSenadoId, deletingId, duplicatingId, branches, savingBranchProductId, cursor, setCursor, limit, orderBy, setOrderBy, apiUrl, data, error, isLoading, mutate, productsLocal, setProductsLocal, totalProducts, stockSettings, lowStockAccessoryProducts,
     stateOptions, stateColorMap, stateLabelMap, conditionOptions, conditionLabelMap, brands, conditions, colors, capacities, filteredProducts, locations, operationalProducts, phoneSections, grouped, groupedCounts, hasNext,
     clearFilters, selectInventorySegment, toggleProductSelection, canEditField, editableCellProps, startEditField, cancelEditField, updateEditingValue, persistFieldUpdate, commitEditField, isEditing, getEditingValue, persistStockUpdate, startEditStock, changeStockBy, persistStateUpdate, changeState, changeSenado, deleteProduct, duplicateProduct, changeProductBranch, toggleGroup,

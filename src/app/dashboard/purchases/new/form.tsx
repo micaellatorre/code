@@ -9,10 +9,10 @@ import Breadcrumbs from "@/components/Breadcrumbs"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 import ProductCatalogSelectors from "@/components/products/ProductCatalogSelectors"
 import type { Role } from "@/lib/auth/roles"
+import { CONDITION_LABELS, CONDITION_OPTIONS, type ConditionValue } from "@/lib/products/display"
 import { toArgDateInputValue } from "@/lib/timezone"
 
 type PurchaseKind = "PHONE" | "ACCESSORY"
-type ConditionValue = "A_PLUS" | "OEM" | "ASIS" | "ASIS_PLUS" | "SEALED"
 type CurrencyValue = "USD" | "ARS" | "USDT"
 type PaymentMethodValue = "EFECTIVO_PESOS" | "EFECTIVO_USD" | "TRANSFERENCIA_ARS" | "TRANSFERENCIA_USD" | "TARJETA" | "USDT"
 
@@ -494,13 +494,21 @@ export default function NewPurchaseForm({
                         </select>
                       </label>
                       <label className="form-control">
-                        <span className="label-text">Grado / condition</span>
-                        <select className="select select-bordered" value={item.condition} onChange={(event) => updateItem(item.id, { condition: event.target.value as ConditionValue })}>
-                          <option value="SEALED">SEALED</option>
-                          <option value="A_PLUS">A_PLUS</option>
-                          <option value="OEM">OEM</option>
-                          <option value="ASIS">ASIS</option>
-                          <option value="ASIS_PLUS">ASIS_PLUS</option>
+                        <span className="label-text">Condicion</span>
+                        <select
+                          className="select select-bordered"
+                          value={item.condition}
+                          onChange={(event) => {
+                            const condition = event.target.value as ConditionValue
+                            updateItem(item.id, {
+                              condition,
+                              ...(condition === "SEALED" ? { batteryPct: "100" } : {}),
+                            })
+                          }}
+                        >
+                          {CONDITION_OPTIONS.map((condition) => (
+                            <option key={condition} value={condition}>{CONDITION_LABELS[condition]}</option>
+                          ))}
                         </select>
                       </label>
                       <label className="form-control">

@@ -33,6 +33,29 @@ export type ProductCatalogDisplayProduct = {
   catalogColor?: ProductCatalogDisplayColor | null
 }
 
+export type ProductColorPresentation = {
+  label: string | null
+  hexColor: string | null
+  swatchColor: string
+}
+
+export const CONDITION_OPTIONS = ["A_PLUS", "OEM", "ASIS", "ASIS_PLUS", "SEALED"] as const
+
+export type ConditionValue = (typeof CONDITION_OPTIONS)[number]
+
+export const CONDITION_LABELS: Record<ConditionValue, string> = {
+  A_PLUS: "A+",
+  OEM: "OEM",
+  ASIS: "ASIS",
+  ASIS_PLUS: "ASIS+",
+  SEALED: "Sellado",
+}
+
+export function getConditionLabel(condition: string | null | undefined) {
+  if (!condition) return null
+  return CONDITION_LABELS[condition as ConditionValue] ?? condition
+}
+
 export function formatCapacity(capacityGB: number | string | null | undefined) {
   if (capacityGB == null || capacityGB === "") return null
   const value = Number(capacityGB)
@@ -62,6 +85,15 @@ export function getProductDisplayColor(product: ProductCatalogDisplayProduct | n
 
 export function getProductDisplayColorHex(product: ProductCatalogDisplayProduct | null | undefined) {
   return product?.catalogColor?.hexColor?.trim() || null
+}
+
+export function getProductColorPresentation(product: ProductCatalogDisplayProduct | null | undefined): ProductColorPresentation {
+  const hexColor = getProductDisplayColorHex(product)
+  return {
+    label: getProductDisplayColor(product),
+    hexColor,
+    swatchColor: hexColor || "#e5e7eb",
+  }
 }
 
 export function getProductDisplayParts(product: ProductCatalogDisplayProduct | null | undefined) {

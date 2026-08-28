@@ -219,7 +219,8 @@ function saleInclude() {
   return {
     buyer: true,
     user: { select: { id: true, name: true, email: true } },
-    branch: { select: { id: true, code: true, name: true } },
+    closer: { select: { id: true, name: true, email: true } },
+    branch: { select: { id: true, code: true, name: true, phone: true, address: true, city: true, email: true } },
     items: { include: { product: { include: productCatalogDisplayInclude } } },
     payments: { orderBy: { paidAt: "asc" as const } },
   }
@@ -365,7 +366,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         where: { id },
         include: {
           buyer: true,
-          branch: { select: { id: true, name: true } },
+          branch: { select: { id: true, code: true, name: true, phone: true, address: true, city: true, email: true } },
           items: true,
           payments: true,
         },
@@ -1153,6 +1154,13 @@ function serializeSale(sale: any) {
           id: sale.user.id,
           name: sale.user.name,
           email: sale.user.email ?? "",
+        }
+      : null,
+    closer: sale.closer
+      ? {
+          id: sale.closer.id,
+          name: sale.closer.name,
+          email: sale.closer.email ?? "",
         }
       : null,
     subtotal: sale.subtotal != null ? String(sale.subtotal) : null,

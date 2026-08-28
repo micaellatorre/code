@@ -31,7 +31,8 @@ export async function GET() {
       payments: true,
       buyer: true,
       user: { select: { id: true, name: true, email: true } },
-      branch: { select: { id: true, code: true, name: true } },
+      closer: { select: { id: true, name: true, email: true } },
+      branch: { select: { id: true, code: true, name: true, phone: true, address: true, city: true, email: true } },
     },
     orderBy: { date: "desc" },
   })
@@ -585,7 +586,8 @@ export async function POST(request: Request) {
       include: {
         buyer: true,
         user: { select: { id: true, name: true, email: true } },
-        branch: { select: { id: true, code: true, name: true } },
+        closer: { select: { id: true, name: true, email: true } },
+        branch: { select: { id: true, code: true, name: true, phone: true, address: true, city: true, email: true } },
         payments: true,
         items: { include: { product: { include: productCatalogDisplayInclude } } },
       },

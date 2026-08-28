@@ -8,6 +8,7 @@ import Breadcrumbs from "@/components/Breadcrumbs"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 import ProductCatalogSelectors from "@/components/products/ProductCatalogSelectors"
 import { DialogSummaryActions } from "@/components/ui/dialog"
+import { CONDITION_LABELS, CONDITION_OPTIONS } from "@/lib/products/display"
 
 export const dynamic = "force-dynamic"
 
@@ -318,11 +319,9 @@ export default function NewProductForm({
                   <label className="label"><span className="label-text">Condicion</span></label>
                   <select name="condition" value={form.condition} onChange={handleChange} className="select select-bordered" disabled={isSubmitting}>
                     <option value="">Seleccionar</option>
-                    <option value="A_PLUS">A+</option>
-                    <option value="OEM">OEM</option>
-                    <option value="ASIS">ASIS</option>
-                    <option value="ASIS_PLUS">ASIS+</option>
-                    <option value="SEALED">Sellado</option>
+                    {CONDITION_OPTIONS.map((condition) => (
+                      <option key={condition} value={condition}>{CONDITION_LABELS[condition]}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-control">

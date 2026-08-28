@@ -30,8 +30,9 @@ export default async function SalesPage() {
     take: 200,
     include: {
       user: { select: { id: true, name: true, email: true } },
-      branch: { select: { id: true, code: true, name: true } },
-      buyer: { select: { id: true, type: true, name: true, surname: true, businessName: true, phone: true, instagram: true, email: true } },
+      closer: { select: { id: true, name: true, email: true } },
+      branch: { select: { id: true, code: true, name: true, phone: true, address: true, city: true, email: true } },
+      buyer: { select: { id: true, type: true, name: true, surname: true, businessName: true, dni: true, cuit: true, phone: true, instagram: true, email: true } },
       payments: {
         select: {
           id: true,
@@ -107,6 +108,13 @@ export default async function SalesPage() {
           email: sale.user.email ?? "",
         }
       : null,
+    closer: sale.closer
+      ? {
+          id: sale.closer.id,
+          name: sale.closer.name,
+          email: sale.closer.email ?? "",
+        }
+      : null,
     buyer: sale.buyer
       ? {
           id: sale.buyer.id,
@@ -114,6 +122,8 @@ export default async function SalesPage() {
           name: sale.buyer.name,
           surname: sale.buyer.surname,
           businessName: sale.buyer.businessName,
+          dni: sale.buyer.dni,
+          cuit: sale.buyer.cuit,
           phone: sale.buyer.phone,
           instagram: sale.buyer.instagram,
           email: sale.buyer.email,

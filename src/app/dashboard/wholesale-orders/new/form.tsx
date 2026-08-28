@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/DashboardLayout'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { CONDITION_LABELS, CONDITION_OPTIONS } from '@/lib/products/display'
 
 type WholesaleOrderSuccess = { id?: string }
 type WholesaleOrderPayload = {
@@ -131,11 +132,9 @@ export default function NewWholesaleOrderForm({ presentation = "page", formId, h
             <label className="label"><span className="label-text">Condición</span></label>
             <select name="condition" value={form.condition} onChange={handleChange} className="select select-bordered">
               <option value="">Seleccionar</option>
-              <option value="A_PLUS">A+</option>
-              <option value="OEM">OEM</option>
-              <option value="ASIS">ASIS</option>
-              <option value="ASIS_PLUS">ASIS+</option>
-              <option value="SEALED">Sellado</option>
+              {CONDITION_OPTIONS.map((condition) => (
+                <option key={condition} value={condition}>{CONDITION_LABELS[condition]}</option>
+              ))}
             </select>
           </div>
           <div className="form-control">

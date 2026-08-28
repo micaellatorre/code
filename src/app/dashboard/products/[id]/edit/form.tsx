@@ -10,6 +10,7 @@ import { DialogSummaryActions } from "@/components/ui/dialog"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
 import BranchAutocomplete, { type BranchOption } from "@/components/branches/BranchAutocomplete"
 import ProductCatalogSelectors, { type CatalogCapacityDto, type CatalogColorDto, type CatalogModelDto } from "@/components/products/ProductCatalogSelectors"
+import { CONDITION_LABELS, CONDITION_OPTIONS } from "@/lib/products/display"
 
 interface EditProductFormProps {
   id: string
@@ -423,11 +424,9 @@ export default function EditProductForm({
                   <label className="label"><span className="label-text">Condicion</span></label>
                   <select name="condition" value={form.condition} onChange={handleChange} className="select select-bordered" disabled={isSubmitting}>
                     <option value="">Seleccionar</option>
-                    <option value="A_PLUS">A+</option>
-                    <option value="OEM">OEM</option>
-                    <option value="ASIS">ASIS</option>
-                    <option value="ASIS_PLUS">ASIS+</option>
-                    <option value="SEALED">Sellado</option>
+                    {CONDITION_OPTIONS.map((condition) => (
+                      <option key={condition} value={condition}>{CONDITION_LABELS[condition]}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-control">

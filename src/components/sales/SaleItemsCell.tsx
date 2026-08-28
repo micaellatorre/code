@@ -4,7 +4,7 @@ import Link from "next/link"
 import { DevicePhoneMobileIcon, ShoppingBagIcon } from "@heroicons/react/24/outline"
 import ImeiDisplay from "@/components/common/ImeiDisplay"
 import ProductColorSwatch from "@/components/products/ProductColorSwatch"
-import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayColorHex, getProductDisplayModel } from "@/lib/products/display"
+import { getConditionLabel, getProductDisplayCapacity, getProductDisplayColor, getProductDisplayColorHex, getProductDisplayModel } from "@/lib/products/display"
 import type { SaleItemSummary } from "./types"
 
 function TypeIcon({ type }: { type: string }) {
@@ -23,7 +23,7 @@ function ItemLine({ item, nested = false }: { item: SaleItemSummary; nested?: bo
         {color}
       </span>
     ) : null,
-    product.condition,
+    getConditionLabel(product.condition),
     product.batteryPct ? `${product.batteryPct}% bat.` : null,
     product.type?.toUpperCase() === "ACCESSORY" ? `x${item.units}` : null,
   ].filter(Boolean)

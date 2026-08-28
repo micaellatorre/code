@@ -1,6 +1,6 @@
 import { formatInTimeZone } from "date-fns-tz"
 import { AR_TIME_ZONE } from "@/lib/timezone"
-import { getProductDisplayCapacity, getProductDisplayColor, getProductDisplayLabel, getProductDisplayModel } from "@/lib/products/display"
+import { getConditionLabel, getProductDisplayCapacity, getProductDisplayColor, getProductDisplayLabel, getProductDisplayModel } from "@/lib/products/display"
 import type { SerializedSale } from "./types"
 
 export function toNumber(value: string | number | null | undefined) {
@@ -63,6 +63,7 @@ export function getSaleSearchText(sale: SerializedSale) {
       getProductDisplayCapacity(item.product),
       getProductDisplayColor(item.product),
       item.product?.condition,
+      getConditionLabel(item.product?.condition),
     ]),
   ]
     .filter(Boolean)

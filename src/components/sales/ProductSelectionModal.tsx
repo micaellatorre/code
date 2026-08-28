@@ -6,6 +6,7 @@ import type { Role } from '@/lib/auth/roles'
 import type { Product, ProductType, ProductStatus } from '@prisma/client'
 import ProductColorSwatch from '@/components/products/ProductColorSwatch'
 import {
+  getConditionLabel,
   getProductDisplayCapacity,
   getProductDisplayColor,
   getProductDisplayColorHex,
@@ -899,7 +900,8 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
   const productAttributeLine = (product: ApiProduct | (Product & ProductCatalogDisplayProduct)) => {
     const color = getProductDisplayColor(product)
     const capacity = product.type === 'PHONE' ? getProductDisplayCapacity(product) : null
-    if (!color && !capacity) return null
+    const condition = getConditionLabel(product.condition)
+    if (!color && !capacity && !condition) return null
 
     return (
       <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs opacity-70">
@@ -910,6 +912,7 @@ export default function ProductSelectionModal({ existingItems, branchId, saleTyp
           </span>
         ) : null}
         {capacity ? <span>{capacity}</span> : null}
+        {condition ? <span>{condition}</span> : null}
       </div>
     )
   }

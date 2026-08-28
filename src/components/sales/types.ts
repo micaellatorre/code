@@ -15,6 +15,8 @@ export type SaleBuyerSummary = {
   name: string
   surname: string | null
   businessName?: string | null
+  dni?: string | null
+  cuit?: string | null
   phone?: string | null
   instagram?: string | null
   email?: string | null
@@ -87,7 +89,7 @@ export type SerializedSale = {
   id: string
   tenantId: string
   branchId: string | null
-  branch?: { id: string; code: string; name: string } | null
+  branch?: { id: string; code: string; name: string; phone?: string | null; address?: string | null; city?: string | null; email?: string | null } | null
   date: string | null
   customerName: string | null
   origin: string | null
@@ -106,6 +108,7 @@ export type SerializedSale = {
   buyer: SaleBuyerSummary | null
   createdBy: string
   createdByUser: SaleUserSummary | null
+  closer: SaleUserSummary | null
   items: SaleItemSummary[]
   payments: SalePaymentSummary[]
   receipt?: SerializedSaleReceipt | null
