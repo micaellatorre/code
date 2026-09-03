@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{font:13px Inter,Arial,sans-serif;margin:0;padding:18px;background:var(--figma-color-bg);color:var(--figma-color-text)}
+h2{margin:0 0 8px;font-size:18px}.muted{color:var(--figma-color-text-secondary);line-height:1.4}.box{border:1px solid var(--figma-color-border);border-radius:10px;padding:12px;margin:14px 0}label{display:block;font-weight:600;margin-bottom:7px}input{width:100%}button{width:100%;padding:11px;border:0;border-radius:8px;background:#1478ff;color:white;font-weight:700;cursor:pointer}button:disabled{opacity:.5}.status{margin-top:12px;white-space:pre-wrap;font-size:12px;color:var(--figma-color-text-secondary)}code{font-size:11px}</style></head><body>
+<h2>TECH-STOCK UX Importer</h2><div class="muted">Genera Foundations, Atomic Design y las 64 interfaces como frames editables. Las imágenes se usan sólo como referencias opcionales.</div>
+<div class="box"><label>1. Manifest UX (JSON)</label><input id="manifest" type="file" accept="application/json,.json"></div>
+<div class="box"><label>2. Reference crops (opcional)</label><input id="images" type="file" accept="image/png,image/jpeg" multiple><div class="muted" style="margin-top:7px">Los nombres deben coincidir con <code>referenceAsset</code> del manifest.</div></div>
+<button id="run">Importar en Figma</button><div id="status" class="status">Listo.</div>
+<script>
+const $=id=>document.getElementById(id); let manifest=null;
+$('manifest').onchange=async e=>{const f=e.target.files[0]; if(!f)return; manifest=JSON.parse(await f.text()); $('status').textContent=`Manifest cargado: ${manifest.screens?.length||0} interfaces.`};
+function readData(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
+$('run').onclick=async()=>{if(!manifest){$('status').textContent='Seleccioná el manifest primero.';return} $('run').disabled=true;$('status').textContent='Preparando assets…';const images=[];for(const f of $('images').files){images.push({name:f.name,data:await readData(f),aspect:1.6})}$('status').textContent='Importando…';parent.postMessage({pluginMessage:{type:'IMPORT',manifest,images}},'*')};
+onmessage=e=>{const m=e.data.pluginMessage;if(!m)return;if(m.type==='PROGRESS')$('status').textContent=`${m.count}/${m.total} · ${m.title}`;if(m.type==='DONE'){$('status').textContent=`Importación completa: ${m.count} interfaces.`;$('run').disabled=false}if(m.type==='ERROR'){$('status').textContent='Error:\n'+m.message;$('run').disabled=false}};
+</script></body></html>

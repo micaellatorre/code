@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "TECH-STOCK UX Migration",
+  "screens": [],
+  "note": "El manifest completo de 64 interfaces se genera desde TECH-STOCK_UX_ATOMIC_DESIGN_ATLAS.md y se importa localmente en el plugin. Ver README y artefacto tech-stock-figma-manifest.json."
+}
